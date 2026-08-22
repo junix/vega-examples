@@ -78,9 +78,22 @@ const README_SECTIONS = ['## 学习目标', '## spec 逐段讲解', '## 试一�
  * 换成命令式绘图库要付什么代价。这是该组的立意，缺了就不算写完。
  */
 const GROUP_F_SECTIONS = ['## 与 matplotlib 的对照'];
+
+/*
+ * G 组（42 起）是"官方示例精读"：每个 demo 对应 vega.github.io/vega/examples/ 下的一个官方例子。
+ * 除 F 组要求外，还必须写一节 "## 与官方示例的差异" —— 逐条列出为了适配本仓库约定
+ * （本地数据路径、不覆盖内建 signal、去掉 now() 之类不可复现的调用、空态兜底……）
+ * 做了哪些改动，或明确写"无差异"。不写清楚，读者就无法判断哪部分是官方语法、哪部分是本仓库的取舍。
+ */
+const GROUP_G_SECTIONS = ['## 与官方示例的差异'];
+
 function isGroupF(slug) {
   const n = parseInt(slug, 10);
   return Number.isFinite(n) && n >= 22;
+}
+function isGroupG(slug) {
+  const n = parseInt(slug, 10);
+  return Number.isFinite(n) && n >= 42;
 }
 
 /* Vega 的这些 WARN 说明数据或比例尺已经坏了，必须当成失败 */
@@ -129,7 +142,10 @@ function checkFiles(dir) {
   if (!html.includes('DEMO_META')) return fail('index.html 缺少 window.DEMO_META');
 
   const readme = fs.readFileSync(path.join(dir, 'README.md'), 'utf8');
-  const want = README_SECTIONS.concat(isGroupF(path.basename(dir)) ? GROUP_F_SECTIONS : []);
+  const slug = path.basename(dir);
+  const want = README_SECTIONS
+    .concat(isGroupF(slug) ? GROUP_F_SECTIONS : [])
+    .concat(isGroupG(slug) ? GROUP_G_SECTIONS : []);
   const lackSection = want.filter(s => !readme.includes(s));
   if (lackSection.length) return fail(`README.md 缺少小节: ${lackSection.join(' / ')}`);
 

@@ -1,6 +1,6 @@
 # vega-examples
 
-> 面向计算机 agent（也适合人类）的 **Vega 教学 demo 集**：41 个渐进式 demo，
+> 面向计算机 agent（也适合人类）的 **Vega 教学 demo 集**：47 个渐进式 demo，
 > 覆盖 Vega 的 JSON spec 语法（数据、变换、比例尺、标记、信号、事件）、JS 运行时 API
 > （View、动态数据、自定义变换、无头渲染），以及一整组**稀有与复杂图形**
 > （桑基、弦图、玫瑰图、等值线、六边形分箱、蜂群、小提琴、平行坐标、流图、K 线、
@@ -61,8 +61,19 @@
 | | [39](demos/39-bump-slope-chart/) Bump 图 / 斜率图 | window(rank)、point 反向轴 |
 | | [40](demos/40-gantt-timeline/) 甘特图 / 时间线 | 区间 rect、依赖折线、time + band |
 | | [41](demos/41-matrix-adjacency/) 邻接矩阵 | 镜像边表、scale.domain 用 signal |
+| **G. 官方示例精读** | [42](demos/42-job-voyager/) Job Voyager | aggregate 的 argmax 返回整行、from.data + from.facet |
+| | [43](demos/43-edge-bundling/) 层级边捆绑 | treePath、按数组字段 facet、interpolate: bundle |
+| | [44](demos/44-tree-layout/) 直角坐标树布局 | tree 用 as 重命名转置、linkpath 四种 shape |
+| | [45](demos/45-radar-chart/) 雷达图 | point 角度尺、pow 半径尺、linear-closed 闭合 |
+| | [46](demos/46-connected-scatter/) 连接散点图 | line 轨迹、ordinal 当查找表、collect 定顺序 |
+| | [47](demos/47-serpentine-timeline/) 蛇形时间线 | 直段+圆弧的几何参数化、formula 链 |
 
-F 组每个 demo 的 README 都带一节 **`## 与 matplotlib 的对照`**；
+G 组（42 起）每个 demo 对应 [vega.github.io/vega/examples](https://vega.github.io/vega/examples/) 下的一个
+官方示例，README 里除了讲解还必须有一节 **`## 与官方示例的差异`** ——
+逐条列出为适配本仓库约定（本地数据路径、不覆盖内建 signal、去掉 `now()` 之类不可复现调用、
+空态兜底……）做了哪些改动，读者一眼能分清哪部分是官方语法、哪部分是本仓库的取舍。
+
+F 组起每个 demo 的 README 都带一节 **`## 与 matplotlib 的对照`**；
 整体横向对比见 **[COMPARISON.md](COMPARISON.md)**（Vega 在哪些图形上更强、
 在哪些上明显不如 matplotlib，逐项列表 + 诚实的短板清单）。
 

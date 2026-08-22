@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>42 Job Voyager 精读 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '42-job-voyager',
+  group: 'G. 官方示例精读',
+  title: '42 · Job Voyager：argmax 整行元组 + facet 分组 + 用比例尺代替 if/else',
+  concepts: [
+    'transform: stack',
+    'transform: aggregate（op: argmax 返回整行）',
+    'group mark: from.data + from.facet',
+    'encode: {"parent": "字段"}',
+    'scale: quantize（align / dx）',
+    'scale: quantile（标签透明度）',
+    'scale: sqrt（fontSize）',
+    'signal: bind + on 并用',
+    'expr: test(regexp(...))',
+    '空态兜底（派生 domain signal）'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      对应官方示例 <a href="https://vega.github.io/vega/examples/job-voyager/" target="_blank" rel="noreferrer">Job Voyager</a>。
+      右侧文本框里输入正则（如 <code>engineer</code>、<code>^Teacher</code>、<code>nurse|midwife</code>）过滤职业；
+      <strong>点击任意色带</strong>会把该职业名填进搜索框、<strong>双击画布</strong>清空搜索；
+      radio 切换 men / women / all。每条色带上的标签由
+      <code>aggregate</code> 的 <code>argmax</code> 定位到该序列自己的峰值年份，
+      标签的对齐、偏移、透明度全部由比例尺算出来，spec 里没有一句 if/else。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

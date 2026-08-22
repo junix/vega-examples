@@ -1,0 +1,444 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "官方 Radar Chart 精读：point 比例尺把 7 个维度均分到 [-PI, PI]，pow 比例尺把数值映射成半径，line mark 的 interpolate: linear-closed 把每个系列闭合成一圈折线",
+  "width": 640,
+  "height": 520,
+  "padding": {"top": 58, "left": 16, "right": 16, "bottom": 16},
+  "autosize": {"type": "none", "contains": "padding"},
+
+  "title": {
+    "text": "雷达图（Radar Chart）· 官方示例精读",
+    "subtitle": {
+      "signal": "'7 维 × 2 系列（官方合成数据）· ' + (radiusMode === 'area' ? '面积 ∝ 数值' : '半径 ∝ 数值') + ' · 环距 ' + format(ringStep, 'd') + ' · ' + length(data('selected')) + ' 点'"
+    },
+    "anchor": "start",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#666666",
+    "offset": 10
+  },
+
+  "signals": [
+    {
+      "description": "系列筛选：最后一档「都不选」专门用来看空态兜底 —— 折线消失，但网格、维度轴、比例尺全都还在",
+      "name": "seriesPick",
+      "value": "both",
+      "bind": {
+        "input": "select",
+        "name": "系列筛选：",
+        "options": ["both", "0", "1", "none"],
+        "labels": ["两个系列", "只看系列 0", "只看系列 1", "都不选（看空态兜底）"]
+      }
+    },
+    {
+      "description": "半径映射方式。radius：r 正比于数值（官方写法，linear）；area：r 正比于 √数值，于是折线包围的面积才正比于数值。二者只差 pow 比例尺的 exponent",
+      "name": "radiusMode",
+      "value": "radius",
+      "bind": {
+        "input": "radio",
+        "name": "半径映射：",
+        "options": ["radius", "area"],
+        "labels": ["半径 ∝ 数值", "面积 ∝ 数值"]
+      }
+    },
+    {
+      "description": "打开后半径域只取当前所选系列的最大值 —— 图会被放大，但两个系列不再可比。这是 data 驱动 domain 的典型代价",
+      "name": "autoScale",
+      "value": false,
+      "bind": {"input": "checkbox", "name": "半径域随所选系列自适应："}
+    },
+    {
+      "description": "同心刻度环的间隔（数据单位）。范围上限 20 < 最小可能的域上界 38（autoScale 打开且只看系列 0 时），保证 sequence 至少生成一个环",
+      "name": "ringStep",
+      "value": 10,
+      "bind": {"input": "range", "name": "刻度环间隔：", "min": 5, "max": 20, "step": 5}
+    },
+    {
+      "description": "是否显示顶点上的数值标签（官方示例默认显示，且写在 enter 里）",
+      "name": "showValues",
+      "value": true,
+      "bind": {"input": "checkbox", "name": "显示顶点数值："}
+    },
+    {
+      "description": "多边形填充的不透明度，官方固定 0.1。两片区域叠在一起时越低越容易看清各自的轮廓",
+      "name": "areaOpacity",
+      "value": 0.12,
+      "bind": {"input": "range", "name": "填充不透明度：", "min": 0, "max": 0.6, "step": 0.02}
+    },
+
+    {
+      "description": "留给外圈维度标签的像素余量。Node 无头渲染下文字宽度是估算值（0.8×字数×字号），所以宁可多留",
+      "name": "labelRoom",
+      "value": 58
+    },
+    {
+      "description": "维度标签离外圈的距离，官方写死 5",
+      "name": "labelPad",
+      "value": 9
+    },
+    {
+      "description": "雷达占据画布左侧的一个正方形，右侧留给图例与说明；min() 保证圆不被压成椭圆",
+      "name": "plotSide",
+      "update": "min(width, height)"
+    },
+    {
+      "description": "外圈半径。官方是 radius = width / 2（画布正好正方形、且没有图例与标题时成立）",
+      "name": "radius",
+      "update": "plotSide / 2 - labelRoom"
+    },
+    {"name": "cx", "update": "plotSide / 2"},
+    {"name": "cy", "update": "plotSide / 2"},
+    {
+      "description": "半径域上界。autoScale 关闭时取整表最大值（两系列可比）；打开时取所选系列最大值，并用 length(...) 兜住「一行都没选」——否则 extent([]) 会让 domain 退化成 [0, null]，刻度与环全部消失",
+      "name": "radialMax",
+      "update": "autoScale && length(data('selected')) ? extent(pluck(data('selected'), 'value'))[1] : extent(pluck(data('table'), 'value'))[1]"
+    },
+    {
+      "description": "pow 比例尺的指数：1 等价于 linear（半径线性），0.5 等价于 sqrt（面积线性）。scale 的 type 不能是信号，但 exponent 可以",
+      "name": "radialExponent",
+      "update": "radiusMode === 'area' ? 0.5 : 1"
+    },
+    {
+      "description": "维度个数，用来复原 point 比例尺的角度公式",
+      "name": "keyCount",
+      "update": "length(data('keys'))"
+    },
+    {
+      "description": "相邻两个维度的角度间隔。point 比例尺（padding 0.5）把第 i 个维度放在 -PI + step*(i+0.5)，step = 2PI/n —— 本例 n=7，step=51.43°",
+      "name": "angleStep",
+      "update": "2 * PI / keyCount"
+    },
+    {
+      "description": "刻度环数值标签的方位角：-PI + 2*step 正好是第 1、2 根辐条的角平分线（本例 -77.1°），离两侧顶点标签各 25.7°，不会撞上",
+      "name": "labelAngle",
+      "update": "-PI + angleStep * 2"
+    }
+  ],
+
+  "data": [
+    {
+      "description": "官方示例的内联合成数据，原样照抄：7 个 key（维度）× 2 个 category（系列）= 14 行长表。雷达图的输入天生就是这种「维度-数值-系列」长表",
+      "name": "table",
+      "values": [
+        {"key": "key-0", "value": 19, "category": 0},
+        {"key": "key-1", "value": 22, "category": 0},
+        {"key": "key-2", "value": 14, "category": 0},
+        {"key": "key-3", "value": 38, "category": 0},
+        {"key": "key-4", "value": 23, "category": 0},
+        {"key": "key-5", "value": 5, "category": 0},
+        {"key": "key-6", "value": 27, "category": 0},
+        {"key": "key-0", "value": 13, "category": 1},
+        {"key": "key-1", "value": 12, "category": 1},
+        {"key": "key-2", "value": 42, "category": 1},
+        {"key": "key-3", "value": 13, "category": 1},
+        {"key": "key-4", "value": 6, "category": 1},
+        {"key": "key-5", "value": 15, "category": 1},
+        {"key": "key-6", "value": 8, "category": 1}
+      ]
+    },
+    {
+      "description": "被 seriesPick 过滤后的行，再按 category、key 排好序。collect 不是为了好看：line mark 严格按数据顺序连点，顺序乱了折线就自己打结",
+      "name": "selected",
+      "source": "table",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "seriesPick === 'both' ? true : seriesPick === 'none' ? false : datum.category === +seriesPick"
+        },
+        {"type": "collect", "sort": {"field": ["category", "key"]}}
+      ]
+    },
+    {
+      "description": "维度表：官方用 aggregate + groupby 去重（不给 fields/ops 就只输出分组键）。这里取自未过滤的 table，所以「都不选」时轴与网格仍然在；再 collect 一次保证角度顺序 = 连线顺序",
+      "name": "keys",
+      "source": "table",
+      "transform": [
+        {"type": "aggregate", "groupby": ["key"]},
+        {"type": "collect", "sort": {"field": "key"}}
+      ]
+    },
+    {
+      "description": "同心刻度环的数值：sequence 是右开区间，stop 取不到 —— 域上界正好是 ringStep 整数倍时，最外圈会自动让给 outer-line 那圈多边形，不会叠成双线（默认的 42 不是 10 的整数倍，右开与否都得到 10/20/30/40）",
+      "name": "rings",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": {"signal": "ringStep"},
+          "stop": {"signal": "radialMax"},
+          "step": {"signal": "ringStep"},
+          "as": "level"
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "angular",
+      "type": "point",
+      "range": {"signal": "[-PI, PI]"},
+      "padding": 0.5,
+      "domain": {"data": "keys", "field": "key"}
+    },
+    {
+      "name": "radial",
+      "type": "pow",
+      "exponent": {"signal": "radialExponent"},
+      "range": {"signal": "[0, radius]"},
+      "domain": {"signal": "[0, radialMax]"},
+      "nice": false
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {"data": "table", "field": "category"},
+      "range": {"scheme": "category10"}
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "orient": "none",
+      "legendX": {"signal": "plotSide + 30"},
+      "legendY": 6,
+      "direction": "vertical",
+      "title": "category（系列）",
+      "titleFontSize": 11,
+      "labelFontSize": 11,
+      "symbolType": "square",
+      "symbolSize": 120,
+      "encode": {
+        "labels": {"update": {"text": {"signal": "'系列 ' + datum.value"}}}
+      }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "整张雷达装在一个 group 里，group 的 x/y 就是圆心 —— 之后所有几何都写成以圆心为原点的 (r·cosθ, r·sinθ)。官方示例是把这条平移写在顶层 encode 上（等价于平移根 group），但那样标题与图例会一起被平移出画布，详见 README",
+      "type": "group",
+      "name": "radar",
+      "encode": {
+        "update": {
+          "x": {"signal": "cx"},
+          "y": {"signal": "cy"}
+        }
+      },
+      "marks": [
+        {
+          "description": "各系列的闭合折线：一个 facet 一条路径。line mark 没有 series 通道，多序列只能靠 group + facet",
+          "type": "group",
+          "name": "categories",
+          "zindex": 1,
+          "from": {
+            "facet": {"data": "selected", "name": "facet", "groupby": ["category"]}
+          },
+          "marks": [
+            {
+              "description": "interpolate: linear-closed 自动把最后一点连回第一点，省掉「把首点再 append 一次」的数据加工",
+              "type": "line",
+              "name": "category-line",
+              "from": {"data": "facet"},
+              "encode": {
+                "enter": {
+                  "interpolate": {"value": "linear-closed"},
+                  "stroke": {"scale": "color", "field": "category"},
+                  "strokeWidth": {"value": 2},
+                  "fill": {"scale": "color", "field": "category"}
+                },
+                "update": {
+                  "x": {"signal": "scale('radial', datum.value) * cos(scale('angular', datum.key))"},
+                  "y": {"signal": "scale('radial', datum.value) * sin(scale('angular', datum.key))"},
+                  "fillOpacity": {"signal": "areaOpacity"}
+                }
+              }
+            },
+            {
+              "description": "顶点数值标签。from 指向的是**另一个 mark 的名字**：datum 是那个 mark 的场景元素（有算好的 x/y），datum.datum 才是原始数据行 —— 官方示例最容易被忽略的一招",
+              "type": "text",
+              "name": "value-text",
+              "from": {"data": "category-line"},
+              "encode": {
+                "enter": {
+                  "align": {"value": "center"},
+                  "baseline": {"value": "middle"},
+                  "fontSize": {"value": 10},
+                  "fontWeight": {"value": "bold"},
+                  "fill": {"value": "#333333"}
+                },
+                "update": {
+                  "x": {"signal": "datum.x"},
+                  "y": {"signal": "datum.y"},
+                  "text": {"signal": "format(datum.datum.value, 'd')"},
+                  "opacity": {"signal": "showValues ? 1 : 0"}
+                }
+              }
+            }
+          ]
+        },
+        {
+          "description": "同心刻度环：facet 出每个环一个 group，内层折线用 parent.level 拿到该环的数值。画成多边形而不是圆，是为了和辐条构成雷达图那张「网」",
+          "type": "group",
+          "name": "ringLevels",
+          "zindex": 0,
+          "from": {"facet": {"data": "rings", "name": "ring", "groupby": ["level"]}},
+          "marks": [
+            {
+              "description": "from 用的是全局 keys 数据集（嵌套作用域里可以直接引用顶层数据集），半径来自 parent",
+              "type": "line",
+              "name": "ring-line",
+              "from": {"data": "keys"},
+              "interactive": false,
+              "encode": {
+                "enter": {
+                  "interpolate": {"value": "linear-closed"},
+                  "stroke": {"value": "#c9ced6"},
+                  "strokeWidth": {"value": 1},
+                  "strokeDash": {"value": [3, 3]}
+                },
+                "update": {
+                  "x": {"signal": "scale('radial', parent.level) * cos(scale('angular', datum.key))"},
+                  "y": {"signal": "scale('radial', parent.level) * sin(scale('angular', datum.key))"}
+                }
+              }
+            }
+          ]
+        },
+        {
+          "description": "辐条：每个维度一条从圆心射向外圈的 rule。rule 的 x/y 是起点、x2/y2 是终点",
+          "type": "rule",
+          "name": "radial-grid",
+          "from": {"data": "keys"},
+          "zindex": 0,
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": {"value": 0},
+              "y": {"value": 0},
+              "stroke": {"value": "#b7bec8"},
+              "strokeWidth": {"value": 1}
+            },
+            "update": {
+              "x2": {"signal": "radius * cos(scale('angular', datum.key))"},
+              "y2": {"signal": "radius * sin(scale('angular', datum.key))"}
+            }
+          }
+        },
+        {
+          "description": "最外圈：又一次「mark 当数据源」—— 直接把 radial-grid 那些 rule 的终点 (x2, y2) 当顶点连成闭合多边形，一个坐标都不用重算",
+          "type": "line",
+          "name": "outer-line",
+          "from": {"data": "radial-grid"},
+          "zindex": 0,
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "interpolate": {"value": "linear-closed"},
+              "stroke": {"value": "#8b949e"},
+              "strokeWidth": {"value": 1.2}
+            },
+            "update": {
+              "x": {"field": "x2"},
+              "y": {"field": "y2"}
+            }
+          }
+        },
+        {
+          "description": "刻度环数值：摆在正上方的辐条间隙里，format 成整数（不写 format 就会直出 10.000000 之类的默认格式）",
+          "type": "text",
+          "name": "ring-label",
+          "from": {"data": "rings"},
+          "zindex": 2,
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": {"value": "center"},
+              "baseline": {"value": "bottom"},
+              "dy": {"value": -2},
+              "fontSize": {"value": 9},
+              "fill": {"value": "#8b949e"}
+            },
+            "update": {
+              "x": {"signal": "scale('radial', datum.level) * cos(labelAngle)"},
+              "y": {"signal": "scale('radial', datum.level) * sin(labelAngle)"},
+              "text": {"signal": "format(datum.level, 'd')"}
+            }
+          }
+        },
+        {
+          "description": "维度标签：align/baseline 用 test 数组按方位角分档 —— 左半圈右对齐、右半圈左对齐；上半圈基线在下、下半圈基线在上。这就是官方示例里那两串 test 的全部含义",
+          "type": "text",
+          "name": "key-label",
+          "from": {"data": "keys"},
+          "zindex": 1,
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "fill": {"value": "#24292f"},
+              "fontSize": {"value": 11},
+              "fontWeight": {"value": "bold"}
+            },
+            "update": {
+              "x": {"signal": "(radius + labelPad) * cos(scale('angular', datum.key))"},
+              "y": {"signal": "(radius + labelPad) * sin(scale('angular', datum.key))"},
+              "text": {"field": "key"},
+              "align": [
+                {"test": "abs(scale('angular', datum.key)) > PI / 2", "value": "right"},
+                {"value": "left"}
+              ],
+              "baseline": [
+                {"test": "scale('angular', datum.key) > 0", "value": "top"},
+                {"test": "scale('angular', datum.key) == 0", "value": "middle"},
+                {"value": "bottom"}
+              ]
+            }
+          }
+        },
+        {
+          "description": "空态提示：seriesPick 选到「都不选」时给一句话。非空时 text 求值为 ''，只留一个看不见的空 <text>，不新增数据集（新建一个默认为空的数据集会被校验器判失败）",
+          "type": "text",
+          "name": "emptyHint",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": {"value": 0},
+              "y": {"value": 0},
+              "text": {"signal": "length(data('selected')) ? '' : '没有选中任何系列：折线消失，网格与维度轴仍然在'"},
+              "align": {"value": "center"},
+              "baseline": {"value": "middle"},
+              "fontSize": {"value": 12},
+              "fill": {"value": "#8a8f98"}
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "右栏说明：雷达图最常被误用的一点，直接写在图上",
+      "type": "text",
+      "name": "caption",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": {"signal": "plotSide + 30"},
+          "y": {"value": 92},
+          "text": {
+            "value": [
+              "雷达图只能看形状，",
+              "不能比「总量」：",
+              "维度换个顺序，折线",
+              "围出的面积就变了，",
+              "面积本身没有意义。"
+            ]
+          },
+          "align": {"value": "left"},
+          "baseline": {"value": "top"},
+          "fontSize": {"value": 10},
+          "lineHeight": {"value": 15},
+          "fill": {"value": "#6b7280"}
+        }
+      }
+    }
+  ]
+}

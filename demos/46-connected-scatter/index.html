@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>46 连接散点图（官方精读） · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '46-connected-scatter',
+  group: 'G. 官方示例精读',
+  title: '46 · 连接散点图：油价 vs 驾驶里程的时间轨迹',
+  concepts: [
+    '官方示例：connected-scatter-plot',
+    'mark: line（interpolate cardinal）',
+    'scale: ordinal 当查找表',
+    'text 的 align/baseline/dx/dy',
+    'transform: collect 决定连线顺序',
+    'zero: false',
+    'signal 兜底 domain'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      两个数值维度作 x/y，点按 <code>year</code> 顺序连成一条在平面上游走的轨迹（NYT 那张经典图）。
+      右侧拖「起始/结束年份」看轨迹分段（两根轴会跟着重新标定），
+      「每隔几年标一个」控制标签密度，「插值方式」从 <code>cardinal</code> 换成 <code>linear</code>
+      能看出样条为了平滑在拐点处的过冲。年份标签摆在点的哪一侧，由数据里的
+      <code>side</code> 字段经四个 <code>ordinal</code> 比例尺翻译而来。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

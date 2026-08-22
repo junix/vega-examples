@@ -638,7 +638,7 @@
           "scale": "xTemp",
           "title": "气温 Temperature (°C)",
           "format": ".0f",
-          "tickCount": 8,
+          "tickCount": 10,
           "grid": true,
           "gridOpacity": 0.22,
           "labelFontSize": 10.5,

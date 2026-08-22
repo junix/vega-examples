@@ -1,0 +1,251 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "官方 connected-scatter-plot 精读：油价 vs 人均驾驶里程的时间轨迹。核心技巧是用 4 个 ordinal 比例尺把数据里的 side 字段（人工标注的方位）翻译成年份标签的 align / baseline / dx / dy",
+  "width": 800,
+  "height": 500,
+  "padding": 5,
+
+  "config": {
+    "axis": {
+      "domain": false,
+      "labelFontSize": 12,
+      "labelFontWeight": "bold",
+      "tickSize": 0
+    }
+  },
+
+  "title": {
+    "text": "美国人均年驾驶里程 vs 汽油价格（1956–2010）",
+    "subtitle": {
+      "signal": "'轨迹按 year 升序连线 · 窗口 ' + format(yearFrom, 'd') + '–' + format(yearTo, 'd') + ' 共 ' + length(data('trail')) + ' 个年份，其中标注 ' + length(data('labels')) + ' 个'"
+    },
+    "anchor": "start",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitlePadding": 4,
+    "offset": 4
+  },
+
+  "signals": [
+    {
+      "name": "yearFrom",
+      "description": "轨迹窗口起点。故意允许拖到比 yearTo 更大 —— 那时 trail 为空，正好演示 domain 空态兜底",
+      "value": 1956,
+      "bind": { "input": "range", "name": "起始年份：", "min": 1956, "max": 2010, "step": 1 }
+    },
+    {
+      "name": "yearTo",
+      "value": 2010,
+      "bind": { "input": "range", "name": "结束年份：", "min": 1956, "max": 2010, "step": 1 }
+    },
+    {
+      "name": "labelEvery",
+      "description": "标签密度：官方示例把 55 个年份全标出来（默认 1 = 与官方一致），调大就只标每 N 年一个",
+      "value": 1,
+      "bind": { "input": "select", "name": "每隔几年标一个：", "options": [1, 2, 5, 10] }
+    },
+    {
+      "name": "curve",
+      "description": "官方写死 cardinal（三次样条）。换成 linear 就能看出样条为了平滑在拐点处的过冲——轨迹并不真的经过那些地方",
+      "value": "cardinal",
+      "bind": { "input": "select", "name": "插值方式：", "options": ["cardinal", "linear", "monotone", "catmull-rom", "basis"] }
+    },
+    {
+      "name": "milesExt",
+      "description": "派生 signal：当前可见轨迹的 miles 极值。空集时 extent 返回 [null, null]，span 为 0",
+      "update": "extent(pluck(data('trail'), 'miles'))"
+    },
+    {
+      "name": "gasExt",
+      "update": "extent(pluck(data('trail'), 'gas'))"
+    },
+    {
+      "name": "xDomain",
+      "description": "空态/零跨度兜底：窗口收成 1 个年份时 span 为 0（轴会退化成一个 0.000000 标签），窗口为空时 extent 是 [null, null]（domain 变 [NaN, NaN]、刻度全消失）。两种退化都用 span(...) > 0 一个条件挡掉",
+      "update": "span(milesExt) > 0 ? milesExt : (length(data('trail')) ? [milesExt[0] - 500, milesExt[1] + 500] : [3500, 10500])"
+    },
+    {
+      "name": "yDomain",
+      "update": "span(gasExt) > 0 ? gasExt : (length(data('trail')) ? [gasExt[0] - 0.25, gasExt[1] + 0.25] : [1.2, 3.5])"
+    }
+  ],
+
+  "data": [
+    {
+      "name": "drive",
+      "url": "../../assets/data/driving.json",
+      "description": "55 行：side（标签方位，人工标注）, year, miles（人均年驾驶里程）, gas（按通胀调整的每加仑油价）。文件本来就按 year 升序，但 line mark 是照数据顺序连点的，所以显式 collect 排一次——把'顺序正确'写进 spec，而不是赌数据文件的顺序",
+      "transform": [
+        { "type": "collect", "sort": { "field": "year", "order": "ascending" } }
+      ]
+    },
+    {
+      "name": "trail",
+      "source": "drive",
+      "description": "当前可见的轨迹段。scales 的 domain 跟着它走，所以窗口一收紧，两根轴自动重新标定",
+      "transform": [
+        { "type": "filter", "expr": "datum.year >= yearFrom && datum.year <= yearTo" }
+      ]
+    },
+    {
+      "name": "labels",
+      "source": "trail",
+      "description": "要写字的年份。取模的基准是 yearFrom 而不是 0，这样窗口起点永远带标签；末点单独放行，免得末尾那段没有落点参照",
+      "transform": [
+        { "type": "filter", "expr": "(datum.year - yearFrom) % labelEvery === 0 || datum.year === yearTo" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": { "signal": "xDomain" },
+      "range": "width",
+      "nice": true,
+      "zero": false,
+      "round": true
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": { "signal": "yDomain" },
+      "range": "height",
+      "nice": true,
+      "zero": false,
+      "round": true
+    },
+    {
+      "name": "align",
+      "type": "ordinal",
+      "domain": ["left", "right", "top", "bottom"],
+      "range": ["right", "left", "center", "center"]
+    },
+    {
+      "name": "base",
+      "type": "ordinal",
+      "domain": ["left", "right", "top", "bottom"],
+      "range": ["middle", "middle", "bottom", "top"]
+    },
+    {
+      "name": "dx",
+      "type": "ordinal",
+      "domain": ["left", "right", "top", "bottom"],
+      "range": [-7, 6, 0, 0]
+    },
+    {
+      "name": "dy",
+      "type": "ordinal",
+      "domain": ["left", "right", "top", "bottom"],
+      "range": [1, 1, -5, 6]
+    }
+  ],
+
+  "axes": [
+    {
+      "orient": "top",
+      "scale": "x",
+      "tickCount": 5,
+      "grid": true,
+      "format": ",d"
+    },
+    {
+      "orient": "bottom",
+      "scale": "x",
+      "title": "每年人均驾驶里程（英里）",
+      "ticks": false,
+      "labels": false
+    },
+    {
+      "orient": "left",
+      "scale": "y",
+      "tickCount": 5,
+      "grid": true,
+      "format": "$0.2f"
+    },
+    {
+      "orient": "right",
+      "scale": "y",
+      "title": "汽油价格（每加仑，已按通胀调整）",
+      "ticks": false,
+      "labels": false
+    }
+  ],
+
+  "marks": [
+    {
+      "name": "trajectory",
+      "type": "line",
+      "description": "一个 line mark 只会产生一条路径，点的连接顺序 = 上游数据顺序（见 drive 的 collect）。位置放 update 而不是官方的 enter：enter 只在 item 新建时求值，scale 变了不会重跑，交互一改窗口点就钉在原地了",
+      "from": { "data": "trail" },
+      "encode": {
+        "enter": {
+          "stroke": { "value": "#000000" },
+          "strokeWidth": { "value": 3 }
+        },
+        "update": {
+          "interpolate": { "signal": "curve" },
+          "x": { "scale": "x", "field": "miles" },
+          "y": { "scale": "y", "field": "gas" }
+        }
+      }
+    },
+    {
+      "name": "dots",
+      "type": "symbol",
+      "description": "白心黑边的空心点：size 是外接正方形的面积，49 → 视觉半径 sqrt(49)/2 = 3.5px",
+      "from": { "data": "trail" },
+      "encode": {
+        "enter": {
+          "fill": { "value": "#ffffff" },
+          "stroke": { "value": "#000000" },
+          "strokeWidth": { "value": 1 },
+          "size": { "value": 49 }
+        },
+        "update": {
+          "x": { "scale": "x", "field": "miles" },
+          "y": { "scale": "y", "field": "gas" }
+        }
+      }
+    },
+    {
+      "name": "yearLabels",
+      "type": "text",
+      "description": "核心技巧：side 不是数据，是'这个点的标签该摆哪一侧'的人工标注。四个 ordinal 比例尺把它当查找表用，一次翻译出 align / baseline / dx / dy，省掉一堆 if/else 表达式",
+      "from": { "data": "labels" },
+      "encode": {
+        "enter": {
+          "fill": { "value": "#000000" },
+          "fontSize": { "value": 11 }
+        },
+        "update": {
+          "x": { "scale": "x", "field": "miles" },
+          "y": { "scale": "y", "field": "gas" },
+          "dx": { "scale": "dx", "field": "side" },
+          "dy": { "scale": "dy", "field": "side" },
+          "align": { "scale": "align", "field": "side" },
+          "baseline": { "scale": "base", "field": "side" },
+          "text": { "signal": "format(datum.year, 'd')" }
+        }
+      }
+    },
+    {
+      "name": "emptyHint",
+      "type": "text",
+      "description": "空态提示。非空时 text 求值为 ''，只留一个不含文字的 <text>，不影响任何图元；不能改成'空数据集驱动的 mark'——校验器会把空数据集判失败",
+      "encode": {
+        "update": {
+          "text": { "signal": "length(data('trail')) ? '' : '起始年份已经晚于结束年份，窗口内没有数据（两根轴退回兜底 domain）'" },
+          "x": { "signal": "width / 2" },
+          "y": { "signal": "height / 2" },
+          "align": { "value": "center" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 13 },
+          "fontWeight": { "value": "normal" },
+          "fill": { "value": "#8a8f98" }
+        }
+      }
+    }
+  ]
+}

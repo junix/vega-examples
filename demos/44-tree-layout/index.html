@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>44 tree 直角布局与 linkpath · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '44-tree-layout',
+  group: 'G. 官方示例精读',
+  title: '44 · 官方 tree-layout 精读：直角坐标树与 linkpath 的四种 shape',
+  concepts: ['transform: stratify', 'transform: tree（as 重命名转置）', 'transform: treelinks', 'transform: linkpath', 'tidy vs cluster', 'separation', 'data.source 多上游合流', '深度剪枝 + domain 兜底']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      右侧控件里：<code>布局</code> 切 <code>tidy</code>/<code>cluster</code>，
+      <code>连线 shape</code> 切 <code>line / curve / diagonal / orthogonal</code>（右面板会把选中的那一行标红），
+      <code>separation</code> 决定跨父节点的相邻节点间距是否翻倍，
+      <code>剪到第几层</code> 控制深度剪枝 —— 每改一次，<b>整棵树的坐标都会重算</b>。
+      鼠标悬停节点看 tooltip。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

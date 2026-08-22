@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>47 蛇形时间线 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '47-serpentine-timeline',
+  group: 'G. 官方示例精读',
+  title: '47 · 蛇形时间线：把线性刻度沿「直段 + 半圆弧」路径展开',
+  concepts: ['官方示例: serpentine-timeline', '几何参数化', 'transform: formula 链', 'scale() 用在数据变换里', 'sequence + flatten', 'autosize: pad + resize', 'window: row_number', 'joinaggregate', 'lookup', 'text 的 angle / dy 局部坐标系', 'mark: line / text / symbol']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      整条时间轴不是 <code>axes</code> 画的，而是把 <code>scale('sS1', 年份)</code> 得到的
+      <strong>弧长</strong>沿「直段 + 半圆弧」交替的路径展开出来的：拖右侧的
+      <em>弧数 / 弧直径 / 直段长度</em> 三个滑杆，刻度、标签、里程碑、方向箭头会一起重排。
+      鼠标悬停到红色里程碑点上可高亮；勾上「标签仅 hover 时显示」再试一次。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

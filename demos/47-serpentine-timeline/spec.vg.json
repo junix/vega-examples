@@ -1,0 +1,559 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "官方 serpentine-timeline 精读：把一条线性刻度沿「直段 + 半圆弧」反复交替的蛇形路径展开，刻度线、刻度标签、里程碑、方向箭头全部由同一组几何公式定位",
+  "width": 520,
+  "height": 360,
+  "padding": { "left": 80, "top": 12, "right": 44, "bottom": 52 },
+  "autosize": { "type": "pad", "resize": true },
+
+  "title": {
+    "text": "蛇形时间线 · 一条线性刻度沿「直段 + 半圆弧」折返",
+    "anchor": "start",
+    "offset": 4,
+    "fontSize": 15,
+    "subtitle": {
+      "signal": "'定义域 ' + sDomain[0] + '–' + sDomain[1] + ' · 路径总长 ' + format(sL, '.0f') + 'px · ' + '弧数参数 sN = ' + format(sN, '.2f') + ' · ' + length(data('dataset')) + ' 个里程碑'"
+    },
+    "subtitleFontSize": 11
+  },
+
+  "signals": [
+    {
+      "name": "straightW",
+      "description": "几何：每段直段的水平长度（px）。官方把这个 signal 直接命名成 width，等于顶替内建信号；本例改名，画布尺寸与蛇形几何彻底解耦",
+      "value": 400,
+      "bind": { "input": "range", "name": "直段长度 (px)：", "min": 120, "max": 440, "step": 10 }
+    },
+    {
+      "name": "sH",
+      "description": "几何：半圆弧的直径（px）。它同时是相邻两条直段的垂直行距 —— 弧走完正好下降一个直径",
+      "value": 110,
+      "bind": { "input": "range", "name": "弧直径 (px)：", "min": 40, "max": 180, "step": 5 }
+    },
+    {
+      "name": "sN",
+      "description": "几何：弧的个数。整数时路径正好是 sN+1 段完整直段 + sN 段完整弧；小数部分是按「直段+弧」整周期算的，不是按弧算 —— sN=2.2 表示 2 个整弧之后再走 0.2 个周期（0.2·sWsA），默认参数下落在第三个弧的 66% 处，而不是 20% 处",
+      "value": 2.2,
+      "bind": { "input": "range", "name": "弧数：", "min": 0, "max": 5, "step": 0.05 }
+    },
+    {
+      "name": "tC",
+      "description": "刻度：沿整条路径均匀铺多少个刻度（含首尾两端）。下限取 2：tC=0 会让 tickDomain 变 0 行（本仓库校验器断言每个数据集行数 > 0），tC=1 只剩一个刻度、画不出轴。注意 (tC-1) 那个分母并不会真的除到 0 —— id === 1 的分支先把它挡住了",
+      "value": 21,
+      "bind": { "input": "range", "name": "刻度数：", "min": 2, "max": 41, "step": 1 }
+    },
+    {
+      "name": "mO",
+      "description": "里程碑：标记点到标签的法向偏移量（px）",
+      "value": 35,
+      "bind": { "input": "range", "name": "里程碑偏移 (px)：", "min": 10, "max": 60, "step": 1 }
+    },
+    {
+      "name": "sT",
+      "description": "样式：蛇形线的线宽",
+      "value": 3,
+      "bind": { "input": "range", "name": "线宽：", "min": 1, "max": 10, "step": 0.5 }
+    },
+    {
+      "name": "labelsOnHover",
+      "description": "交互：只在 hover 到里程碑时显示它的标签（标签互相压字时打开）",
+      "value": false,
+      "bind": { "input": "checkbox", "name": "标签仅 hover 时显示：" }
+    },
+    {
+      "name": "includeArrows",
+      "description": "交互：是否画每段起点的方向箭头。官方用 filter 把箭头数据集过滤空，本例改成控制 opacity，避免出现「可以为 0 行」的数据集",
+      "value": true,
+      "bind": { "input": "checkbox", "name": "显示方向箭头：" }
+    },
+    {
+      "name": "reverse",
+      "description": "交互：把 sS1 比例尺整体反向（时间轴从路径末端往回走），箭头与首尾注记会一起翻转",
+      "value": false,
+      "bind": { "input": "checkbox", "name": "反向时间轴：" }
+    },
+    {
+      "name": "annotationStart",
+      "description": "注记：路径起点处的文字",
+      "value": "起点",
+      "bind": { "input": "text", "name": "起点注记：" }
+    },
+    {
+      "name": "annotationEnd",
+      "description": "注记：路径终点处的文字",
+      "value": "Today",
+      "bind": { "input": "text", "name": "终点注记：" }
+    },
+    {
+      "name": "tLO",
+      "description": "刻度：刻度标签沿法向的偏移量（px）。不绑控件，作为「可调但不常调」的参数留在检视面板里",
+      "value": 8
+    },
+    {
+      "name": "domainOverride",
+      "description": "定义域：想手工指定时写成 [1900, 2020]；为 null（或零跨度的 [2000, 2000]）则退回从数据算。官方这里写的是 init: [year(now())-100, year(now())] —— 依赖当前时间，无头校验每年结果都不一样",
+      "value": null
+    },
+    {
+      "name": "dataDomain",
+      "description": "定义域：从数据取极值，空表或零跨度时兜底到 [1920, 2020]（本仓库铁律：data 驱动的 domain 必须兜底，否则 scale 会退化成 [NaN, NaN] 或零跨度）",
+      "update": "span(extent(pluck(data('dataset'), 'domain'))) > 0 ? extent(pluck(data('dataset'), 'domain')) : [1920, 2020]"
+    },
+    {
+      "name": "sDomain",
+      "description": "定义域：优先用 domainOverride（要求跨度非零，否则 lineStep 会变 0、蛇形线退化成 0 行），否则把数据极值向外取整到整十年（1928..2015 → 1920..2020）",
+      "update": "isValid(domainOverride) && span(domainOverride) != 0 ? domainOverride : [floor(dataDomain[0] / 10) * 10, ceil(dataDomain[1] / 10) * 10]"
+    },
+    {
+      "name": "sA",
+      "description": "几何：一段半圆弧的弧长 = π·(sH/2) = sH·π/2",
+      "update": "sH * PI / 2"
+    },
+    {
+      "name": "sWsA",
+      "description": "几何：一个「直段 + 弧」周期的长度，蛇形几何的模数",
+      "update": "straightW + sA"
+    },
+    {
+      "name": "sL",
+      "description": "几何：路径总长 = (sN+1) 段直段 + sN 段弧",
+      "update": "(sN + 1) * straightW + sN * sA"
+    },
+    {
+      "name": "sRange",
+      "description": "比例尺：sS1 的 range 就是「沿路径的弧长」区间 [0, sL]",
+      "update": "[0, sL]"
+    },
+    {
+      "name": "sD",
+      "description": "样式：蛇形线的虚线数组",
+      "update": "[2, 2]"
+    },
+    {
+      "name": "lineSteps",
+      "description": "采样：蛇形线用多少段折线近似（>=400 时肉眼看不出棱角）",
+      "value": 600
+    },
+    {
+      "name": "lineStep",
+      "description": "采样：折线顶点在 domain 上的步长。写成 span/步数 而不是官方的固定 0.1，换定义域（比如毫秒时间戳）也不会爆行数",
+      "update": "span(sDomain) / lineSteps"
+    },
+    {
+      "name": "plotH",
+      "description": "布局：蛇形实际占用的高度，从 serpentine 数据集反算。官方把这个 signal 命名成 height（顶替内建信号，让画布自己长高）；本例改名，只用它来摆放脚注文字",
+      "update": "length(data('serpentine')) ? extent(pluck(data('serpentine'), 'y'))[1] : 0"
+    },
+    {
+      "name": "annotations",
+      "description": "注记：把两个文本框合成一个对象，text mark 里按 category 取用",
+      "update": "{start: (isValid(annotationStart) ? annotationStart : ''), end: (isValid(annotationEnd) ? annotationEnd : '')}"
+    },
+    {
+      "name": "hoverFocus",
+      "description": "交互：当前 hover 的里程碑元组（没有则 null）。官方写 value: 0 —— isValid(0) 为真，初始态就已经算「有焦点」了，这里改成 null",
+      "value": null,
+      "on": [
+        { "events": "@milestone_markers:mouseover", "update": "datum" },
+        { "events": "@milestone_markers:mouseout", "update": "null" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "sS1",
+      "type": "linear",
+      "zero": false,
+      "reverse": { "signal": "reverse" },
+      "domain": { "signal": "sDomain" },
+      "range": { "signal": "sRange" }
+    }
+  ],
+
+  "data": [
+    {
+      "name": "dataset",
+      "comment": "里程碑事件表，照抄官方示例的 8 行（domain 是年份，label 是事件名）",
+      "values": [
+        { "domain": 1928, "label": "Major Event A" },
+        { "domain": 1939, "label": "Major Event B" },
+        { "domain": 1954, "label": "Major Event C" },
+        { "domain": 1962, "label": "Major Event D" },
+        { "domain": 1974, "label": "Major Event E" },
+        { "domain": 1990, "label": "Major Event F" },
+        { "domain": 2001, "label": "Major Event G" },
+        { "domain": 2015, "label": "Major Event H" }
+      ]
+    },
+    {
+      "name": "serpentineDomain",
+      "comment": "蛇形线的折线顶点：在 domain 上均匀采样 lineSteps+1 个值。sequence 是右开区间，所以 stop 要加半步才能把末点包进来",
+      "values": [{}],
+      "transform": [
+        { "type": "formula", "expr": "sequence(sDomain[0], sDomain[1] + lineStep / 2, lineStep)", "as": "domain" },
+        { "type": "flatten", "fields": ["domain"] }
+      ]
+    },
+    {
+      "name": "tickDomain",
+      "comment": "刻度值：先造 1..tC 的序号，再线性插值成 domain 值并取整；首尾两个刻度直接锚到 sDomain 端点",
+      "values": [{}],
+      "transform": [
+        { "type": "formula", "expr": "sequence(1, tC + 1, 1)", "as": "id" },
+        { "type": "flatten", "fields": ["id"] },
+        {
+          "type": "formula",
+          "expr": "round(datum.id === 1 ? sDomain[0] : datum.id === tC ? sDomain[1] : sDomain[0] + span(sDomain) * ((datum.id - 1) / (tC - 1)))",
+          "as": "domain"
+        },
+        { "type": "project", "fields": ["domain"] }
+      ]
+    },
+    {
+      "name": "componentEncodings",
+      "comment": "全图唯一的几何流水线：五类构件（起点注记 / 蛇形线顶点 / 里程碑 / 刻度 / 终点注记）共用同一套公式，把 domain 值算成 (x, y, labelAngle, side, direction)",
+      "values": [
+        { "category": "start" },
+        { "category": "serpentine" },
+        { "category": "milestone" },
+        { "category": "tick" },
+        { "category": "end" }
+      ],
+      "transform": [
+        {
+          "type": "formula",
+          "comment": "每类构件取自己那串 domain 值（起点/终点各取一个端点，反向时互换）",
+          "expr": "datum.category === 'start' ? [sDomain[reverse ? 1 : 0]] : datum.category === 'serpentine' ? pluck(data('serpentineDomain'), 'domain') : datum.category === 'milestone' ? pluck(data('dataset'), 'domain') : datum.category === 'tick' ? pluck(data('tickDomain'), 'domain') : [sDomain[reverse ? 0 : 1]]",
+          "as": "domain"
+        },
+        { "type": "flatten", "fields": ["domain"] },
+        { "type": "formula", "expr": "+datum.domain", "as": "domain" },
+        {
+          "type": "window",
+          "comment": "组内序号，供 segment_ends 找每段的第一个顶点（row_number 不像 rank 那样遇并列多吐行）",
+          "ops": ["row_number"],
+          "sort": { "field": "domain" },
+          "groupby": ["category"],
+          "as": ["id"]
+        },
+        {
+          "type": "formula",
+          "comment": "第 1 步：domain 值 → 沿路径的弧长 sK（数据变换里可以直接调 scale()）",
+          "expr": "scale('sS1', datum.domain)",
+          "as": "sK"
+        },
+        { "type": "formula", "comment": "第 2 步：第几个「直段+弧」周期", "expr": "floor(datum.sK / sWsA)", "as": "i" },
+        { "type": "formula", "comment": "第 3 步：周期内位移", "expr": "datum.sK % sWsA", "as": "r" },
+        { "type": "formula", "comment": "第 4 步：弧内圆心角（弧长/半径），r<straightW 时为负数、用不到", "expr": "(datum.r - straightW) / (sH / 2)", "as": "alpha" },
+        { "type": "formula", "comment": "第 5 步：判定落在直段还是弧上", "expr": "datum.r <= straightW ? 'straight' : 'arc'", "as": "type" },
+        {
+          "type": "formula",
+          "comment": "第 6 步：直段部分的 x —— 偶数段左→右取 min(r, W)，奇数段右→左取 max(W-r, 0)",
+          "expr": "datum.i % 2 == 0 ? min(datum.r, straightW) : max(straightW - datum.r, 0)",
+          "as": "xStraight"
+        },
+        {
+          "type": "formula",
+          "comment": "第 7 步：弧上再叠加 ±sin(alpha)·sH/2 的横向分量（偶数段向右凸，奇数段向左凸）",
+          "expr": "datum.type === 'straight' ? datum.xStraight : datum.xStraight + (datum.i % 2 == 0 ? 1 : -1) * sin(datum.alpha) * sH / 2",
+          "as": "x"
+        },
+        {
+          "type": "formula",
+          "comment": "第 8 步：y —— 直段是 i·sH，弧上再加 (1-cos(alpha))·sH/2，alpha 走到 π 时正好降满一个 sH",
+          "expr": "datum.i * sH + (datum.type === 'straight' ? 0 : (1 - cos(datum.alpha)) * sH / 2)",
+          "as": "y"
+        },
+        { "type": "formula", "comment": "弧凸向画布的哪一侧", "expr": "datum.type === 'straight' ? null : datum.i % 2 === 0 ? 'right' : 'left'", "as": "side" },
+        { "type": "formula", "comment": "在弧的上半还是下半（决定标签要不要翻 180°）", "expr": "datum.type === 'straight' ? null : datum.alpha < PI / 2 ? 'top' : 'bottom'", "as": "hemisphere" },
+        {
+          "type": "formula",
+          "comment": "标签/刻度线的旋转角：切线方向 = alpha（度），左侧弧取反，过 90° 再翻 180° 让字始终朝外正立",
+          "expr": "datum.type === 'straight' ? 0 : (datum.side === 'left' ? -1 : 1) * datum.alpha * (180 / PI) + (datum.alpha < PI / 2 ? 0 : 180)",
+          "as": "labelAngle"
+        },
+        { "type": "formula", "comment": "直段的行进方向", "expr": "datum.i % 2 === 0 ? '→' : '←'", "as": "direction" },
+        {
+          "type": "formula",
+          "comment": "弧上的行进方向按「哪侧 + 上下半圆」四象限判",
+          "expr": "datum.type === 'straight' ? datum.direction : datum.side === 'left' ? (datum.hemisphere === 'top' ? '←' : '→') : (datum.hemisphere === 'top' ? '→' : '←')",
+          "as": "direction"
+        }
+      ]
+    },
+    {
+      "name": "serpentine",
+      "comment": "蛇形线本体（line mark 按行顺序连点，上游 window 已按 domain 排好）",
+      "source": "componentEncodings",
+      "transform": [{ "type": "filter", "expr": "datum.category === 'serpentine'" }]
+    },
+    {
+      "name": "ticks",
+      "source": "componentEncodings",
+      "transform": [
+        { "type": "filter", "expr": "datum.category === 'tick'" },
+        {
+          "type": "formula",
+          "comment": "刻度标签沿法向的偏移：直段固定朝下；弧上要按 side 与 alpha 是否过 90° 决定符号与倍数（旋转后局部坐标系跟着转）",
+          "expr": "!isValid(datum.side) ? (tLO + 3.5) : (round(datum.alpha * (180 / PI)) >= 90 ? -1 : 1.75) * (tLO + 3.5)",
+          "as": "dy"
+        }
+      ]
+    },
+    {
+      "name": "domain_extent",
+      "comment": "首尾注记：只保留 start / end 两行，另算文字的 align 与 dx（让注记贴在路径外侧）",
+      "source": "componentEncodings",
+      "transform": [
+        { "type": "filter", "expr": "datum.category === 'start' || datum.category === 'end'" },
+        {
+          "type": "formula",
+          "expr": "datum.category === 'start' ? 'right' : datum.direction === '←' && datum.type === 'straight' ? 'right' : datum.side === 'left' ? 'right' : 'left'",
+          "as": "align"
+        },
+        {
+          "type": "formula",
+          "expr": "(datum.align === 'right' ? -1 : 1) * (tLO + 5)",
+          "as": "dx"
+        }
+      ]
+    },
+    {
+      "name": "segment_ends",
+      "comment": "方向箭头：每个周期 i 里取 id 最小（反向时最大）的那个顶点，即该段的起点",
+      "source": "componentEncodings",
+      "transform": [
+        { "type": "filter", "expr": "datum.category === 'serpentine'" },
+        { "type": "joinaggregate", "fields": ["id", "id"], "ops": ["min", "max"], "groupby": ["i"], "as": ["minId", "maxId"] },
+        { "type": "filter", "expr": "datum.id === (reverse ? datum.maxId : datum.minId)" }
+      ]
+    },
+    {
+      "name": "milestones",
+      "comment": "里程碑：几何流水线的结果回连 dataset 取 label，再算标签的法向偏移 dy",
+      "source": "componentEncodings",
+      "transform": [
+        { "type": "filter", "expr": "datum.category === 'milestone'" },
+        { "type": "lookup", "key": "domain", "from": "dataset", "fields": ["domain"], "values": ["label"] },
+        {
+          "type": "formula",
+          "comment": "直段：标签在线上方（-mO）；弧上：过 90° 后局部 y 轴已翻转，符号跟着反过来",
+          "expr": "!isValid(datum.side) ? -mO : (round(datum.alpha * (180 / PI)) >= 90 ? 1 : -0.5) * (mO + 3.5)",
+          "as": "dy"
+        }
+      ]
+    }
+  ],
+
+  "marks": [
+    {
+      "name": "axis_group",
+      "comment": "轴的四件套打包在一个 group 里：没有 from / encode，纯粹用来分组与控制绘制顺序",
+      "type": "group",
+      "marks": [
+        {
+          "name": "annotations",
+          "comment": "首尾注记",
+          "type": "text",
+          "from": { "data": "domain_extent" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "x" },
+              "y": { "field": "y" },
+              "text": { "signal": "datum.category === 'start' ? annotations.start : annotations.end" },
+              "fontSize": { "value": 10 },
+              "baseline": { "value": "middle" },
+              "align": { "field": "align" },
+              "dx": { "field": "dx" },
+              "dy": { "value": 1 },
+              "fill": { "value": "#666" }
+            }
+          }
+        },
+        {
+          "name": "serpentine_line",
+          "comment": "蛇形线本体：601 个顶点的一条 line，充当轴的 domain 线",
+          "type": "line",
+          "from": { "data": "serpentine" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "x" },
+              "y": { "field": "y" },
+              "strokeDash": { "signal": "sD" },
+              "stroke": { "value": "#888" },
+              "strokeWidth": { "signal": "sT" }
+            }
+          }
+        },
+        {
+          "name": "arrow_marks",
+          "comment": "方向箭头：用一个 text 字形代替 shape，旋转直接交给 angle",
+          "type": "text",
+          "from": { "data": "segment_ends" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "x" },
+              "y": { "field": "y" },
+              "dy": { "value": 1 },
+              "text": { "value": "➤" },
+              "fontSize": { "value": 16 },
+              "fill": { "value": "#4c78a8" },
+              "stroke": { "value": "#fff" },
+              "strokeWidth": { "value": 1 },
+              "angle": { "signal": "datum.direction === '→' ? 0 : 180" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" },
+              "opacity": { "signal": "includeArrows ? 1 : 0" }
+            }
+          }
+        },
+        {
+          "name": "tick_marks",
+          "comment": "刻度线：同样是一个 '|' 字形，angle 取 labelAngle 就自动垂直于路径",
+          "type": "text",
+          "from": { "data": "ticks" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "x" },
+              "y": { "field": "y" },
+              "dy": { "signal": "2.5 * (datum.type === 'straight' ? 1 : round(datum.alpha * (180 / PI)) >= 90 ? -1 : 4)" },
+              "text": { "value": "|" },
+              "fontSize": { "value": 7 },
+              "fill": { "value": "#333" },
+              "angle": { "field": "labelAngle" },
+              "align": { "value": "center" },
+              "baseline": { "signal": "datum.type === 'straight' ? 'top' : 'bottom'" }
+            }
+          }
+        },
+        {
+          "name": "tick_labels",
+          "comment": "刻度标签：年份是整数，不需要 format",
+          "type": "text",
+          "from": { "data": "ticks" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "x" },
+              "y": { "field": "y" },
+              "dy": { "field": "dy" },
+              "text": { "field": "domain" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#333" },
+              "align": { "value": "center" },
+              "angle": { "field": "labelAngle" },
+              "baseline": { "signal": "datum.type === 'straight' ? 'top' : 'bottom'" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "milestone_connecting_lines",
+      "comment": "里程碑的引线：还是 '|' 字形，dy 取标签偏移的一半，正好落在标记点与标签之间",
+      "type": "text",
+      "from": { "data": "milestones" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "field": "x" },
+          "y": { "field": "y" },
+          "text": { "value": "|" },
+          "fontSize": { "value": 15 },
+          "fontWeight": { "value": 100 },
+          "dy": { "signal": "datum.type === 'arc' && round(datum.alpha * (180 / PI)) > 89 ? 0.35 * (mO + 3.5) : datum.dy / 2" },
+          "align": { "value": "center" },
+          "baseline": { "value": "middle" },
+          "angle": { "field": "labelAngle" },
+          "fillOpacity": { "value": 0.35 },
+          "opacity": { "signal": "isValid(hoverFocus) && datum.label === hoverFocus.label ? 1 : labelsOnHover ? 0 : 1" }
+        }
+      }
+    },
+    {
+      "name": "milestone_markers",
+      "comment": "里程碑标记点：全图唯一 interactive 的 mark，hoverFocus 的事件源就是它",
+      "type": "symbol",
+      "from": { "data": "milestones" },
+      "interactive": true,
+      "encode": {
+        "update": {
+          "x": { "field": "x" },
+          "y": { "field": "y" },
+          "size": { "signal": "isValid(hoverFocus) && datum.label === hoverFocus.label ? 200 : 150" },
+          "fill": { "signal": "labelsOnHover ? (isValid(hoverFocus) && datum.label === hoverFocus.label ? 'firebrick' : '#e4b3b4') : 'firebrick'" },
+          "stroke": { "signal": "labelsOnHover ? (isValid(hoverFocus) && datum.label === hoverFocus.label ? '#fff' : 'firebrick') : '#fff'" },
+          "strokeWidth": { "signal": "labelsOnHover ? 1 : 2" },
+          "cursor": { "value": "pointer" },
+          "tooltip": { "signal": "datum.domain + ' · ' + datum.label" }
+        }
+      }
+    },
+    {
+      "name": "milestone_label_backgrounds",
+      "comment": "标签白描边垫底：同一段文字先用 7px 白色 stroke 画一遍，压掉底下的蛇形线",
+      "type": "text",
+      "from": { "data": "milestones" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "field": "x" },
+          "y": { "field": "y" },
+          "dy": { "field": "dy" },
+          "text": { "signal": "datum.domain + ' - ' + datum.label" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#fff" },
+          "stroke": { "value": "#fff" },
+          "strokeWidth": { "value": 7 },
+          "angle": { "field": "labelAngle" },
+          "align": { "value": "center" },
+          "baseline": { "signal": "datum.type === 'straight' ? 'top' : 'bottom'" },
+          "opacity": { "signal": "isValid(hoverFocus) && datum.label === hoverFocus.label ? 1 : labelsOnHover ? 0 : 1" }
+        }
+      }
+    },
+    {
+      "name": "milestone_labels",
+      "comment": "标签正文，与垫底 mark 的定位表达式必须逐字一致",
+      "type": "text",
+      "from": { "data": "milestones" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "field": "x" },
+          "y": { "field": "y" },
+          "dy": { "field": "dy" },
+          "text": { "signal": "datum.domain + ' - ' + datum.label" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "firebrick" },
+          "angle": { "field": "labelAngle" },
+          "align": { "value": "center" },
+          "baseline": { "signal": "datum.type === 'straight' ? 'top' : 'bottom'" },
+          "opacity": { "signal": "isValid(hoverFocus) && datum.label === hoverFocus.label ? 1 : labelsOnHover ? 0 : 1" }
+        }
+      }
+    },
+    {
+      "name": "footnote",
+      "comment": "脚注：用派生 signal plotH 摆位置 —— 官方那个从数据反算高度的 signal 在本例只承担这一件事，不再顶替内建 height",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "max(plotH, 0) + 34" },
+          "text": { "signal": "'声明画布 ' + width + '×' + height + 'px，autosize resize:true 让视图跟着蛇形一起长大 · 蛇形当前占高 ' + format(plotH, '.0f') + 'px'" },
+          "fontSize": { "value": 10 },
+          "align": { "value": "left" },
+          "baseline": { "value": "top" },
+          "fill": { "value": "#888" }
+        }
+      }
+    }
+  ]
+}

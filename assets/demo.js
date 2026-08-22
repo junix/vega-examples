@@ -87,9 +87,29 @@
     });
     box.appendChild(table);
 
+    /*
+     * 抹掉浮点噪声再显示。signal 面板是这套 demo 的主要教学界面（README 让读者盯着它看），
+     * 而 scale.invert()、算出来的 extent 之类天生带二进制浮点尾巴：
+     * 2.4000000000000004、0.6999999999999997、6.428571428571429 这种。
+     * toPrecision(12) 足以在 double 的有效位内还原本意，又不会改变真正需要精度的值。
+     * 只动显示，不动 signal 本身的值。
+     */
+    function tidy(value) {
+      if (typeof value === 'number') {
+        return Number.isFinite(value) ? Number(value.toPrecision(12)) : value;
+      }
+      if (Array.isArray(value)) return value.map(tidy);
+      if (value && typeof value === 'object' && !(value instanceof Date)) {
+        var o = {};
+        Object.keys(value).forEach(function (k) { o[k] = tidy(value[k]); });
+        return o;
+      }
+      return value;
+    }
+
     function fmt(value) {
       var s;
-      try { s = JSON.stringify(value); } catch (e) { s = String(value); }
+      try { s = JSON.stringify(tidy(value)); } catch (e) { s = String(value); }
       if (s == null) s = String(value);
       return s.length > 140 ? s.slice(0, 140) + '…' : s;
     }

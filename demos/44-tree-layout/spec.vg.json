@@ -1,0 +1,550 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "官方 tree-layout 精读：tree 布局的直角坐标（Cartesian）一支 —— 用 as 重命名一步完成广度/深度转置，treelinks + linkpath 画连边，并把 linkpath 的四种 shape 并排对比",
+  "width": 1120,
+  "height": 700,
+  "padding": { "left": 6, "top": 50, "right": 6, "bottom": 6 },
+  "autosize": "none",
+
+  "title": {
+    "text": "flare 层级树 · tree 直角坐标布局 + linkpath 四种连线形态",
+    "anchor": "start",
+    "offset": 8,
+    "fontSize": 15,
+    "subtitle": "左：tidy / cluster 直角树（tree 的 as 重命名一步完成转置）　右：同一棵小树在 line / curve / diagonal / orthogonal 下的连线对比",
+    "subtitleFontSize": 11
+  },
+
+  "signals": [
+    {
+      "description": "官方 spec 的四个控件（labels / layout / links / separation）都保留，只把 links 改名成 linkShape：官方那份 spec 里同时存在名为 links 的 signal 和名为 links 的数据集，读起来极易混淆",
+      "name": "labels",
+      "value": true,
+      "bind": { "input": "checkbox", "name": "显示标签：" }
+    },
+    {
+      "description": "tidy = Reingold-Tilford 紧凑布局（内部节点按子树居中，深度方向按层等分）；cluster = 树状图/dendrogram（所有叶子对齐到最外层）",
+      "name": "layout",
+      "value": "tidy",
+      "bind": { "input": "radio", "options": ["tidy", "cluster"], "name": "布局：" }
+    },
+    {
+      "description": "linkpath 的 shape。官方叫 links；本例改名 linkShape，避免和数据集 links 同名。arc 也是合法取值，但它没有 -horizontal 变体（见 README）",
+      "name": "linkShape",
+      "value": "diagonal",
+      "bind": {
+        "input": "select",
+        "options": ["line", "curve", "diagonal", "orthogonal"],
+        "name": "连线 shape："
+      }
+    },
+    {
+      "description": "false → 相邻节点一律等距；true（Vega 默认）→ 不同父节点的相邻节点间距翻倍，于是子树之间出现可见的『缝』",
+      "name": "separation",
+      "value": false,
+      "bind": { "input": "checkbox", "name": "separation：" }
+    },
+    {
+      "description": "深度剪枝：只保留 depth0 <= maxDepth 的节点。官方画完整的 252 个节点（220 个叶子）、画布 600×1600；本仓库版心放不下那么高，所以加了这个控件",
+      "name": "maxDepth",
+      "value": 2,
+      "bind": { "input": "select", "options": [1, 2, 3, 4], "name": "剪到第几层：" }
+    },
+
+    { "description": "顶部留给面板小标题、状态行与 depth 图例的高度", "name": "bandTop", "value": 70 },
+    { "description": "左面板（主树）的右边界", "name": "mainRight", "value": 690 },
+    { "description": "根节点的 x：给根标签（align right, dx -7）留出左边距", "name": "treeX0", "value": 56 },
+    { "description": "右侧留给叶子标签的宽度。maxDepth=2 时最长叶子名 19 字符，按 Vega 无 canvas 时的宽度上界 19 × 6 × 0.8 ≈ 91px 估，再留余量", "name": "labelPad", "value": 130 },
+    { "description": "tree 的深度方向尺寸 = size[1]", "name": "treeSpan", "update": "mainRight - treeX0 - labelPad" },
+    { "name": "treeY0", "update": "bandTop + 8" },
+    { "description": "tree 的广度方向尺寸 = size[0]。横向布局里广度就是屏幕 y", "name": "treeHeight", "update": "height - treeY0 - 12" },
+
+    { "description": "剪枝后的叶子个数，由数据集 leaves 反算 —— 用来自适应字号与节点大小", "name": "leafN", "update": "length(data('leaves'))" },
+    { "description": "相邻叶子的像素间距。d3 的归一化是 kx = size[0] / ((最右叶 x - 最左叶 x) + 2 × separation/2)：separation=false 时 s=0.5、叶子原始 x 是 0…leafN-1，分母正好等于 leafN，所以 treeHeight / leafN 就是【精确】的叶间距（本例 610 / 100 = 6.1px，最上面那个叶子落在 kx/2 = 3.05）。分母数的是 leafN 个格子，不是 leafN-1 个间隔 —— 写成 (leafN - 1) 会高估约 1%。separation=true 时同父间距被压窄、跨父翻倍，这个值退化成近似平均值", "name": "leafGap", "update": "treeHeight / max(1, leafN)" },
+    { "description": "叶子标签字号：不超过 9px，也不小于 4px", "name": "leafLabelSize", "update": "min(9, max(4, leafGap * 0.95))" },
+    { "description": "叶子太密（间距 < 5px）时索性不画标签，免得糊成一片黑", "name": "showLeafLabels", "update": "labels && leafGap >= 5" },
+    { "description": "symbol 的 size 是【外接正方形的面积】，Vega 按 r = sqrt(size)/2 作图。要让直径不超过叶间距，就写 pow(0.7 * leafGap, 2)", "name": "nodeSize", "update": "min(100, max(9, pow(0.7 * leafGap, 2)))" },
+    {
+      "description": "data 驱动的 domain 兜底：直接写 {data:'nodes', field:'depth'} 时，若上游被过滤到 0 行，domain 会退化成 [null, null] / 零跨度，图例刻度全消失。判据用 span(extent(...)) > 0，空集与单值两种退化一起挡掉",
+      "name": "depthDomain",
+      "update": "span(extent(pluck(data('nodes'), 'depth'))) > 0 ? extent(pluck(data('nodes'), 'depth')) : [0, 1]"
+    },
+    { "description": "剪枝后是否还有节点 —— 驱动『无节点』提示文字", "name": "hasNodes", "update": "length(data('nodes')) > 0" },
+
+    { "description": "右面板（四种 shape 对比）的左边界", "name": "miniX0", "value": 740 },
+    { "description": "小树的深度方向尺寸", "name": "miniSpan", "value": 340 },
+    { "description": "小树的广度方向尺寸（单行高度）", "name": "miniBreadth", "value": 96 },
+    { "description": "四行的行距", "name": "miniRowH", "value": 152 },
+    { "name": "miniY0", "update": "bandTop + 26" }
+  ],
+
+  "data": [
+    {
+      "description": "flare.json 本身就是摊平的父子表 {id, name, parent?, size?}，可以直接喂给 stratify —— 和官方示例用的是同一份数据、同一种形态",
+      "name": "flare",
+      "url": "../../assets/data/flare.json"
+    },
+    {
+      "description": "第一趟 tree 是【一次性的、只为拿 depth 用的】：父子表里没有深度字段，而 depth 只有层级布局变换才会写出来。size 给 [1,1]、method 固定 tidy，因为这趟的坐标（b0/d0）根本用不到，只取第三路输出 depth0",
+      "name": "depths",
+      "source": "flare",
+      "transform": [
+        { "type": "stratify", "key": "id", "parentKey": "parent" },
+        {
+          "type": "tree",
+          "method": "tidy",
+          "size": [1, 1],
+          "as": ["b0", "d0", "depth0", "kids0"]
+        }
+      ]
+    },
+    {
+      "description": "深度剪枝。注意这里剪的是【布局的输入】，不是渲染：父节点一定先于子节点被保留，所以 stratify 不会因为父节点缺失而断链",
+      "name": "pruned",
+      "source": "depths",
+      "transform": [
+        { "type": "filter", "expr": "datum.depth0 <= maxDepth" }
+      ]
+    },
+    {
+      "description": "第二趟 tree 才是真正的布局，跑在剪枝后的树上。as 的第一路是【广度】、第二路是【深度】—— 故意把第一路命名成 y、第二路命名成 x，一步就把纵向树转置成横向树，比事后写两个 formula 交换字段干净得多。另外 as 的第四路不是子节点数组，而是【子节点个数】（0 就是叶子）",
+      "name": "nodes",
+      "source": "pruned",
+      "transform": [
+        { "type": "stratify", "key": "id", "parentKey": "parent" },
+        {
+          "type": "tree",
+          "method": { "signal": "layout" },
+          "size": [{ "signal": "treeHeight" }, { "signal": "treeSpan" }],
+          "separation": { "signal": "separation" },
+          "as": ["y", "x", "depth", "children"]
+        }
+      ]
+    },
+    {
+      "description": "剪枝后的叶子。只用来给 leafN / leafGap / 字号自适应提供计数（标签本身仍由 nodes 那一个 text mark 统一画，靠 datum.children 决定左右）",
+      "name": "leaves",
+      "source": "nodes",
+      "transform": [
+        { "type": "filter", "expr": "!datum.children" }
+      ]
+    },
+    {
+      "description": "treelinks 从 stratify 挂在数据源上的 root 里取出每条父子边，产出全新的 {source, target} 元组（两个字段都是对节点元组的引用）。linkpath 随后按 orient + shape 把两端连成一条 SVG path 写进 path 字段；因为上一步的 as 已经把广度写进 y、深度写进 x，这里连 sourceX/sourceY 都不用写，默认的 source.x / source.y 正好对",
+      "name": "links",
+      "source": "nodes",
+      "transform": [
+        { "type": "treelinks" },
+        {
+          "type": "linkpath",
+          "orient": "horizontal",
+          "shape": { "signal": "linkShape" }
+        }
+      ]
+    },
+
+    {
+      "description": "右面板用一棵 8 节点的小树，好让四种 shape 的差别一眼可辨。用 cluster 让 5 个叶子对齐到最右侧。as 用 m* 前缀是为了不和左图的 x/y/depth/children 撞车（两个布局写的可能是同一批元组对象时必须这么做，这里数据源不同，前缀主要是为了可读）",
+      "name": "miniTree",
+      "values": [
+        { "id": 1, "name": "root" },
+        { "id": 2, "parent": 1 },
+        { "id": 3, "parent": 1 },
+        { "id": 4, "parent": 2 },
+        { "id": 5, "parent": 2 },
+        { "id": 6, "parent": 3 },
+        { "id": 7, "parent": 3 },
+        { "id": 8, "parent": 3 }
+      ],
+      "transform": [
+        { "type": "stratify", "key": "id", "parentKey": "parent" },
+        {
+          "type": "tree",
+          "method": "cluster",
+          "size": [{ "signal": "miniBreadth" }, { "signal": "miniSpan" }],
+          "as": ["my", "mx", "mdepth", "mkids"]
+        }
+      ]
+    },
+    {
+      "description": "linkpath 的 shape 是变换参数，一次只能生成一种形状。所以四种形状要四条独立的数据流 —— 每条都在同一个 miniTree 上重跑 treelinks（treelinks 每次都 ingest 全新的元组，互不干扰），再各自 linkpath 一次。row 字段记住这条边该画在第几行",
+      "name": "linkLine",
+      "source": "miniTree",
+      "transform": [
+        { "type": "treelinks" },
+        {
+          "type": "linkpath",
+          "orient": "horizontal",
+          "shape": "line",
+          "sourceX": "source.mx", "sourceY": "source.my",
+          "targetX": "target.mx", "targetY": "target.my"
+        },
+        { "type": "formula", "as": "row", "expr": "0" },
+        { "type": "formula", "as": "shapeName", "expr": "'line'" }
+      ]
+    },
+    {
+      "name": "linkCurve",
+      "source": "miniTree",
+      "transform": [
+        { "type": "treelinks" },
+        {
+          "type": "linkpath",
+          "orient": "horizontal",
+          "shape": "curve",
+          "sourceX": "source.mx", "sourceY": "source.my",
+          "targetX": "target.mx", "targetY": "target.my"
+        },
+        { "type": "formula", "as": "row", "expr": "1" },
+        { "type": "formula", "as": "shapeName", "expr": "'curve'" }
+      ]
+    },
+    {
+      "name": "linkDiagonal",
+      "source": "miniTree",
+      "transform": [
+        { "type": "treelinks" },
+        {
+          "type": "linkpath",
+          "orient": "horizontal",
+          "shape": "diagonal",
+          "sourceX": "source.mx", "sourceY": "source.my",
+          "targetX": "target.mx", "targetY": "target.my"
+        },
+        { "type": "formula", "as": "row", "expr": "2" },
+        { "type": "formula", "as": "shapeName", "expr": "'diagonal'" }
+      ]
+    },
+    {
+      "name": "linkOrtho",
+      "source": "miniTree",
+      "transform": [
+        { "type": "treelinks" },
+        {
+          "type": "linkpath",
+          "orient": "horizontal",
+          "shape": "orthogonal",
+          "sourceX": "source.mx", "sourceY": "source.my",
+          "targetX": "target.mx", "targetY": "target.my"
+        },
+        { "type": "formula", "as": "row", "expr": "3" },
+        { "type": "formula", "as": "shapeName", "expr": "'orthogonal'" }
+      ]
+    },
+    {
+      "description": "data.source 可以写成数组，把多条数据流并成一个数据集（parseData 里 array(data.source).map(...)，装配出一个 Relay + 一个 collect 汇流）。Relay 的 derive 只在上游变换 modifies 元组时才为真；这里下游没有变换，所以四条流的元组是【原对象】直接流过来的，实测 data('miniLinks')[0] === data('linkLine')[0]。这样四行只用一个 path mark 和两个 symbol mark 就画完了",
+      "name": "miniLinks",
+      "source": ["linkLine", "linkCurve", "linkDiagonal", "linkOrtho"]
+    },
+    {
+      "description": "四行的小标题与说明。note 里的结论都是从未压缩构建 assets/vega.js 的 Paths 映射表里读出来的，不是猜的",
+      "name": "shapeRows",
+      "values": [
+        { "row": 0, "shapeName": "line", "note": "直线段；Paths 里没有 line-horizontal，orient 被忽略" },
+        { "row": 1, "shapeName": "curve", "note": "固定偏移的贝塞尔；同样没有 -horizontal 变体" },
+        { "row": 2, "shapeName": "diagonal", "note": "控制点取中点，两端切线水平" },
+        { "row": 3, "shapeName": "orthogonal", "note": "先竖后横的直角折线（V…H…）" }
+      ]
+    },
+    {
+      "description": "右下角的三行脚注，写清楚本例相对官方的最大改动。中文在无 canvas 的 Node 环境下宽度会被低估（0.8 × 字数 × 字号），所以每行都刻意压短",
+      "name": "footnotes",
+      "values": [
+        { "row": 0, "text": "官方：600×1600 画布，252 个节点全画。" },
+        { "row": 1, "text": "本例：maxDepth 深度剪枝，适配 1120×700 版心。" },
+        { "row": 2, "text": "剪枝换掉叶子集合 → tree 重算全部坐标。" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "linear",
+      "range": { "scheme": "magma", "extent": [0.12, 0.78] },
+      "domain": { "signal": "depthDomain" },
+      "zero": true
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "type": "gradient",
+      "orient": "none",
+      "legendX": 0,
+      "legendY": 34,
+      "direction": "horizontal",
+      "gradientLength": 150,
+      "gradientThickness": 10,
+      "title": "depth",
+      "titleOrient": "left",
+      "titleFontSize": 11,
+      "labelFontSize": 10,
+      "format": "d",
+      "values": { "signal": "sequence(0, maxDepth + 1)" }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "左面板小标题",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#333333" }
+        },
+        "update": {
+          "y": { "value": 8 },
+          "text": { "signal": "'tree(' + layout + ') + linkpath(' + linkShape + ', orient=horizontal)'" }
+        }
+      }
+    },
+    {
+      "description": "左面板状态行：节点/叶子计数与叶间距。空态时换成提示文字（用 signal 驱动 text，而不是新建一个默认为空的数据集）",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#666666" }
+        },
+        "update": {
+          "y": { "value": 24 },
+          "text": {
+            "signal": "hasNodes ? 'depth ≤ ' + maxDepth + '：' + length(data('nodes')) + ' 个节点 / ' + leafN + ' 个叶子，叶间距 ' + format(leafGap, '.1f') + 'px，separation = ' + separation : '当前剪枝没有留下任何节点'"
+          },
+          "fill": { "signal": "hasNodes ? '#666666' : '#c0392b'" }
+        }
+      }
+    },
+    {
+      "description": "左面板连边：linkpath 写出的 path 用的是 tree 的原始坐标，所以 path mark 靠 x/y 整体平移到面板原点",
+      "type": "path",
+      "from": { "data": "links" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "fill": { "value": null },
+          "stroke": { "value": "#cccccc" }
+        },
+        "update": {
+          "x": { "signal": "treeX0" },
+          "y": { "signal": "treeY0" },
+          "path": { "field": "path" },
+          "strokeWidth": { "signal": "leafGap >= 12 ? 1.2 : 0.8" }
+        }
+      }
+    },
+    {
+      "description": "左面板节点。size 随叶间距自适应：写死 100（官方值）在 100 个叶子、6px 间距下会糊成一条黑带。tooltip 刻意放在 update 而不是 enter：enter 只对新增的 mark item 跑一次，改 maxDepth 时存活下来的元组走 MOD 通道、只跑 update —— 放 enter 里的 tooltip 会停在旧的 depth/children 上",
+      "type": "symbol",
+      "from": { "data": "nodes" },
+      "encode": {
+        "enter": {
+          "shape": { "value": "circle" },
+          "stroke": { "value": "#ffffff" }
+        },
+        "update": {
+          "tooltip": {
+            "signal": "datum.name + ' · depth=' + datum.depth + ' · ' + (datum.children ? datum.children + ' 个子节点' : '叶子')"
+          },
+          "x": { "signal": "treeX0 + datum.x" },
+          "y": { "signal": "treeY0 + datum.y" },
+          "size": { "signal": "nodeSize" },
+          "fill": { "scale": "color", "field": "depth" },
+          "strokeWidth": { "signal": "leafGap >= 12 ? 1 : 0.4" },
+          "zindex": { "value": 0 }
+        },
+        "hover": {
+          "size": { "signal": "max(nodeSize * 3, 90)" },
+          "stroke": { "value": "#222222" },
+          "strokeWidth": { "value": 1.5 },
+          "zindex": { "value": 1 }
+        }
+      }
+    },
+    {
+      "description": "左面板标签：官方示例最漂亮的一手 —— 一个 text mark 同时管内部节点和叶子，靠 datum.children（子节点个数）决定 align 与 dx 的符号，内部节点向左写、叶子向右写。limit 是硬保证：字号自适应只决定要不要画，limit 决定画出来一定不越界",
+      "type": "text",
+      "from": { "data": "nodes" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "text": { "field": "name" },
+          "baseline": { "value": "middle" },
+          "fill": { "value": "#1b1b1b" }
+        },
+        "update": {
+          "x": { "signal": "treeX0 + datum.x" },
+          "y": { "signal": "treeY0 + datum.y" },
+          "dx": { "signal": "datum.children ? -7 : 7" },
+          "align": { "signal": "datum.children ? 'right' : 'left'" },
+          "fontSize": { "signal": "datum.children ? 9 : leafLabelSize" },
+          "limit": { "signal": "datum.children ? treeSpan / (maxDepth + 1) : labelPad - 10" },
+          "opacity": { "signal": "datum.children ? (labels ? 1 : 0) : (showLeafLabels ? 1 : 0)" }
+        }
+      }
+    },
+
+    {
+      "description": "右面板总标题",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "signal": "miniX0" },
+          "y": { "value": 8 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#333333" },
+          "text": { "value": "linkpath 的四种 shape（orient = horizontal）" }
+        }
+      }
+    },
+    {
+      "description": "右面板副说明",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "signal": "miniX0" },
+          "y": { "value": 24 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#666666" },
+          "text": { "value": "同一棵 8 节点小树；选中的那一行标红，就是左图正在用的形态" }
+        }
+      }
+    },
+    {
+      "description": "四行的行标题：当前选中的那一行加粗高亮",
+      "type": "text",
+      "from": { "data": "shapeRows" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "signal": "miniX0" },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 11 },
+          "fontWeight": { "value": "bold" }
+        },
+        "update": {
+          "y": { "signal": "miniY0 + datum.row * miniRowH - 13" },
+          "text": { "field": "shapeName" },
+          "fill": { "signal": "datum.shapeName === linkShape ? '#c0392b' : '#333333'" }
+        }
+      }
+    },
+    {
+      "description": "四行的说明文字，右对齐贴到小树的右边界",
+      "type": "text",
+      "from": { "data": "shapeRows" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "align": { "value": "right" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#888888" },
+          "text": { "field": "note" }
+        },
+        "update": {
+          "x": { "signal": "miniX0 + miniSpan" },
+          "y": { "signal": "miniY0 + datum.row * miniRowH - 13" }
+        }
+      }
+    },
+    {
+      "description": "四行的连边：一个 mark 画完 4 × 7 = 28 条边，行偏移由 datum.row 给出",
+      "type": "path",
+      "from": { "data": "miniLinks" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "fill": { "value": null },
+          "strokeWidth": { "value": 1.4 },
+          "strokeCap": { "value": "round" }
+        },
+        "update": {
+          "x": { "signal": "miniX0" },
+          "y": { "signal": "miniY0 + datum.row * miniRowH" },
+          "path": { "field": "path" },
+          "stroke": { "signal": "datum.shapeName === linkShape ? '#c0392b' : '#9ecae1'" },
+          "strokeOpacity": { "value": 0.95 }
+        }
+      }
+    },
+    {
+      "description": "四行的子节点圆点（每条边的 target 各画一个，正好覆盖除根以外的 7 个节点）",
+      "type": "symbol",
+      "from": { "data": "miniLinks" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "shape": { "value": "circle" },
+          "size": { "value": 36 },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 1 }
+        },
+        "update": {
+          "x": { "signal": "miniX0 + datum.target.mx" },
+          "y": { "signal": "miniY0 + datum.row * miniRowH + datum.target.my" },
+          "fill": { "signal": "datum.shapeName === linkShape ? '#c0392b' : '#4c78a8'" }
+        }
+      }
+    },
+    {
+      "description": "四行的根节点圆点：根只出现在边的 source 一侧，这里只取根出发的那两条边（source.mdepth == 0）画点，两个点重合在同一坐标上，视觉上就是一个",
+      "type": "symbol",
+      "from": { "data": "miniLinks" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "shape": { "value": "circle" },
+          "size": { "value": 52 },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 1 }
+        },
+        "update": {
+          "x": { "signal": "miniX0 + datum.source.mx" },
+          "y": { "signal": "miniY0 + datum.row * miniRowH + datum.source.my" },
+          "fill": { "signal": "datum.shapeName === linkShape ? '#c0392b' : '#274d70'" },
+          "opacity": { "signal": "datum.source.mdepth == 0 ? 1 : 0" }
+        }
+      }
+    },
+    {
+      "description": "右下角脚注",
+      "type": "text",
+      "from": { "data": "footnotes" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "signal": "miniX0" },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 9.5 },
+          "fill": { "value": "#999999" },
+          "text": { "field": "text" }
+        },
+        "update": {
+          "y": { "signal": "miniY0 + 3 * miniRowH + miniBreadth + 14 + datum.row * 13" }
+        }
+      }
+    }
+  ]
+}

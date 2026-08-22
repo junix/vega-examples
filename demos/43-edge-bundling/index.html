@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>43 层级边捆绑 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '43-edge-bundling',
+  group: 'G. 官方示例精读',
+  title: '43 · 层级边捆绑：treePath + 按数组字段 facet + bundle 插值',
+  concepts: ['transform: stratify', 'transform: tree', 'expr: treePath', 'expr: treeAncestors', 'formula: initonly', 'from.facet.field', 'mark: line', 'interpolate: bundle', 'tension', 'expr: indata', 'signal: pointerover', 'legend: symbolType stroke']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      把鼠标移到圆环外侧任意<strong>类名</strong>上：<span style="color:firebrick">红色</span>是它依赖的类，
+      <span style="color:forestgreen">绿色</span>是依赖它的类；鼠标移到空白处复位（图下方那行文字会提示当前状态）。
+      拖动右侧 <code>tension</code> 滑杆看「捆绑」是怎么发生的 —— 0 是一把直弦，1 是完全贴着目录树走。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

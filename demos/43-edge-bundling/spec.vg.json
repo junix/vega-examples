@@ -1,0 +1,263 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "官方示例精读 · 层级边捆绑：treePath 求两点在树上的路径 + 按数组字段 facet 把路径展成子数据集 + line 的 bundle 插值 + 极坐标手工换算",
+  "width": 720,
+  "height": 720,
+  "padding": { "top": 100, "right": 100, "bottom": 76, "left": 100 },
+  "autosize": "none",
+
+  "title": {
+    "text": "flare 类库的依赖网络 · 层级边捆绑（hierarchical edge bundling）",
+    "subtitle": {
+      "signal": "'220 个叶子类 / 764 条依赖 · 布局 ' + layout + ' · tension ' + format(tension, '.2f') + ' · 半径 ' + format(radius, 'd') + 'px · 张角 ' + format(extent, 'd') + '° · 旋转 ' + format(rotate, 'd') + '°'"
+    },
+    "anchor": "start",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitlePadding": 6,
+    "offset": 6
+  },
+
+  "signals": [
+    {
+      "name": "tension",
+      "description": "line mark 的 bundle 插值参数（d3 里叫 beta）。0 = 起止两点的直线，1 = 完全贴着树上的折线走。边捆绑的本体就是这一个数",
+      "value": 0.85,
+      "bind": { "input": "range", "name": "捆绑张力 tension：", "min": 0, "max": 1, "step": 0.01 }
+    },
+    {
+      "name": "radius",
+      "description": "叶子所在圆环的半径（px）。极坐标换算里的 r = radius * beta",
+      "value": 280,
+      "bind": { "input": "range", "name": "半径 radius：", "min": 20, "max": 400 }
+    },
+    {
+      "name": "extent",
+      "description": "整棵树铺开的圆心角（度）。注意这个 signal 名字盖住了同名的 extent() 表达式函数，所以本 spec 里任何地方都不能再调用 extent(...)",
+      "value": 360,
+      "bind": { "input": "range", "name": "张角 extent（°）：", "min": 0, "max": 360, "step": 1 }
+    },
+    {
+      "name": "rotate",
+      "description": "整体旋转角（度）",
+      "value": 0,
+      "bind": { "input": "range", "name": "旋转 rotate（°）：", "min": 0, "max": 360, "step": 1 }
+    },
+    {
+      "name": "textSize",
+      "value": 8,
+      "bind": { "input": "range", "name": "标签字号：", "min": 2, "max": 20, "step": 1 }
+    },
+    {
+      "name": "textOffset",
+      "value": 2,
+      "bind": { "input": "range", "name": "标签离圆环距离：", "min": 0, "max": 10, "step": 1 }
+    },
+    {
+      "name": "layout",
+      "description": "tree 变换的 method：cluster 把所有叶子对齐到最外圈（树状图/dendrogram），tidy 让节点按 Reingold-Tilford 分层，内部节点也会占半径",
+      "value": "cluster",
+      "bind": { "input": "radio", "name": "布局 method：", "options": ["tidy", "cluster"] }
+    },
+    { "name": "colorIn", "value": "firebrick" },
+    { "name": "colorOut", "value": "forestgreen" },
+    { "name": "originX", "update": "width / 2" },
+    { "name": "originY", "update": "height / 2" },
+    {
+      "name": "active",
+      "description": "当前高亮的叶子 id。默认值 35（flare.animate.Transitioner，46 条相关依赖）不是官方的 null —— 官方默认 null 时派生数据集 selected 是 0 行，本仓库校验器把空数据集判失败。选择器用 @leafLabel 限定 mark 名，官方写的 text:pointerover 匹配的是 mark 类型，会连图例标签、状态文字一起命中",
+      "value": 35,
+      "on": [
+        { "events": "@leafLabel:pointerover", "update": "datum.id" },
+        { "events": "pointerover[!event.item]", "update": "null" }
+      ]
+    },
+    {
+      "name": "activePath",
+      "description": "用 treeAncestors 把 active 节点的祖先链取出来（[自身, 父, …, 根]），reverse 后 join 成 flare.animate.Transitioner 这样的全名。treeAncestors 在 active 为 null（或 id 不在树里）时返回 undefined，而 pluck(undefined, 'name') 会直接抛 TypeError，所以外面必须套一层 isArray 判空",
+      "update": "isArray(treeAncestors('tree', active)) ? join(reverse(pluck(treeAncestors('tree', active), 'name')), '.') : ''"
+    },
+    {
+      "name": "statusText",
+      "description": "空态兜底：activePath 为空串（active 为 null）时 selected 是 0 行，图上一根高亮都没有；这时给一句提示文字，而不是让读者以为图坏了",
+      "update": "activePath === '' ? '当前无高亮 · 把鼠标移到任意叶子标签上，看它的依赖关系被点亮（鼠标移到空白处即复位）' : '高亮：' + activePath + ' · 相关依赖边 ' + length(data('selected')) + ' 条'"
+    }
+  ],
+
+  "data": [
+    {
+      "name": "tree",
+      "description": "flare.json 已经是摊平的父子表（252 行 / 220 叶子 / 最深 4 层），stratify 直接建树",
+      "url": "../../assets/data/flare.json",
+      "transform": [
+        { "type": "stratify", "key": "id", "parentKey": "parent" },
+        {
+          "type": "tree",
+          "method": { "signal": "layout" },
+          "size": [1, 1],
+          "as": ["alpha", "beta", "depth", "children"]
+        },
+        {
+          "type": "formula",
+          "expr": "(rotate + extent * datum.alpha + 270) % 360",
+          "as": "angle"
+        },
+        {
+          "type": "formula",
+          "expr": "inrange(datum.angle, [90, 270])",
+          "as": "leftside"
+        },
+        {
+          "type": "formula",
+          "expr": "originX + radius * datum.beta * cos(PI * datum.angle / 180)",
+          "as": "x"
+        },
+        {
+          "type": "formula",
+          "expr": "originY + radius * datum.beta * sin(PI * datum.angle / 180)",
+          "as": "y"
+        }
+      ]
+    },
+    {
+      "name": "leaves",
+      "description": "tree 变换把子节点个数写进 children，叶子是 0（falsy）",
+      "source": "tree",
+      "transform": [
+        { "type": "filter", "expr": "!datum.children" }
+      ]
+    },
+    {
+      "name": "dependencies",
+      "description": "764 条 {source, target}，值是 flare.json 里的节点 id。约定是 target 依赖 source（target imports source）",
+      "url": "../../assets/data/flare-dependencies.json",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "treePath('tree', datum.source, datum.target)",
+          "as": "treepath",
+          "initonly": true
+        }
+      ]
+    },
+    {
+      "name": "selected",
+      "description": "与 active 相关的依赖边。text mark 用 indata('selected', …) 反查节点该染成哪个颜色",
+      "source": "dependencies",
+      "transform": [
+        { "type": "filter", "expr": "datum.source === active || datum.target === active" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": ["当前节点依赖的", "依赖当前节点的"],
+      "range": [{ "signal": "colorIn" }, { "signal": "colorOut" }]
+    }
+  ],
+
+  "legends": [
+    {
+      "stroke": "color",
+      "orient": "bottom-right",
+      "title": "依赖方向（悬停某个类时）",
+      "symbolType": "stroke",
+      "labelFontSize": 11,
+      "titleFontSize": 11
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "text",
+      "name": "leafLabel",
+      "description": "220 个叶子类的名字，沿半径方向排布；左半圆的字要整体转 180° 并右对齐，否则全是倒的",
+      "from": { "data": "leaves" },
+      "encode": {
+        "enter": {
+          "text": { "field": "name" },
+          "baseline": { "value": "middle" }
+        },
+        "update": {
+          "x": { "field": "x" },
+          "y": { "field": "y" },
+          "dx": { "signal": "textOffset * (datum.leftside ? -1 : 1)" },
+          "angle": { "signal": "datum.leftside ? datum.angle - 180 : datum.angle" },
+          "align": { "signal": "datum.leftside ? 'right' : 'left'" },
+          "fontSize": { "signal": "textSize" },
+          "fontWeight": [
+            { "test": "indata('selected', 'source', datum.id)", "value": "bold" },
+            { "test": "indata('selected', 'target', datum.id)", "value": "bold" },
+            { "value": null }
+          ],
+          "fill": [
+            { "test": "datum.id === active", "value": "black" },
+            { "test": "indata('selected', 'source', datum.id)", "signal": "colorIn" },
+            { "test": "indata('selected', 'target', datum.id)", "signal": "colorOut" },
+            { "value": "#4a4a4a" }
+          ]
+        }
+      }
+    },
+    {
+      "type": "group",
+      "description": "本例的核心：facet 的 field 形态把 dependencies 每行的 treepath 数组展开成一个子数据集，于是 764 条依赖 = 764 个 group = 764 条折线",
+      "from": {
+        "facet": {
+          "name": "path",
+          "data": "dependencies",
+          "field": "treepath"
+        }
+      },
+      "marks": [
+        {
+          "type": "line",
+          "interactive": false,
+          "from": { "data": "path" },
+          "encode": {
+            "enter": {
+              "interpolate": { "value": "bundle" },
+              "strokeWidth": { "value": 1.5 }
+            },
+            "update": {
+              "stroke": [
+                { "test": "parent.source === active", "signal": "colorOut" },
+                { "test": "parent.target === active", "signal": "colorIn" },
+                { "value": "steelblue" }
+              ],
+              "strokeOpacity": [
+                { "test": "parent.source === active || parent.target === active", "value": 1 },
+                { "value": 0.2 }
+              ],
+              "tension": { "signal": "tension" },
+              "x": { "field": "x" },
+              "y": { "field": "y" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "name": "statusLabel",
+      "description": "图下方的状态行（图注）。位置写成 height + 40 而不是 (0, 0)：圆环外侧的类名会探出画布上边与左上角，(0, 0) 处的横排文字会被那十几个近乎竖直的类名穿过。interactive:false 很关键：不加的话它也是一个 text mark，会被 pointerover 命中，也会挡住底下的图元拾取",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "signal": "height + 40" },
+          "align": { "value": "left" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 11 },
+          "fill": { "value": "#333" }
+        },
+        "update": {
+          "text": { "signal": "statusText" }
+        }
+      }
+    }
+  ]
+}

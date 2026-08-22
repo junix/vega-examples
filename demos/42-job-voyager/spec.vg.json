@@ -1,0 +1,266 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "官方 Job Voyager 精读：可搜索的堆叠面积图，aggregate 的 argmax 取出每条序列的峰值整行、quantize/quantile 比例尺代替 if/else 决定标签的对齐与可见性",
+  "width": 800,
+  "height": 500,
+  "padding": 5,
+
+  "title": {
+    "text": "美国就业结构 1850–2000 · Job Voyager",
+    "subtitle": {
+      "signal": "(sex === 'all' ? '男女合计' : sex === 'men' ? '仅男性' : '仅女性') + ' · ' + (query ? '搜索「' + query + '」' : '全部 255 个职业') + ' · 命中 ' + length(data('series')) + ' 条序列 / ' + length(data('jobs')) + ' 行'"
+    },
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#6b7280"
+  },
+
+  "signals": [
+    {
+      "name": "sex",
+      "comment": "官方原样：radio 控件切换性别。'all' 时男女两条序列各自堆叠，可以直接看到同一职业的性别构成",
+      "value": "all",
+      "bind": { "input": "radio", "name": "性别 sex：", "options": ["men", "women", "all"] }
+    },
+    {
+      "name": "query",
+      "comment": "同一个 signal 同时挂 bind（文本框手输）和 on（事件驱动）：点面积 → 填入该职业名，双击画布 → 清空。'area:click!' 的 ! 表示阻止事件冒泡后的重复触发，dblclick! 不限定 mark 所以点空白处也能清空",
+      "value": "",
+      "on": [
+        { "events": "area:click!", "update": "datum.job" },
+        { "events": "dblclick!", "update": "''" }
+      ],
+      "bind": { "input": "text", "name": "搜索职业（正则）：", "placeholder": "engineer / nurse / ^Teacher", "autocomplete": "off" }
+    },
+
+    {
+      "name": "xDomain",
+      "comment": "空态兜底 1/5。官方直接写 domain:{data:'jobs',field:'year'}；搜索无命中时 jobs 变 0 行，extent 退化成 [null,null]，Vega 抛 Infinite extent WARN、x 轴刻度全消失。span(...)>0 一个条件同时挡掉「空集」与「零跨度」两种退化",
+      "update": "span(extent(pluck(data('jobs'), 'year'))) > 0 ? extent(pluck(data('jobs'), 'year')) : [1850, 2000]"
+    },
+    {
+      "name": "yDomain",
+      "comment": "空态兜底 2/5。y 有 zero:true，只剩一条序列也不会退化（[0, max] 仍有跨度），真正会坏的只有 0 行。所以判 max>0 即可：空集时 extent(...)[1] 是 null，null > 0 为 false，一并兜住",
+      "update": "extent(pluck(data('jobs'), 'y1'))[1] > 0 ? [0, extent(pluck(data('jobs'), 'y1'))[1]] : [0, 1]"
+    },
+    {
+      "name": "alphaDomain",
+      "comment": "空态兜底 3/5：面积填充不透明度按序列总份额取值，同样 zero:true，只需兜住 0 行",
+      "update": "extent(pluck(data('series'), 'sum'))[1] > 0 ? [0, extent(pluck(data('series'), 'sum'))[1]] : [0, 1]"
+    },
+    {
+      "name": "peakExtent",
+      "comment": "空态兜底 4/5：给 font（sqrt，连续比例尺）用。注意 pluck 支持点号路径，'argmax.perc' 直接读聚合出来的整行元组里的字段。连续比例尺的 domain 必须是 [min, max] 两元素 —— 官方写 {data:'series', field:'argmax.perc'} 时 Vega 内部就是求 extent；换成 signal 后必须自己求，否则把 510 个值整数组塞进去会让 d3 只按 min(domain.length, range.length)=2 取 domain 的**前两个**值当端点（不是首尾两个），其余值全靠外推，实测最大字号飙到 162px",
+      "update": "extent(pluck(data('series'), 'argmax.perc'))[1] > 0 ? [0, extent(pluck(data('series'), 'argmax.perc'))[1]] : [0, 0.45]"
+    },
+    {
+      "name": "peakSample",
+      "comment": "空态兜底 5/5：给 opacity（quantile）用。quantile 比例尺的 domain 是**整个样本数组**（不是 [min,max]）——它要按分位数切桶，所以这里必须原样传 510 个值。空数组会让分位阈值全变 NaN、标签透明度取到 undefined，所以退化成一个单元素数组",
+      "update": "length(data('series')) ? pluck(data('series'), 'argmax.perc') : [0.001]"
+    }
+  ],
+
+  "data": [
+    {
+      "name": "jobs",
+      "url": "../../assets/data/jobs.json",
+      "comment": "7650 行 = 255 个职业 × men|women × 15 个普查年（1850–2000，1890 年缺失）。perc 已经是「占当年全部就业人口的比例」，每年 men+women 全职业合计恰好 1.0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "(sex === 'all' || datum.sex === sex) && (!query || test(regexp(query, 'i'), datum.job))"
+        },
+        {
+          "type": "stack",
+          "field": "perc",
+          "groupby": ["year"],
+          "sort": { "field": ["job", "sex"], "order": ["descending", "descending"] }
+        }
+      ]
+    },
+    {
+      "name": "series",
+      "source": "jobs",
+      "comment": "本例的核心：一行 = 一条序列（job × sex）。argmax op 返回的不是数值而是**整行元组**，所以下游能写 datum.argmax.year / argmax.perc / argmax.y0 / argmax.y1 —— 标签因此能钉在每条序列自己的峰值那一年、峰值那一段堆叠带的中点上",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["job", "sex"],
+          "fields": ["perc", "perc"],
+          "ops": ["sum", "argmax"],
+          "as": ["sum", "argmax"]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "range": "width",
+      "zero": false,
+      "round": true,
+      "domain": { "signal": "xDomain" }
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "range": "height",
+      "round": true,
+      "zero": true,
+      "domain": { "signal": "yDomain" }
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": ["men", "women"],
+      "range": ["#3355ff", "#ff3333"]
+    },
+    {
+      "name": "alpha",
+      "type": "linear",
+      "zero": true,
+      "domain": { "signal": "alphaDomain" },
+      "range": [0.4, 0.8]
+    },
+    {
+      "name": "font",
+      "type": "sqrt",
+      "range": [0, 20],
+      "round": true,
+      "zero": true,
+      "domain": { "signal": "peakExtent" }
+    },
+    {
+      "name": "opacity",
+      "type": "quantile",
+      "range": [0, 0, 0, 0, 0, 0.1, 0.2, 0.4, 0.7, 1.0],
+      "domain": { "signal": "peakSample" }
+    },
+    {
+      "name": "align",
+      "type": "quantize",
+      "range": ["left", "center", "right"],
+      "zero": false,
+      "domain": [1730, 2130]
+    },
+    {
+      "name": "offset",
+      "type": "quantize",
+      "range": [6, 0, -6],
+      "zero": false,
+      "domain": [1730, 2130]
+    }
+  ],
+
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "x",
+      "format": "d",
+      "tickCount": 15,
+      "title": "普查年份 year"
+    },
+    {
+      "orient": "right",
+      "scale": "y",
+      "format": "%",
+      "grid": true,
+      "domain": false,
+      "tickSize": 12,
+      "title": "占当年就业人口的比例（堆叠）",
+      "encode": {
+        "grid": { "enter": { "stroke": { "value": "#cccccc" } } },
+        "ticks": { "enter": { "stroke": { "value": "#cccccc" } } }
+      }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "title": "sex（性别）",
+      "orient": "top",
+      "direction": "horizontal",
+      "encode": {
+        "labels": {
+          "update": {
+            "text": { "signal": "datum.value === 'men' ? 'men 男性' : 'women 女性'" }
+          }
+        }
+      }
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "group",
+      "comment": "from 同时给 data 和 facet：外层由汇总表 series 驱动（一组一行，带 sum / argmax），内层 facet 分的是明细表 jobs。子 mark 里用 {\"parent\": \"sum\"} 反向取外层那一行的字段 —— 这是 Vega 里「一条序列一个 group」的标准写法，也是 area/line mark 没有 series 通道时唯一的多序列办法",
+      "from": {
+        "data": "series",
+        "facet": {
+          "name": "facet",
+          "data": "jobs",
+          "groupby": ["job", "sex"]
+        }
+      },
+      "marks": [
+        {
+          "type": "area",
+          "from": { "data": "facet" },
+          "encode": {
+            "update": {
+              "x": { "scale": "x", "field": "year" },
+              "y": { "scale": "y", "field": "y0" },
+              "y2": { "scale": "y", "field": "y1" },
+              "fill": { "scale": "color", "field": "sex" },
+              "fillOpacity": { "scale": "alpha", "field": { "parent": "sum" } },
+              "tooltip": {
+                "signal": "datum.job + ' · ' + datum.sex + ' · ' + datum.year + '：' + format(datum.perc, '.3%')"
+              }
+            },
+            "hover": { "fillOpacity": { "value": 0.2 } }
+          }
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "comment": "标签层：一条序列一个标签，摆在 argmax 那一行的位置上。interactive:false 很关键 —— 拾取是自上而下取第一个命中的 mark，标签若可交互就会把 area:click 抢走，query 的点击填入功能失效",
+      "from": { "data": "series" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "scale": "x", "field": "argmax.year" },
+          "dx": { "scale": "offset", "field": "argmax.year" },
+          "y": { "signal": "scale('y', 0.5 * (datum.argmax.y0 + datum.argmax.y1))" },
+          "fill": { "value": "#000000" },
+          "fillOpacity": { "scale": "opacity", "field": "argmax.perc" },
+          "fontSize": { "scale": "font", "field": "argmax.perc", "offset": 5 },
+          "text": { "field": "job" },
+          "align": { "scale": "align", "field": "argmax.year" },
+          "baseline": { "value": "middle" }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "comment": "空态提示：搜索无命中时用 signal 驱动 text。非空态下求值为 ''，Vega 只留一个不含文字的空 <text>，不影响任何刻度与图元。刻意不新建一个默认为空的数据集 —— 校验器会把 0 行的数据集判失败",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "text": {
+            "signal": "length(data('jobs')) ? '' : '没有职业名匹配正则「' + query + '」——双击画布清空搜索'"
+          },
+          "x": { "signal": "width / 2" },
+          "y": { "signal": "height / 2" },
+          "align": { "value": "center" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 14 },
+          "fill": { "value": "#8a8f98" }
+        }
+      }
+    }
+  ]
+}

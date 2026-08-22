@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>45 雷达图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '45-radar-chart',
+  group: 'G. 官方示例精读',
+  title: '45 · 雷达图：point 角度尺 + pow 半径尺 + linear-closed 闭合折线',
+  concepts: [
+    'scale: point（range 写成 [-PI, PI]）',
+    'scale: pow（exponent 用 signal）',
+    '极坐标换算 r·cosθ / r·sinθ',
+    'line mark: interpolate linear-closed',
+    'mark 当数据源（from.data 指向 mark 名）',
+    'datum vs datum.datum',
+    'group + from.facet 画多序列',
+    'parent 读外层 facet 字段',
+    'transform: aggregate 去重',
+    'transform: sequence（右开区间）',
+    'transform: collect 定连线顺序',
+    'align / baseline 的 test 数组',
+    '空态兜底（length(data(...))）'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      七根辐条是七个维度，每个系列是一条<b>闭合</b>折线。切换<code>半径映射</code>：
+      「半径 ∝ 数值」是官方写法（<code>pow</code> 指数 1，等价 linear），
+      「面积 ∝ 数值」把指数改成 0.5（等价 sqrt）—— 同一份数据，两个形状。
+      <code>系列筛选</code>拉到最后一档「都不选」可以看空态兜底：折线消失，网格与维度轴还在。
+      注意：<b>雷达图只能比形状，不能比面积</b> —— 把七个维度换个顺序，折线围出的面积会变（本例可差 1.3 倍），
+      理由见 README。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>
