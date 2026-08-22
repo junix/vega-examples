@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>28 小提琴图与山脊线图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '28-violin-ridgeline',
+  group: 'F. 稀有与复杂图形',
+  title: '28 · 小提琴图与山脊线图：核密度的两种画法',
+  concepts: ['transform: kde', 'transform: joinaggregate（全体最大值）', 'transform: lookup', 'mark: area（orient horizontal / vertical）', 'from.facet 拆多条曲线', 'scale: point 当行基线', 'group 局部 width/height 信号']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      左边拖 <code>bwMass</code> 看核带宽如何在「一个平滑包」与「一堆假峰」之间摆动，切
+      <code>widthMode</code> 看同一份密度换三种归一化口径；右边分别拖
+      <code>rowStep</code>（行高）与 <code>amplitude</code>（振幅）——两者互相独立，
+      重叠量就是 <code>amplitude / rowStep</code>。鼠标停在深条与山脊上有提示框。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

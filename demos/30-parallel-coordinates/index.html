@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>30 平行坐标图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+window.DEMO_META = {
+  slug: '30-parallel-coordinates',
+  group: 'F. 稀有与复杂图形',
+  title: '30 · 平行坐标图：多轴归一化与逐轴刻度反算',
+  concepts: ['transform: fold', 'transform: aggregate(min/max)', 'transform: lookup', 'transform: flatten', 'expr: sequence()', 'mark: group + facet', 'mark: line', 'mark: rule/text 手工轴', 'signal 驱动高亮']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      每条折线是一辆车，穿过六个维度的竖轴。<strong>悬停</strong>任意折线会高亮它并在图下显示明细，
+      <strong>点击右侧图例</strong>按产地筛选（点空白处还原）。右侧滑块里
+      <code>lineOpacity</code> 是平行坐标的核心旋钮 —— 400 条线必须靠透明度叠加才能看出线束密度。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

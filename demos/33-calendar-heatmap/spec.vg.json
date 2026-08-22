@@ -1,0 +1,354 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "日历热力图：一格一天，横轴是一年中的第几周、纵轴是星期，颜色编码当天的气象数值；四年数据按年分成四个小倍图面板",
+  "width": 790,
+  "height": 580,
+  "padding": 10,
+  "autosize": { "type": "pad", "resize": true },
+
+  "title": {
+    "text": { "signal": "'西雅图逐日' + metricLabel + '日历热力图'" },
+    "subtitle": {
+      "signal": "'一格一天 · 横轴 = 一年中的第几周 · 纵轴 = 星期（' + (weekStart === 1 ? '周一起，ISO 口径' : '周日起，美式口径') + '） · ' + yearSpan"
+    },
+    "anchor": "start",
+    "frame": "group",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#71717a",
+    "offset": 10
+  },
+
+  "signals": [
+    {
+      "description": "颜色编码哪个字段。formula 变换里用 datum[metric] 取值，所以换字段不需要改 spec 其它部分",
+      "name": "metric",
+      "value": "temp_max",
+      "bind": {
+        "input": "select",
+        "options": ["temp_max", "temp_min", "precipitation", "wind"],
+        "labels": ["最高气温 (°C)", "最低气温 (°C)", "降水量 (mm)", "风速 (m/s)"]
+      }
+    },
+    {
+      "description": "连续配色方案，直接喂给 scale.range.scheme",
+      "name": "palette",
+      "value": "viridis",
+      "bind": {
+        "input": "select",
+        "options": ["viridis", "yellowgreenblue", "blues", "inferno", "plasma", "turbo", "browngreen"]
+      }
+    },
+    {
+      "description": "一周从周几开始：0 = 周日（美式），1 = 周一（ISO 8601）。它同时决定行号和列号的算法",
+      "name": "weekStart",
+      "value": 1,
+      "bind": {
+        "input": "select",
+        "options": [0, 1],
+        "labels": ["周日起（美式）", "周一起（ISO）"]
+      }
+    },
+    {
+      "description": "单个日格的网格步长（像素）。width / height 都由它推出来，拖动即整体缩放",
+      "name": "cell",
+      "value": 13,
+      "bind": { "input": "range", "min": 9, "max": 20, "step": 1 }
+    },
+    {
+      "description": "日格之间的留白，格子实际边长 = cell - gap",
+      "name": "gap",
+      "value": 2,
+      "bind": { "input": "range", "min": 0, "max": 5, "step": 1 }
+    },
+    {
+      "description": "是否显示月份分隔阶梯线与月份名",
+      "name": "showMonths",
+      "value": true,
+      "bind": { "input": "checkbox" }
+    },
+
+    {
+      "description": "网格最多 54 列：闰年 + 首日恰好落在一周最后一天时，(365 + 6) / 7 = 53，故列号 0..53",
+      "name": "gridCols",
+      "value": 54
+    },
+    { "description": "左侧留给星期标签和年份标签的宽度", "name": "leftPad", "value": 82 },
+    { "description": "每个面板上方留给月份名的高度", "name": "bandH", "value": 20 },
+    { "description": "相邻两个年份面板之间的垂直空隙", "name": "panelGap", "value": 16 },
+
+    { "description": "一个面板的高度：7 行 × 步长", "name": "panelH", "update": "7 * cell" },
+    { "description": "相邻面板左上角的垂直间距", "name": "panelStep", "update": "panelH + bandH + panelGap" },
+    { "description": "网格总宽度", "name": "gridW", "update": "gridCols * cell" },
+    { "description": "数据里一共有几年 —— signal 可以读 data()，于是面板数量完全由数据决定", "name": "nYears", "update": "length(data('years'))" },
+    { "description": "年份区间文字，供副标题用", "name": "yearSpan", "update": "nYears ? data('years')[0].yr + '–' + peek(data('years')).yr : '无数据'" },
+
+    { "description": "覆盖内建 width 信号：画布宽度由 cell 反推，而不是写死", "name": "width", "update": "leftPad + gridW + 4" },
+    { "description": "覆盖内建 height 信号：面板数 × 面板间距 + 底部图例区", "name": "height", "update": "max(nYears, 1) * panelStep + 64" },
+
+    { "description": "tooltip 里显示数值用的格式：保留数据本身的 0.1 精度", "name": "valueFmt", "value": ".1f" },
+    { "description": "图例刻度格式：温度取整，降水与风速留一位小数", "name": "legendFmt", "update": "metric === 'temp_max' || metric === 'temp_min' ? '.0f' : '.1f'" },
+    { "description": "单位（裸串），供图例标题用", "name": "unitBare", "update": "metric === 'precipitation' ? 'mm' : metric === 'wind' ? 'm/s' : '°C'" },
+    { "description": "单位后缀（前置空格），图例刻度标签和 tooltip 共用", "name": "unit", "update": "' ' + unitBare" },
+    { "description": "指标中文名，用于标题、图例标题和 tooltip", "name": "metricLabel", "update": "metric === 'temp_max' ? '最高气温' : metric === 'temp_min' ? '最低气温' : metric === 'precipitation' ? '降水量' : '风速'" }
+  ],
+
+  "data": [
+    {
+      "description": "原始逐日观测。CSV 必须显式声明 format.type；date 用 date:'%Y-%m-%d' 按本地时区解析——若写成 'date'，'2012-01-01' 会被当 ISO 串按 UTC 午夜解析，在西半球时区里 year()/month()/date() 会整体退回前一天",
+      "name": "weather",
+      "url": "../../assets/data/seattle-weather.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "date": "date:'%Y-%m-%d'",
+          "precipitation": "number",
+          "temp_max": "number",
+          "temp_min": "number",
+          "wind": "number"
+        }
+      },
+      "transform": [
+        { "type": "formula", "as": "yr", "expr": "year(datum.date)" },
+        {
+          "description": "0 基的一年中第几天。+0.5 再 floor 是为了吸收夏令时造成的 23/25 小时误差，否则 3 月之后整年会错一天",
+          "type": "formula",
+          "as": "doy",
+          "expr": "floor((datum.date - datetime(datum.yr, 0, 1)) / 86400000 + 0.5)"
+        },
+        {
+          "description": "1 月 1 日在它所属那一列里的行号，也就是该年网格左上角空出来的格子数",
+          "type": "formula",
+          "as": "firstShift",
+          "expr": "(day(datetime(datum.yr, 0, 1)) - weekStart + 7) % 7"
+        },
+        {
+          "description": "行 = 星期，day() 是 0=周日..6=周六，减去 weekStart 后归一到 0..6",
+          "type": "formula",
+          "as": "row",
+          "expr": "(day(datum.date) - weekStart + 7) % 7"
+        },
+        {
+          "description": "列 = 第几周。自己算而不用 week()：week(d)=timeSunday.count(Jan1-1ms, d)，当 1 月 1 日本身是周日时（如 2012）它会多算一周，四个年份就会互相错一列",
+          "type": "formula",
+          "as": "col",
+          "expr": "floor((datum.doy + datum.firstShift) / 7)"
+        }
+      ]
+    },
+    {
+      "description": "每年一行：算出面板序号 yIdx，面板的 y 偏移就是 yIdx * panelStep",
+      "name": "years",
+      "source": "weather",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["yr"],
+          "fields": ["col", "col"],
+          "ops": ["max", "count"],
+          "as": ["maxCol", "days"]
+        },
+        { "type": "window", "sort": { "field": "yr" }, "ops": ["row_number"], "as": ["rank"] },
+        { "type": "collect", "sort": { "field": "yr" } },
+        { "type": "formula", "as": "yIdx", "expr": "datum.rank - 1" }
+      ]
+    },
+    {
+      "description": "画格子用的数据集：把面板序号 join 回每一天，并把当前 metric 取到统一的 value 字段上（比例尺 domain 只需盯着 value）",
+      "name": "cells",
+      "source": "weather",
+      "transform": [
+        { "type": "lookup", "from": "years", "key": "yr", "fields": ["yr"], "values": ["yIdx"] },
+        { "type": "formula", "as": "value", "expr": "datum[metric]" }
+      ]
+    },
+    {
+      "description": "月份分隔线：每个月 1 号一条阶梯折线（1 月除外，那是网格自身的左边界）。折线在面板局部坐标里描述，靠 path mark 的 x/y 平移到各年面板",
+      "name": "month_edges",
+      "source": "cells",
+      "transform": [
+        { "type": "filter", "expr": "date(datum.date) === 1 && month(datum.date) > 0" },
+        {
+          "description": "三段折线：从 (col+1, 0) 竖下到 (col+1, row)，横移到 (col, row)，再竖下到 (col, 7)",
+          "type": "formula",
+          "as": "edge",
+          "expr": "'M' + round((datum.col + 1) * cell) + ',0 L' + round((datum.col + 1) * cell) + ',' + round(datum.row * cell) + ' L' + round(datum.col * cell) + ',' + round(datum.row * cell) + ' L' + round(datum.col * cell) + ',' + round(7 * cell)"
+        }
+      ]
+    },
+    {
+      "description": "月份名：取每月 15 号所在的列当锚点，正好落在这个月的中间偏左",
+      "name": "month_labels",
+      "source": "cells",
+      "transform": [
+        { "type": "filter", "expr": "date(datum.date) === 15" },
+        { "type": "formula", "as": "mlabel", "expr": "(month(datum.date) + 1) + '月'" }
+      ]
+    },
+    {
+      "description": "左侧星期标签：每年 7 行，用 formula 造数组再 flatten 展平（Vega 的 cross 变换只能自乘，没法和别的数据集做叉积）",
+      "name": "dow_labels",
+      "source": "years",
+      "transform": [
+        { "type": "formula", "as": "rows", "expr": "[0, 1, 2, 3, 4, 5, 6]" },
+        { "type": "flatten", "fields": ["rows"], "as": ["row"] },
+        {
+          "type": "formula",
+          "as": "label",
+          "expr": "['周日', '周一', '周二', '周三', '周四', '周五', '周六'][(datum.row + weekStart) % 7]"
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "linear",
+      "domain": { "data": "cells", "field": "value" },
+      "range": { "scheme": { "signal": "palette" } },
+      "nice": true
+    }
+  ],
+
+  "legends": [
+    {
+      "type": "gradient",
+      "fill": "color",
+      "direction": "horizontal",
+      "orient": "none",
+      "legendX": { "signal": "leftPad" },
+      "legendY": { "signal": "max(nYears, 1) * panelStep + 6" },
+      "gradientLength": { "signal": "min(300, gridW)" },
+      "gradientThickness": 12,
+      "title": { "signal": "metricLabel + '（' + unitBare + '）'" },
+      "titleFontSize": 11,
+      "titlePadding": 6,
+      "labelFontSize": 10,
+      "tickCount": 5,
+      "encode": {
+        "labels": {
+          "update": {
+            "text": { "signal": "format(datum.value, legendFmt) + unit" }
+          }
+        }
+      }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "每年一个 group：facet 把 cells 按 (yr, yIdx) 切成若干份，group 自身的 x/y 就是该年面板的左上角，于是内部的格子只需要面板局部坐标 col*cell / row*cell",
+      "type": "group",
+      "name": "yearPanel",
+      "from": { "facet": { "name": "days", "data": "cells", "groupby": ["yr", "yIdx"] } },
+      "encode": {
+        "update": {
+          "x": { "signal": "leftPad" },
+          "y": { "signal": "datum.yIdx * panelStep + bandH" },
+          "width": { "signal": "gridW" },
+          "height": { "signal": "panelH" },
+          "fill": { "value": "#f4f4f5" },
+          "stroke": { "value": "#e4e4e7" },
+          "strokeWidth": { "value": 1 }
+        }
+      },
+      "marks": [
+        {
+          "description": "一天一个圆角小方块。x/y 全是算出来的，没有任何比例尺参与位置——只有颜色走 scale",
+          "type": "rect",
+          "from": { "data": "days" },
+          "encode": {
+            "enter": { "cornerRadius": { "value": 2 } },
+            "update": {
+              "x": { "signal": "datum.col * cell + gap / 2" },
+              "y": { "signal": "datum.row * cell + gap / 2" },
+              "width": { "signal": "max(cell - gap, 1)" },
+              "height": { "signal": "max(cell - gap, 1)" },
+              "fill": { "scale": "color", "field": "value" },
+              "stroke": { "value": null },
+              "strokeWidth": { "value": 0 },
+              "tooltip": {
+                "signal": "{'日期': timeFormat(datum.date, '%Y-%m-%d'), '星期': ['周日','周一','周二','周三','周四','周五','周六'][day(datum.date)], '指标': metricLabel, '数值': format(datum.value, valueFmt) + unit, '天气': datum.weather, '网格': '第 ' + (datum.col + 1) + ' 列 / 第 ' + (datum.row + 1) + ' 行'}"
+              }
+            },
+            "hover": {
+              "stroke": { "value": "#18181b" },
+              "strokeWidth": { "value": 1.5 }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "月份分隔阶梯线：path 的 d 是面板局部坐标，x/y 负责平移到对应年份的面板；一条 path 一个月界",
+      "type": "path",
+      "from": { "data": "month_edges" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "leftPad" },
+          "y": { "signal": "datum.yIdx * panelStep + bandH" },
+          "path": { "field": "edge" },
+          "fill": { "value": null },
+          "stroke": { "value": "#3f3f46" },
+          "strokeWidth": { "value": 1.2 },
+          "opacity": { "signal": "showMonths ? 0.8 : 0" }
+        }
+      }
+    },
+    {
+      "description": "面板上方的月份名",
+      "type": "text",
+      "from": { "data": "month_labels" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "leftPad + (datum.col + 0.5) * cell" },
+          "y": { "signal": "datum.yIdx * panelStep + bandH - 5" },
+          "text": { "field": "mlabel" },
+          "align": { "value": "center" },
+          "baseline": { "value": "bottom" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#52525b" },
+          "opacity": { "signal": "showMonths ? 1 : 0" }
+        }
+      }
+    },
+    {
+      "description": "左侧星期标签，每个面板一套（随 weekStart 改变含义）",
+      "type": "text",
+      "from": { "data": "dow_labels" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "leftPad - 6" },
+          "y": { "signal": "datum.yIdx * panelStep + bandH + datum.row * cell + cell / 2" },
+          "text": { "field": "label" },
+          "align": { "value": "right" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 9 },
+          "fill": { "value": "#71717a" }
+        }
+      }
+    },
+    {
+      "description": "每个面板最左侧的年份标签",
+      "type": "text",
+      "from": { "data": "years" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "leftPad - 34" },
+          "y": { "signal": "datum.yIdx * panelStep + bandH + panelH / 2" },
+          "text": { "signal": "datum.yr + ''" },
+          "align": { "value": "right" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 14 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#27272a" }
+        }
+      }
+    }
+  ]
+}

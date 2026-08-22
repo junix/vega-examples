@@ -19,7 +19,8 @@ window.DEMO_META = {
 <main class="demo-main">
   <div class="demo-view">
     <div class="demo-notes">
-      把鼠标悬停在县（county）色块上：色块变红并弹出 tooltip 显示 FIPS 码与失业率。
+      把鼠标悬停在县（county）色块上：色块变红并弹出 tooltip 显示 <strong>补足 5 位</strong>的 FIPS 码与失业率
+      （FIPS 在数据里存成数字，01～09 号州的县会掉前导零，所以显示时用 <code>pad()</code> 补回来）。
       地图由两层 <code>shape</code> 标记叠加而成——下层是按失业率填色的县多边形，
       上层是只描白边、不填充的州界。全部地理形状都来自同一份 TopoJSON 文件
       <code>us-10m.json</code>，只是 <code>format.feature</code> 取了不同的 object。

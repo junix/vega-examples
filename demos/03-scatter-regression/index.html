@@ -23,7 +23,7 @@ window.DEMO_META = {
       实线是<strong>线性回归</strong>（<code>method: "linear"</code>），
       虚线是<strong>二次多项式拟合</strong>（<code>method: "poly", order: 2</code>）；
       两者都按 Origin 分组拟合，且都只画在各自组的数据范围内（regression 缺省的 extent 行为）。
-      原始数据里有 6 辆车的 Horsepower 为 null，已被 <code>filter</code> 变换滤除。
+      原始数据里 6 辆车缺 Horsepower、8 辆车缺 Miles_per_Gallon，共 14 条已被 <code>filter</code> 变换滤除（406 → 392）。
     </div>
     <div id="view"></div>
   </div>

@@ -1,0 +1,536 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "左：损益瀑布图（window 累计和定柱子起止 + rule 连接线）；右：马赛克/Marimekko 图（外层 stack 定列宽 x、内层 stack 定分段 y）",
+  "width": 940,
+  "height": 460,
+  "padding": 8,
+
+  "title": {
+    "text": "瀑布图 与 马赛克（Marimekko）图：两种靠 window / 两级 stack 算出来的稀有图形",
+    "subtitle": "左 · 逐项增减累计到净利（window 累计和 + rule 连接虚线）　　右 · 影片类型 × MPAA 分级列联表（列宽 ∝ 影片数，列内高度 ∝ 分级构成）",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#57606a",
+    "anchor": "start"
+  },
+
+  "signals": [
+    { "name": "panelTop", "comment": "两个面板共用的顶边：上面 88px 留给主标题、横向图例和马赛克图的列名", "value": 88 },
+    { "name": "panelH",   "comment": "两个面板共用的绘图高度", "value": 300 },
+    { "name": "wfW",      "comment": "瀑布图面板宽度", "value": 380 },
+    { "name": "mariX",    "comment": "马赛克图面板左边缘（460 + 470 = 930 < width 940，右侧不溢出）", "value": 460 },
+    { "name": "mariW",    "comment": "马赛克图面板宽度", "value": 470 },
+
+    {
+      "comment": "瀑布图柱间留白：band 的 padding 同时作用于 paddingInner / paddingOuter，柱缝就是连接虚线的长度",
+      "name": "barPad",
+      "value": 0.28,
+      "bind": { "input": "range", "min": 0.05, "max": 0.6, "step": 0.01 }
+    },
+    {
+      "comment": "是否画柱间连接虚线 —— 瀑布图的标志性细节，关掉就退化成一堆看不出关联的悬空柱",
+      "name": "showLinks",
+      "value": true,
+      "bind": { "input": "checkbox" }
+    },
+    {
+      "comment": "是否在柱子外侧标注增减数值",
+      "name": "showValues",
+      "value": true,
+      "bind": { "input": "checkbox" }
+    },
+    {
+      "comment": "马赛克图列间留白（像素）：列宽是算出来的连续值，只能靠像素偏移抠出缝",
+      "name": "colGap",
+      "value": 2,
+      "bind": { "input": "range", "min": 0, "max": 10, "step": 1 }
+    },
+    {
+      "comment": "格子高度（像素）低于此值就不标百分比，用来控制标签密度",
+      "name": "minCellH",
+      "value": 16,
+      "bind": { "input": "range", "min": 6, "max": 48, "step": 1 }
+    },
+    {
+      "comment": "格子宽度（像素）低于此值也不标百分比",
+      "name": "minCellW",
+      "value": 26,
+      "bind": { "input": "range", "min": 10, "max": 80, "step": 2 }
+    },
+
+    {
+      "comment": "参与马赛克图的影片类型（= 列）。改这个数组就换一批列，其它地方一行都不用动",
+      "name": "genres",
+      "value": ["Drama", "Comedy", "Action", "Adventure", "Thriller/Suspense", "Horror"]
+    },
+    {
+      "comment": "参与马赛克图的 MPAA 分级（= 列内分段）。数组顺序既是图例顺序，也是内层 stack 自下而上的堆叠顺序",
+      "name": "ratings",
+      "value": ["Not Rated", "G", "PG", "PG-13", "R"]
+    }
+  ],
+
+  "data": [
+    {
+      "comment": "瀑布图数据：一张虚构的年度损益表，单位万元。kind='total' 的行是从 0 起画的合计柱（首行营业收入、末行净利润）",
+      "name": "pnl",
+      "values": [
+        { "label": "营业收入", "delta": 1200, "kind": "total" },
+        { "label": "原材料成本", "delta": -430, "kind": "delta" },
+        { "label": "制造费用", "delta": -165, "kind": "delta" },
+        { "label": "物流仓储", "delta": -78, "kind": "delta" },
+        { "label": "研发投入", "delta": -142, "kind": "delta" },
+        { "label": "销售费用", "delta": -96, "kind": "delta" },
+        { "label": "管理费用", "delta": -63, "kind": "delta" },
+        { "label": "汇兑收益", "delta": 34, "kind": "delta" },
+        { "label": "政府补贴", "delta": 52, "kind": "delta" },
+        { "label": "所得税", "delta": -47, "kind": "delta" },
+        { "label": "净利润", "delta": 0, "kind": "total" }
+      ],
+      "transform": [
+        {
+          "comment": "核心一步：window 的 sum 默认窗口是 [null, 0]（首行到当前行），于是 cum 就是逐行累计和。同一个 window 里再用 lead 取下一行的 label，给连接虚线定右端点",
+          "type": "window",
+          "ops": ["sum", "lead"],
+          "fields": ["delta", "label"],
+          "as": ["cum", "nextLabel"]
+        },
+        {
+          "comment": "合计柱从 0 画到累计值；增减柱从上一行的累计值（cum - delta）画到本行的累计值",
+          "type": "formula",
+          "expr": "datum.kind === 'total' ? 0 : datum.cum - datum.delta",
+          "as": "y0"
+        },
+        { "type": "formula", "expr": "datum.cum", "as": "y1" },
+        {
+          "comment": "涨 / 跌 / 合计三分类，喂给 ordinal 颜色比例尺和图例",
+          "type": "formula",
+          "expr": "datum.kind === 'total' ? 'total' : (datum.delta >= 0 ? 'increase' : 'decrease')",
+          "as": "cat"
+        },
+        {
+          "comment": "合计柱标累计值（无符号），增减柱标带正负号的增量：'+,.0f' 里的 + 就是强制显示符号",
+          "type": "formula",
+          "expr": "datum.kind === 'total' ? format(datum.cum, ',.0f') : format(datum.delta, '+,.0f')",
+          "as": "tag"
+        }
+      ]
+    },
+    {
+      "comment": "连接虚线的数据源：末行没有下一根柱子，lead 返回 null，过滤掉",
+      "name": "pnl-links",
+      "source": "pnl",
+      "transform": [
+        { "type": "filter", "expr": "datum.nextLabel != null" }
+      ]
+    },
+
+    {
+      "comment": "马赛克图原始数据。movies.json 是 JSON，不需要写 format；但必须先剔掉类型/分级为 null 的行，否则 ordinal domain 会混进 null",
+      "name": "movies",
+      "url": "../../assets/data/movies.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "indexof(genres, datum['Major Genre']) >= 0 && indexof(ratings, datum['MPAA Rating']) >= 0"
+        },
+        { "type": "formula", "expr": "datum['Major Genre']", "as": "genre" },
+        { "type": "formula", "expr": "datum['MPAA Rating']", "as": "rating" },
+        {
+          "comment": "把分级映射成数字次序，内层 stack 靠它决定自下而上的堆叠顺序",
+          "type": "formula",
+          "expr": "indexof(ratings, datum['MPAA Rating'])",
+          "as": "rank"
+        },
+        {
+          "comment": "列联表本体：每个 (类型, 分级) 一行，n = 影片数",
+          "type": "aggregate",
+          "groupby": ["genre", "rating", "rank"],
+          "ops": ["count"],
+          "as": ["n"]
+        }
+      ]
+    },
+    {
+      "comment": "外层 stack：先把列联表压成每列一行，再 stack 出列的 x 区间。offset=normalize 把区间归一到 0~1，于是列宽 ∝ 该列影片数占比",
+      "name": "mari-cols",
+      "source": "movies",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["genre"],
+          "fields": ["n"],
+          "ops": ["sum"],
+          "as": ["colN"]
+        },
+        {
+          "type": "stack",
+          "field": "colN",
+          "sort": { "field": "colN", "order": "descending" },
+          "offset": "normalize",
+          "as": ["cx0", "cx1"]
+        },
+        { "type": "formula", "expr": "datum.cx1 - datum.cx0", "as": "colShare" },
+        { "type": "formula", "expr": "0.5 * (datum.cx0 + datum.cx1)", "as": "cxMid" },
+        {
+          "comment": "stack 只写字段、不重排元组，所以这里显式 collect 一次，让 row_number 拿到从左到右的真实列序（列名交错换行防重叠要用）",
+          "type": "collect",
+          "sort": { "field": "cx0" }
+        },
+        { "type": "window", "ops": ["row_number"], "as": ["colIdx"] }
+      ]
+    },
+    {
+      "comment": "内层 stack：按列（genre）分组再 stack 一次，normalize 得到列内 0~1 的 y 区间；随后 lookup 把外层算好的 x 区间贴回每个格子。数据流无环：mari-cells 和 mari-cols 都直接从 movies 派生",
+      "name": "mari-cells",
+      "source": "movies",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": ["genre"],
+          "field": "n",
+          "sort": { "field": "rank" },
+          "offset": "normalize",
+          "as": ["y0", "y1"]
+        },
+        {
+          "type": "lookup",
+          "from": "mari-cols",
+          "key": "genre",
+          "fields": ["genre"],
+          "values": ["cx0", "cx1", "colN", "colShare"]
+        },
+        { "type": "formula", "expr": "datum.n / datum.colN", "as": "share" }
+      ]
+    },
+    {
+      "comment": "只给足够大的格子生成百分比标签：两个像素阈值分别管高度和宽度。注意这里用的是顶层 signal（panelH / mariW），因为顶层 data 看不到 group 内部的局部 signal",
+      "name": "mari-labels",
+      "source": "mari-cells",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "(datum.y1 - datum.y0) * panelH >= minCellH && (datum.cx1 - datum.cx0) * mariW >= minCellW"
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "wfColor",
+      "type": "ordinal",
+      "domain": ["increase", "decrease", "total"],
+      "range": ["#2f9e5b", "#d1495b", "#4e79a7"]
+    },
+    {
+      "name": "mariColor",
+      "type": "ordinal",
+      "domain": { "signal": "ratings" },
+      "range": { "scheme": "blues", "count": 5, "extent": [0.32, 1] }
+    }
+  ],
+
+  "marks": [
+    {
+      "comment": "===== 左面板：瀑布图 =====",
+      "type": "group",
+      "name": "waterfall",
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "width": { "signal": "wfW" },
+          "height": { "signal": "panelH" }
+        },
+        "update": {
+          "y": { "signal": "panelTop" }
+        }
+      },
+
+      "signals": [
+        {
+          "comment": "关键：group 内部的 scale 写 \"range\": \"width\"/\"height\" 解析的是**外层**同名 signal。给 group 声明同名局部 signal，子图才会按自己的尺寸画",
+          "name": "width",
+          "update": "wfW"
+        },
+        { "name": "height", "update": "panelH" }
+      ],
+
+      "scales": [
+        {
+          "name": "xw",
+          "type": "band",
+          "domain": { "data": "pnl", "field": "label" },
+          "range": "width",
+          "padding": { "signal": "barPad" }
+        },
+        {
+          "name": "yw",
+          "type": "linear",
+          "domain": { "data": "pnl", "field": "y1" },
+          "range": [{ "signal": "height" }, 18],
+          "zero": true,
+          "nice": true
+        }
+      ],
+
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "xw",
+          "title": "损益项目",
+          "labelAngle": -35,
+          "labelAlign": "right",
+          "labelBaseline": "middle",
+          "labelFontSize": 10,
+          "labelPadding": 4
+        },
+        {
+          "orient": "left",
+          "scale": "yw",
+          "title": "累计金额（万元）",
+          "format": ",.0f",
+          "tickCount": 6,
+          "grid": true,
+          "gridOpacity": 0.25
+        }
+      ],
+
+      "legends": [
+        {
+          "fill": "wfColor",
+          "orient": "none",
+          "legendX": 0,
+          "legendY": -76,
+          "direction": "horizontal",
+          "title": "柱子含义",
+          "titleFontSize": 11,
+          "labelFontSize": 11,
+          "symbolType": "square",
+          "encode": {
+            "labels": {
+              "update": {
+                "text": {
+                  "signal": "datum.value === 'increase' ? '增加' : datum.value === 'decrease' ? '减少' : '合计（自 0 起）'"
+                }
+              }
+            }
+          }
+        }
+      ],
+
+      "marks": [
+        {
+          "comment": "连接虚线：从第 i 根柱子的右边缘拉到第 i+1 根柱子的左边缘，高度取第 i 行的累计值 cum —— 这条线正好落在下一根柱子的起点上",
+          "type": "rule",
+          "from": { "data": "pnl-links" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "scale('xw', datum.label) + bandwidth('xw')" },
+              "x2": { "signal": "scale('xw', datum.nextLabel)" },
+              "y": { "scale": "yw", "field": "cum" },
+              "stroke": { "value": "#8b949e" },
+              "strokeWidth": { "value": 1 },
+              "strokeDash": { "value": [3, 3] },
+              "opacity": { "signal": "showLinks ? 1 : 0" }
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "from": { "data": "pnl" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "xw", "field": "label" },
+              "width": { "scale": "xw", "band": 1 },
+              "fill": { "scale": "wfColor", "field": "cat" },
+              "tooltip": {
+                "signal": "datum.kind === 'total' ? datum.label + '：' + format(datum.cum, ',.0f') + ' 万元' : datum.label + '：' + format(datum.delta, '+,.0f') + ' 万元，累计 ' + format(datum.cum, ',.0f')"
+              }
+            },
+            "update": {
+              "y": { "scale": "yw", "field": "y0" },
+              "y2": { "scale": "yw", "field": "y1" },
+              "fillOpacity": { "value": 1 }
+            },
+            "hover": {
+              "fillOpacity": { "value": 0.6 }
+            }
+          }
+        },
+        {
+          "comment": "数值标在柱子外侧：跌柱标在下沿之下，涨柱与合计柱标在上沿之上",
+          "type": "text",
+          "from": { "data": "pnl" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "scale('xw', datum.label) + 0.5 * bandwidth('xw')" },
+              "y": {
+                "signal": "datum.cat === 'decrease' ? scale('yw', min(datum.y0, datum.y1)) + 12 : scale('yw', max(datum.y0, datum.y1)) - 8"
+              },
+              "text": { "field": "tag" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 10 },
+              "fill": { "scale": "wfColor", "field": "cat" },
+              "opacity": { "signal": "showValues ? 1 : 0" }
+            }
+          }
+        },
+        {
+          "comment": "单位说明放在面板右上的空白区（营收柱之后累计值一路走低，右上角天然是空的）",
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "width - 2" },
+              "y": { "value": 4 },
+              "text": { "value": "单位：万元" },
+              "align": { "value": "right" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 11 },
+              "fill": { "value": "#57606a" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "comment": "===== 右面板：马赛克 / Marimekko =====",
+      "type": "group",
+      "name": "marimekko",
+      "encode": {
+        "enter": {
+          "width": { "signal": "mariW" },
+          "height": { "signal": "panelH" }
+        },
+        "update": {
+          "x": { "signal": "mariX" },
+          "y": { "signal": "panelTop" }
+        }
+      },
+
+      "signals": [
+        { "name": "width", "update": "mariW" },
+        { "name": "height", "update": "panelH" }
+      ],
+
+      "scales": [
+        {
+          "name": "xm",
+          "type": "linear",
+          "domain": [0, 1],
+          "range": "width",
+          "zero": true
+        },
+        {
+          "name": "ym",
+          "type": "linear",
+          "domain": [0, 1],
+          "range": "height",
+          "zero": true
+        }
+      ],
+
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "xm",
+          "title": "影片数累计占比（列宽 ∝ 该类型影片数）",
+          "format": ".0%",
+          "tickCount": 5
+        },
+        {
+          "orient": "left",
+          "scale": "ym",
+          "title": "列内 MPAA 分级构成",
+          "format": ".0%",
+          "tickCount": 5
+        }
+      ],
+
+      "legends": [
+        {
+          "fill": "mariColor",
+          "orient": "none",
+          "legendX": 0,
+          "legendY": -76,
+          "direction": "horizontal",
+          "title": "MPAA 分级（自下而上堆叠）",
+          "titleFontSize": 11,
+          "labelFontSize": 11,
+          "symbolType": "square"
+        }
+      ],
+
+      "marks": [
+        {
+          "comment": "格子：x 区间来自外层 stack（列宽），y 区间来自内层 stack（列内构成）；colGap 用像素偏移抠出列缝",
+          "type": "rect",
+          "from": { "data": "mari-cells" },
+          "encode": {
+            "enter": {
+              "tooltip": {
+                "signal": "datum.genre + ' · ' + datum.rating + '：' + datum.n + ' 部，占本列 ' + format(datum.share, '.1%')"
+              }
+            },
+            "update": {
+              "x": { "signal": "scale('xm', datum.cx0) + colGap / 2" },
+              "x2": { "signal": "scale('xm', datum.cx1) - colGap / 2" },
+              "y": { "scale": "ym", "field": "y0" },
+              "y2": { "scale": "ym", "field": "y1" },
+              "fill": { "scale": "mariColor", "field": "rating" },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.5 },
+              "fillOpacity": { "value": 1 }
+            },
+            "hover": {
+              "fillOpacity": { "value": 0.65 }
+            }
+          }
+        },
+        {
+          "comment": "格子里的列内占比；深色格子（rank >= 3，即 PG-13 / R）用白字",
+          "type": "text",
+          "from": { "data": "mari-labels" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "scale('xm', 0.5 * (datum.cx0 + datum.cx1))" },
+              "y": { "signal": "scale('ym', 0.5 * (datum.y0 + datum.y1))" },
+              "text": { "signal": "format(datum.share, '.0%')" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 10 },
+              "fill": { "signal": "datum.rank >= 3 ? '#ffffff' : '#0b2545'" }
+            }
+          }
+        },
+        {
+          "comment": "列名（类型 + 列宽占比）贴在面板上沿。两处防重叠：① 奇偶列交错成两行（colIdx 来自 collect + row_number），长名字才不会左右压住；② 首列改左对齐、末列改右对齐，标签就不会探出面板边界 —— 不用知道文字实际宽度，靠对齐点解决",
+          "type": "text",
+          "from": { "data": "mari-cols" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": {
+                "signal": "datum.cx0 <= 0 ? 0 : (datum.cx1 >= 1 ? width : scale('xm', datum.cxMid))"
+              },
+              "y": { "signal": "datum.colIdx % 2 === 1 ? -22 : -6" },
+              "text": { "signal": "datum.genre + ' ' + format(datum.colShare, '.0%')" },
+              "align": {
+                "signal": "datum.cx0 <= 0 ? 'left' : (datum.cx1 >= 1 ? 'right' : 'center')"
+              },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#24292f" }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

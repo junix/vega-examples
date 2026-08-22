@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>41 邻接矩阵 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '41-matrix-adjacency',
+  group: 'F. 稀有与复杂图形',
+  title: '41 · 邻接矩阵：signal 驱动行列顺序的网络矩阵视图',
+  concepts: [
+    'format.property',
+    'data.source 数组合并',
+    'transform: formula 镜像边表',
+    'transform: aggregate 求度数',
+    'transform: lookup',
+    'transform: collect（signal 排序键）',
+    'transform: window（row_number / lag）',
+    'scale.domain 用 signal（pluck）',
+    'band scale 共用 domain',
+    'mark: rect / rule / text',
+    'text angle -90',
+    'hover 十字高亮'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      切换 <code>orderBy</code> 下拉框：同一份数据、同一批格子，只改行列顺序，
+      「一团噪点」和「沿对角线的社群方块」之间来回切换 —— 这就是邻接矩阵的核心结论：
+      <b>矩阵的可读性完全取决于行列顺序</b>。把鼠标移到格子或行列标签上会十字高亮整行整列；
+      <code>colorBy</code> 切换「权重」/「是否同社群」两种语义，<code>encodeSize</code>
+      让格子边长也编码权重，<code>labelMinDegree</code> 控制标签密度。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

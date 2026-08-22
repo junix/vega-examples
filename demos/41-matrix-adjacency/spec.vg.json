@@ -1,0 +1,544 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "邻接矩阵：把《悲惨世界》共现网络画成 77×77 的格子矩阵；边表镜像成对称矩阵，行列顺序由 signal 驱动的 band scale domain 决定，悬停十字高亮整行整列",
+  "width": 620,
+  "height": 620,
+  "padding": 6,
+  "autosize": { "type": "pad" },
+
+  "title": {
+    "text": "《悲惨世界》人物共现邻接矩阵",
+    "subtitle": "行与列是同一批 77 个人物、同一顺序；格子 = 两人共同出场的章节数",
+    "anchor": "start",
+    "frame": "group",
+    "offset": 10,
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitlePadding": 4
+  },
+
+  "signals": [
+    {
+      "description": "本 demo 的技术核心：行列顺序。它只改一个排序键，矩阵的可读性天差地别",
+      "name": "orderBy",
+      "value": "group",
+      "bind": {
+        "input": "select",
+        "options": ["name", "group", "degree", "strength", "group+degree"],
+        "labels": ["字母序", "社群 group", "度数（降序）", "加权强度（降序）", "社群 + 度数"]
+      }
+    },
+    {
+      "description": "格子填色的语义：连续的边权重 vs 离散的“两端是否同社群”",
+      "name": "colorBy",
+      "value": "weight",
+      "bind": {
+        "input": "select",
+        "options": ["weight", "community"],
+        "labels": ["边权重（连续）", "是否同社群（离散）"]
+      }
+    },
+    {
+      "description": "打开后格子边长也编码权重（面积 ∝ 权重），颜色与大小双通道冗余编码",
+      "name": "encodeSize",
+      "value": false,
+      "bind": { "input": "checkbox" }
+    },
+    {
+      "description": "标签密度阀门：只给度数 ≥ 该值的人物写名字。77 个名字全写会糊成一团",
+      "name": "labelMinDegree",
+      "value": 4,
+      "bind": { "input": "range", "min": 0, "max": 36, "step": 1 }
+    },
+
+    {
+      "description": "排序引擎（本 demo 的技术核心）：把 orderBy 翻译成三级比较键。注意 collect 的 sort 里每个数组元素各自是一个 signal —— 不能写成“一个值为数组的 signal”，那样会静默排错，见 README",
+      "name": "sortField1",
+      "update": "orderBy === 'degree' ? 'degree' : orderBy === 'strength' ? 'strength' : orderBy === 'name' ? 'name' : 'group'"
+    },
+    {
+      "name": "sortOrder1",
+      "update": "orderBy === 'degree' || orderBy === 'strength' ? 'descending' : 'ascending'"
+    },
+    {
+      "description": "第二级键：只有“社群 + 度数”才需要在社群内部再按度数降序，其余情况退化成按名字",
+      "name": "sortField2",
+      "update": "orderBy === 'group+degree' ? 'degree' : 'name'"
+    },
+    {
+      "name": "sortOrder2",
+      "update": "orderBy === 'group+degree' ? 'descending' : 'ascending'"
+    },
+    {
+      "description": "把 orderBy 翻成人话，写进图下方的说明行",
+      "name": "orderLabel",
+      "update": "orderBy === 'name' ? '字母序（等于原始节点表顺序打乱后的中性基线）' : orderBy === 'group' ? '按社群 group 分块' : orderBy === 'degree' ? '按度数降序' : orderBy === 'strength' ? '按加权强度降序' : '先按社群、社群内再按度数降序'"
+    },
+    {
+      "description": "只有按社群排序时，画社群分块虚线才有意义",
+      "name": "groupBlocks",
+      "update": "orderBy === 'group' || orderBy === 'group+degree'"
+    },
+    { "name": "nodeCount", "update": "length(data('nodes-ordered'))" },
+    { "name": "edgeCount", "update": "length(data('links-raw'))" },
+    { "name": "cellCount", "update": "length(data('matrix'))" },
+    {
+      "description": "一格的步长（含间隙）。band scale 的 range 从 0 开始，所以第 k 格的左边界就是 (k-1)*stepSize",
+      "name": "stepSize",
+      "update": "width / max(nodeCount, 1)"
+    },
+    {
+      "description": "标签字号跟着格子大小走，避免换数据集时字压字",
+      "name": "labelFontSize",
+      "update": "min(9, max(6, stepSize - 1.2))"
+    },
+
+    {
+      "description": "悬停的行（人物名）。矩阵图没有十字高亮基本不可用",
+      "name": "hoverRow",
+      "value": null,
+      "on": [
+        { "events": "@cells:mouseover", "update": "datum.rowName" },
+        { "events": "@rowLabels:mouseover", "update": "datum.name" },
+        { "events": "@colLabels:mouseover", "update": "null" },
+        { "events": "@cells:mouseout, @rowLabels:mouseout", "update": "null" }
+      ]
+    },
+    {
+      "description": "悬停的列（人物名）",
+      "name": "hoverCol",
+      "value": null,
+      "on": [
+        { "events": "@cells:mouseover", "update": "datum.colName" },
+        { "events": "@colLabels:mouseover", "update": "datum.name" },
+        { "events": "@rowLabels:mouseover", "update": "null" },
+        { "events": "@cells:mouseout, @colLabels:mouseout", "update": "null" }
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "description": "同一个 JSON 读两次，用 format.property 各取一段：nodes 是 77 个人物，links 是 254 条无向边",
+      "name": "nodes-raw",
+      "url": "../../assets/data/miserables.json",
+      "format": { "type": "json", "property": "nodes" }
+    },
+    {
+      "name": "links-raw",
+      "url": "../../assets/data/miserables.json",
+      "format": { "type": "json", "property": "links" }
+    },
+
+    {
+      "description": "原方向：row = source, col = target",
+      "name": "edges-ab",
+      "source": "links-raw",
+      "transform": [
+        { "type": "formula", "as": "row", "expr": "datum.source" },
+        { "type": "formula", "as": "col", "expr": "datum.target" }
+      ]
+    },
+    {
+      "description": "镜像方向：row = target, col = source。两个分支各自从 links-raw 派生，Vega 会插入 derive 的 Relay 复制元组，所以互不污染",
+      "name": "edges-ba",
+      "source": "links-raw",
+      "transform": [
+        { "type": "formula", "as": "row", "expr": "datum.target" },
+        { "type": "formula", "as": "col", "expr": "datum.source" }
+      ]
+    },
+    {
+      "description": "两半合并 = 对称矩阵的全部 508 个非空格子",
+      "name": "edges",
+      "source": ["edges-ab", "edges-ba"]
+    },
+
+    {
+      "description": "在对称边表上按 row 聚合，就同时得到度数（邻居个数）与加权强度（权重之和）",
+      "name": "degree",
+      "source": "edges",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["row"],
+          "fields": ["value", "value"],
+          "ops": ["count", "sum"],
+          "as": ["degree", "strength"]
+        }
+      ]
+    },
+
+    {
+      "description": "行列顺序的唯一真源：把度数接到节点上 → collect 按 signal 驱动的比较键真正重排 → window 记下 1 基的 rank。xNode/yNode 的 domain 再用 pluck 从这个数据集取顺序",
+      "name": "nodes-ordered",
+      "source": "nodes-raw",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "degree",
+          "key": "row",
+          "fields": ["index"],
+          "values": ["degree", "strength"],
+          "default": 0
+        },
+        {
+          "description": "真正重排数据集：三级比较键的前两级来自 signal，最后一级固定用 name 保证结果稳定唯一",
+          "type": "collect",
+          "sort": {
+            "field": [{ "signal": "sortField1" }, { "signal": "sortField2" }, "name"],
+            "order": [{ "signal": "sortOrder1" }, { "signal": "sortOrder2" }, "ascending"]
+          }
+        },
+        {
+          "description": "1 基的行列序号。第 k 行的上边界就是 (k-1)*stepSize，画社群分块线时不必再查 scale",
+          "type": "window",
+          "sort": {
+            "field": [{ "signal": "sortField1" }, { "signal": "sortField2" }, "name"],
+            "order": [{ "signal": "sortOrder1" }, { "signal": "sortOrder2" }, "ascending"]
+          },
+          "ops": ["row_number"],
+          "as": ["rank"]
+        }
+      ]
+    },
+
+    {
+      "description": "格子数据：把边两端的人物名与社群号 lookup 过来，再算“是否同社群”",
+      "name": "matrix",
+      "source": "edges",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "nodes-raw",
+          "key": "index",
+          "fields": ["row"],
+          "values": ["name", "group"],
+          "as": ["rowName", "rowGroup"]
+        },
+        {
+          "type": "lookup",
+          "from": "nodes-raw",
+          "key": "index",
+          "fields": ["col"],
+          "values": ["name", "group"],
+          "as": ["colName", "colGroup"]
+        },
+        { "type": "formula", "as": "sameGroup", "expr": "datum.rowGroup === datum.colGroup" }
+      ]
+    },
+
+    {
+      "description": "标签密度阀门：labelMinDegree 是 signal，拖动它数据集会重算",
+      "name": "labels",
+      "source": "nodes-ordered",
+      "transform": [
+        { "type": "filter", "expr": "datum.degree >= labelMinDegree" }
+      ]
+    },
+
+    {
+      "description": "社群分界：用 window 的 lag 拿到前一行的 group，group 变了就是一条分块线。非社群排序时由 mark 的 strokeOpacity 隐藏（数据集本身始终非空）",
+      "name": "group-breaks",
+      "source": "nodes-ordered",
+      "transform": [
+        {
+          "type": "window",
+          "sort": {
+            "field": [{ "signal": "sortField1" }, { "signal": "sortField2" }, "name"],
+            "order": [{ "signal": "sortOrder1" }, { "signal": "sortOrder2" }, "ascending"]
+          },
+          "ops": ["lag"],
+          "fields": ["group"],
+          "as": ["prevGroup"]
+        },
+        { "type": "filter", "expr": "datum.prevGroup != null && datum.prevGroup !== datum.group" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "xNode",
+      "type": "band",
+      "domain": { "signal": "pluck(data('nodes-ordered'), 'name')" },
+      "range": "width",
+      "padding": 0.08
+    },
+    {
+      "name": "yNode",
+      "type": "band",
+      "domain": { "signal": "pluck(data('nodes-ordered'), 'name')" },
+      "range": "height",
+      "padding": 0.08
+    },
+    {
+      "name": "weight",
+      "type": "sqrt",
+      "domain": { "data": "matrix", "field": "value" },
+      "range": { "scheme": "blues", "extent": [0.3, 1] },
+      "zero": false
+    },
+    {
+      "name": "wSize",
+      "type": "sqrt",
+      "domain": { "data": "matrix", "field": "value" },
+      "range": [0.3, 1],
+      "zero": true
+    },
+    {
+      "name": "group",
+      "type": "ordinal",
+      "domain": { "data": "nodes-raw", "field": "group", "sort": true },
+      "range": { "scheme": "tableau20" }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "weight",
+      "type": "gradient",
+      "title": "共同出场章节数",
+      "orient": "right",
+      "direction": "vertical",
+      "gradientLength": 150,
+      "values": [1, 5, 10, 20, 31],
+      "format": "d"
+    },
+    {
+      "fill": "group",
+      "type": "symbol",
+      "symbolType": "square",
+      "symbolSize": 90,
+      "title": "社群 group",
+      "orient": "right",
+      "direction": "vertical",
+      "columns": 1,
+      "format": "d"
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "矩阵底板：没有边的格子留白，一眼看出网络有多稀疏（508 / 5929 ≈ 8.6%）",
+      "type": "rect",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "value": 0 },
+          "width": { "signal": "width" },
+          "height": { "signal": "height" },
+          "fill": { "value": "#ffffff" },
+          "stroke": { "value": "#c8ccd0" },
+          "strokeWidth": { "value": 1 }
+        }
+      }
+    },
+    {
+      "description": "十字高亮之横带。hoverRow 为 null 时高度收成 0（而不是挪到画布外，那会把场景包围盒撑坏），既避免 scale(null) 算出非法坐标，也不影响 autosize 计算",
+      "type": "rect",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "width": { "signal": "width" },
+          "y": { "signal": "hoverRow === null ? 0 : scale('yNode', hoverRow) - (stepSize - bandwidth('yNode')) / 2" },
+          "height": { "signal": "hoverRow === null ? 0 : stepSize" },
+          "fill": { "value": "#f2b23e" },
+          "fillOpacity": { "signal": "hoverRow === null ? 0 : 0.22" }
+        }
+      }
+    },
+    {
+      "description": "十字高亮之竖带",
+      "type": "rect",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "y": { "value": 0 },
+          "height": { "signal": "height" },
+          "x": { "signal": "hoverCol === null ? 0 : scale('xNode', hoverCol) - (stepSize - bandwidth('xNode')) / 2" },
+          "width": { "signal": "hoverCol === null ? 0 : stepSize" },
+          "fill": { "value": "#f2b23e" },
+          "fillOpacity": { "signal": "hoverCol === null ? 0 : 0.22" }
+        }
+      }
+    },
+    {
+      "description": "对角线：自环位置。同一个人和自己没有“共现”，所以这一条永远是空的，画出来当作行=列的参照线",
+      "name": "diagonal",
+      "type": "rect",
+      "from": { "data": "nodes-ordered" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "scale": "xNode", "field": "name" },
+          "width": { "scale": "xNode", "band": 1 },
+          "y": { "scale": "yNode", "field": "name" },
+          "height": { "scale": "yNode", "band": 1 },
+          "fill": { "value": "#e3e6e9" }
+        }
+      }
+    },
+    {
+      "description": "矩阵格子。x 用列名、y 用行名，两把 band scale 共用同一个 domain signal —— 所以换排序时行列一起动，矩阵始终对称",
+      "name": "cells",
+      "type": "rect",
+      "from": { "data": "matrix" },
+      "encode": {
+        "update": {
+          "x": { "signal": "scale('xNode', datum.colName) + (1 - (encodeSize ? scale('wSize', datum.value) : 1)) * bandwidth('xNode') / 2" },
+          "width": { "signal": "bandwidth('xNode') * (encodeSize ? scale('wSize', datum.value) : 1)" },
+          "y": { "signal": "scale('yNode', datum.rowName) + (1 - (encodeSize ? scale('wSize', datum.value) : 1)) * bandwidth('yNode') / 2" },
+          "height": { "signal": "bandwidth('yNode') * (encodeSize ? scale('wSize', datum.value) : 1)" },
+          "fill": { "signal": "colorBy === 'weight' ? scale('weight', datum.value) : (datum.sameGroup ? scale('group', datum.rowGroup) : '#cbd1d6')" },
+          "fillOpacity": { "signal": "(hoverRow === null && hoverCol === null) ? 1 : ((datum.rowName === hoverRow || datum.colName === hoverCol) ? 1 : 0.16)" },
+          "tooltip": { "signal": "{'行': datum.rowName, '列': datum.colName, '共同出场章节': datum.value, '同社群': datum.sameGroup ? '是（group ' + datum.rowGroup + '）' : '否（' + datum.rowGroup + ' × ' + datum.colGroup + '）'}" }
+        }
+      }
+    },
+    {
+      "description": "社群分块横线：第 rank 格的上边界 = (rank - 1) * stepSize，纯算术，不用查 scale",
+      "type": "rule",
+      "from": { "data": "group-breaks" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "x2": { "signal": "width" },
+          "y": { "signal": "(datum.rank - 1) * stepSize" },
+          "y2": { "signal": "(datum.rank - 1) * stepSize" },
+          "stroke": { "value": "#5a6570" },
+          "strokeWidth": { "value": 0.8 },
+          "strokeDash": { "value": [3, 2] },
+          "strokeOpacity": { "signal": "groupBlocks ? 0.7 : 0" }
+        }
+      }
+    },
+    {
+      "description": "社群分块竖线",
+      "type": "rule",
+      "from": { "data": "group-breaks" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "y": { "value": 0 },
+          "y2": { "signal": "height" },
+          "x": { "signal": "(datum.rank - 1) * stepSize" },
+          "x2": { "signal": "(datum.rank - 1) * stepSize" },
+          "stroke": { "value": "#5a6570" },
+          "strokeWidth": { "value": 0.8 },
+          "strokeDash": { "value": [3, 2] },
+          "strokeOpacity": { "signal": "groupBlocks ? 0.7 : 0" }
+        }
+      }
+    },
+    {
+      "description": "左侧社群色带：给全部 77 行都涂一条 4px 宽的色块。标签只写高度数节点，但色带覆盖每一行，所以任何排序下都能看出社群边界",
+      "type": "rect",
+      "from": { "data": "nodes-ordered" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "value": -5 },
+          "width": { "value": 4 },
+          "y": { "scale": "yNode", "field": "name" },
+          "height": { "scale": "yNode", "band": 1 },
+          "fill": { "scale": "group", "field": "group" }
+        }
+      }
+    },
+    {
+      "description": "上侧社群色带",
+      "type": "rect",
+      "from": { "data": "nodes-ordered" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "y": { "value": -5 },
+          "height": { "value": 4 },
+          "x": { "scale": "xNode", "field": "name" },
+          "width": { "scale": "xNode", "band": 1 },
+          "fill": { "scale": "group", "field": "group" }
+        }
+      }
+    },
+    {
+      "description": "行标签：贴在色带外侧，右对齐。字色用中性深灰而不是社群色 —— tableau20 里的浅色在白底上做 7px 细笔画的文字读不清，社群信息交给旁边的色带",
+      "name": "rowLabels",
+      "type": "text",
+      "from": { "data": "labels" },
+      "encode": {
+        "update": {
+          "x": { "value": -8 },
+          "y": { "scale": "yNode", "field": "name", "band": 0.5 },
+          "text": { "field": "name" },
+          "align": { "value": "right" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "signal": "labelFontSize" },
+          "fill": { "signal": "datum.name === hoverRow ? '#111111' : '#4a5462'" },
+          "fontWeight": { "signal": "datum.name === hoverRow ? 'bold' : 'normal'" },
+          "tooltip": { "signal": "datum.name + '：度数 ' + datum.degree + '，加权强度 ' + datum.strength + '，社群 ' + datum.group" }
+        }
+      }
+    },
+    {
+      "description": "列标签：angle -90 把文字转成竖排。align=left + baseline=middle 让锚点落在“列中心、色带外沿”，文字朝上生长",
+      "name": "colLabels",
+      "type": "text",
+      "from": { "data": "labels" },
+      "encode": {
+        "update": {
+          "x": { "scale": "xNode", "field": "name", "band": 0.5 },
+          "y": { "value": -8 },
+          "text": { "field": "name" },
+          "angle": { "value": -90 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "signal": "labelFontSize" },
+          "fill": { "signal": "datum.name === hoverCol ? '#111111' : '#4a5462'" },
+          "fontWeight": { "signal": "datum.name === hoverCol ? 'bold' : 'normal'" },
+          "tooltip": { "signal": "datum.name + '：度数 ' + datum.degree + '，加权强度 ' + datum.strength + '，社群 ' + datum.group" }
+        }
+      }
+    },
+    {
+      "description": "说明行 1：当前排序方案与规模",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "height + 20" },
+          "text": { "signal": "'行列顺序：' + orderLabel + '　|　' + nodeCount + ' 个人物 × ' + nodeCount + ' 个人物 = ' + (nodeCount * nodeCount) + ' 格，其中 ' + cellCount + ' 格有边（' + edgeCount + ' 条无向边镜像成两半），填充率 ' + format(cellCount / (nodeCount * nodeCount), '.1%')" },
+          "align": { "value": "left" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 11 },
+          "fill": { "value": "#3c4450" }
+        }
+      }
+    },
+    {
+      "description": "说明行 2：交互提示 / 悬停读数",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "height + 38" },
+          "text": { "signal": "hoverRow === null && hoverCol === null ? '把鼠标移到格子（或行列标签）上：十字高亮该人物的整行整列；灰色对角格是自环位置，恒为空' : '悬停：行 ' + (hoverRow === null ? '—' : hoverRow) + '　×　列 ' + (hoverCol === null ? '—' : hoverCol)" },
+          "align": { "value": "left" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 11 },
+          "fill": { "signal": "hoverRow === null && hoverCol === null ? '#7a838f' : '#111111'" }
+        }
+      }
+    }
+  ],
+
+  "config": {
+    "legend": { "labelFontSize": 10, "titleFontSize": 11, "symbolStrokeWidth": 0, "gradientThickness": 12 },
+    "title": { "color": "#1c2430", "subtitleColor": "#5a6570" }
+  }
+}

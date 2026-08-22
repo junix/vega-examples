@@ -17,9 +17,12 @@
 | `data[4]` `quarters` | 列头数据 | 4 条记录，只为画出 q1..q4 四个列标题 |
 | `scales` `color` | 季度配色 | 顶层定义，两个分区都能按名字引用；显式 `domain` 保证颜色顺序稳定 |
 | `legends` | 季度图例 | `orient: "right"`，超出 width 的部分由默认 autosize（pad）自动扩出画布 |
-| `marks[0]` `fold-section` | 折线图分区 | `group` 标记：有自己的 `scales`/`axes`/`marks` 和独立局部坐标系，`range: "width"/"height"` 跟随 group 的宽高 |
+| `signals` | 分区几何 | `foldTop/foldHeight/pivotTop/pivotHeight`：抽成信号是为了让 group 的 `encode` 与它的**局部 height 信号**共用同一个数字 |
+| `marks[0]` `fold-section` | 折线图分区 | `group` 标记：有自己的 `scales`/`axes`/`marks` 和独立局部坐标系 |
+| `marks[0].signals` | **局部 height 信号** | `{"name": "height", "update": "foldHeight"}`。`range: "height"` 的含义是「取当前作用域里名为 height 的信号」，group mark **不会**自动把它重绑为自己的高度 —— 少了这一条，y 轴会按顶层的 630 铺开，折线直接冲出分区（详见 demos/05 的「作用域陷阱」一节） |
+| `marks[0].scales[x]` | 年份轴 | 必须显式 `"zero": false` ——线性比例尺默认把 0 纳入 domain，年份轴一旦从 0 起，2019~2024 就被压成右边缘一条竖线；`padding: 14` 是像素留白，免得首末点贴在轴两端 |
 | `marks[0].marks[1]` | facet 多序列 | `from.facet` 按 quarter 把 `sales-long` 切成 4 个子数据集 `series`，每个子分组画一条 line + 一组 symbol |
-| `marks[1]` `pivot-section` | 表格分区 | 两个 band 比例尺：`xcol`（显式 domain 定列序）定位列、`yrow`（domain 取 pivot 输出的 year 并 `sort: true`）定位行 |
+| `marks[1]` `pivot-section` | 表格分区 | 同样声明了局部 `height` 信号；两个 band 比例尺：`xcol`（显式 domain 定列序）定位列、`yrow`（domain 取 pivot 输出的 year 并 `sort: true`）定位行 |
 | `pivot-section` 内 text/rect | 表格本体 | 列头（quarters 数据，画在 y=-10）、行头（sales-pivoted 的 year，画在 x=-10）、rect 描单元格边框、text 写数值；`"band": 0.5` 取带宽中点做居中 |
 
 ### 关键概念
@@ -28,6 +31,11 @@
 - **pivot 的输出字段**：新列名来自 `field` 字段的**取值**（本例即 "q1".."q4"），不在 spec 里显式列出——数据里出现什么值，输出就有哪些列。
 - **变换可以串成管线也可以成环**：`sales-wide → sales-long → sales-pivoted → sales-cells`，pivot 后再 fold 完全合法。变换只描述数据形状，不区分「第几手」数据。
 - **group 标记分区**：一个 spec 里想放多个独立图表时，每个图表包一个 `group`，组内比例尺、坐标轴、数据都局部生效；组的位置用 `encode.enter.x/y` 指定。
+- **别忘了给 group 声明局部 `width`/`height` 信号**：这是 Vega 最容易踩且不报错的坑。
+  `range: "width"/"height"` 只是「查作用域里这个名字的信号」，group 不会自动重绑。
+  本项目的 `node tools/validate.cjs` 加了布局溢出检查专门抓它。
+- **线性比例尺的 `zero`**：默认会把 0 拉进 domain。画金额、计数时这是对的（柱状图必须从 0 起），
+  但画年份、温度、pH 这类不以 0 为基准的量时必须显式关掉。
 
 ## 试一试
 

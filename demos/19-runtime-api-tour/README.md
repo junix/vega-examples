@@ -8,13 +8,19 @@ spec 只描述"图表长什么样"；这个 demo 的主角是 `main.js`：把 Ve
 ## 运行
 
 ```sh
-../../serve.sh        # 在 vega 仓库根启动静态服务器
-# 浏览器打开 http://localhost:8000/vega-examples/demos/19-runtime-api-tour/
+../../serve.sh        # 在本项目根目录启动静态服务器
+# 浏览器打开 http://localhost:8000/demos/19-runtime-api-tour/
 ```
 
 ## spec 逐段讲解
 
 本图（cars 散点）本身没有新语法，重点在 main.js。spec 只有一处是本 demo 的关键前提：
+
+> 轴标题的一处语义提醒：`Miles_per_Gallon`（mpg）是**每加仑行驶多少英里**，属于燃油经济性指标，
+> **值越大越省油**；中文"油耗"（L/100km）方向恰好相反。本例 y 轴 domain 是 5–50，
+> 图上靠顶部的 40+ mpg 是轻量小车（mazda glc 46.6、honda civic 44.6），
+> 靠底部的 9–10 mpg 是重型 V8（hi 1200d、ford f250），与 Horsepower 的相关系数约 -0.78。
+> 所以轴标题写成"每加仑英里数，越大越省油"，不要写"油耗"——否则读者会把结论读反。
 
 | 段落 | 作用 | 本例要点 |
 | --- | --- | --- |

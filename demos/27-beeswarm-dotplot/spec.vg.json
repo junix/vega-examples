@@ -1,0 +1,437 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "同一批马力数据的两种「保留个体」画法：左侧蜂群图用 force 布局把点推开，右侧 Wilkinson 点图用 dotbin + stack 把点堆成箱柱",
+  "width": 900,
+  "height": 340,
+  "padding": 8,
+  "autosize": { "type": "pad", "resize": false },
+
+  "title": {
+    "text": "400 辆车的马力分布：蜂群图 vs Wilkinson 点图",
+    "subtitle": "数据 cars.json（已剔除 Horsepower 缺失的 6 行）· 两个面板共享同一条 x 比例尺与同一套配色",
+    "subtitleFontSize": 11,
+    "fontSize": 15,
+    "anchor": "start",
+    "offset": 4
+  },
+
+  "signals": [
+    {
+      "description": "两个面板之间留出的空隙：右面板的左侧计数轴要占掉一部分",
+      "name": "panelGap",
+      "value": 86
+    },
+    {
+      "description": "面板顶部让出的高度，用来放两个面板的小标题（避免文字画到画布外被裁掉）",
+      "name": "groupTop",
+      "value": 26
+    },
+    { "name": "panelW", "update": "(width - panelGap) / 2" },
+    { "name": "panelH", "update": "height - groupTop" },
+    { "name": "panel2X", "update": "panelW + panelGap" },
+
+    {
+      "description": "x 比例尺 nice 之后的数据跨度（马力单位）。domain()/scale() 在 signal 表达式里可用，所以像素与数据单位之间的换算率能算出来",
+      "name": "hpSpan",
+      "update": "span(domain('x'))"
+    },
+    {
+      "description": "每 1 马力对应多少像素 —— 点图要用它把「箱宽（马力）」翻译成「点直径（像素）」",
+      "name": "pxPerHp",
+      "update": "panelW / hpSpan"
+    },
+
+    {
+      "description": "蜂群图 collide 力的半径（像素），同时驱动 symbol 的面积：size = 直径的平方",
+      "name": "nodeRadius",
+      "value": 3,
+      "bind": { "input": "range", "min": 1, "max": 7, "step": 0.5, "name": "蜂群 collide 半径 nodeRadius：" }
+    },
+    {
+      "description": "forceX 强度：越大越忠实于真实马力值（横向偏移小），越小越容易被 collide 挤歪",
+      "name": "gravityX",
+      "value": 0.7,
+      "bind": { "input": "range", "min": 0.02, "max": 1, "step": 0.02, "name": "forceX 强度 gravityX：" }
+    },
+    {
+      "description": "forceY 强度：把点拉回本组的基线，决定蜂群「厚度」",
+      "name": "gravityY",
+      "value": 0.2,
+      "bind": { "input": "range", "min": 0.02, "max": 1, "step": 0.02, "name": "forceY 强度 gravityY：" }
+    },
+    {
+      "description": "static=true：仿真在一个数据流脉冲里跑满 iterations 次就收敛输出，不依赖动画帧。无头渲染（tools/validate.cjs、view.toSVG）必须这样才拿得到稳定布局",
+      "name": "staticLayout",
+      "value": true,
+      "bind": { "input": "checkbox", "name": "force static（关掉看动画）：" }
+    },
+
+    {
+      "description": "Wilkinson 点图的箱宽（马力）。点直径严格等于箱宽，所以 step 越大列越高；上限设在 4 hp 以保证最高的一列不溢出面板",
+      "name": "dotStep",
+      "value": 2.5,
+      "bind": { "input": "range", "min": 1, "max": 4, "step": 0.25, "name": "点图箱宽 dotStep（hp）：" }
+    },
+    {
+      "description": "dotbin 的 smooth：在相邻不足 step/4 的两堆之间挪点，降低堆高方差（Wilkinson 原文的平滑步骤）",
+      "name": "dotSmooth",
+      "value": false,
+      "bind": { "input": "checkbox", "name": "dotbin smooth：" }
+    },
+    {
+      "description": "一个点的直径（像素）= 箱宽 × 像素换算率。它既是 symbol 的直径，也是纵向一格的高度",
+      "name": "dotUnit",
+      "update": "dotStep * pxPerHp"
+    },
+    {
+      "description": "最高一列的点数。signal 表达式里可以用 data() 读聚合结果，从而把「数据算出来的量」喂回布局",
+      "name": "dotMax",
+      "update": "data('dot-stats').length ? data('dot-stats')[0].maxStack : 1"
+    }
+  ],
+
+  "data": [
+    {
+      "name": "cars-raw",
+      "url": "../../assets/data/cars.json"
+    },
+    {
+      "description": "cars.json 里有 6 行 Horsepower 为 null，不剔掉的话 linear domain 会被污染成 [null, 230]",
+      "name": "cars",
+      "source": "cars-raw",
+      "transform": [
+        { "type": "filter", "expr": "datum.Horsepower != null && datum.Origin != null" }
+      ]
+    },
+    {
+      "description": "每个产地的样本数，用来画蜂群图的基线与行尾的 n= 标注",
+      "name": "origins",
+      "source": "cars",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["Origin"],
+          "fields": ["Horsepower", "Horsepower"],
+          "ops": ["count", "median"],
+          "as": ["n", "medianHp"]
+        }
+      ]
+    },
+    {
+      "description": "点图两步走：dotbin 把每个点归到最近的箱位中心（写入 hpBin），stack 在同一箱位内累加 1 得到 0,1,2,… 的堆叠序号（stackLo）",
+      "name": "dots",
+      "source": "cars",
+      "transform": [
+        {
+          "type": "dotbin",
+          "field": "Horsepower",
+          "step": { "signal": "dotStep" },
+          "smooth": { "signal": "dotSmooth" },
+          "as": "hpBin"
+        },
+        {
+          "type": "stack",
+          "groupby": ["hpBin"],
+          "sort": { "field": "Horsepower" },
+          "as": ["stackLo", "stackHi"]
+        }
+      ]
+    },
+    {
+      "description": "最高列的点数，既喂给 dotMax signal，也直接给面板里的注释文字用",
+      "name": "dot-stats",
+      "source": "dots",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": ["stackHi", "hpBin"],
+          "ops": ["max", "distinct"],
+          "as": ["maxStack", "binCount"]
+        }
+      ]
+    },
+    {
+      "name": "panel-titles",
+      "values": [
+        { "px": 0, "text": "① 蜂群图 beeswarm — force 布局（forceX + forceY + collide）" },
+        { "px": 1, "text": "② Wilkinson 点图 — dotbin + stack（点直径 = 箱宽）" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": { "data": "cars", "field": "Horsepower" },
+      "range": { "signal": "[0, panelW]" },
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "origin",
+      "type": "band",
+      "domain": { "data": "cars", "field": "Origin", "sort": true },
+      "range": { "signal": "[0, panelH]" },
+      "padding": 0.1
+    },
+    {
+      "name": "dotY",
+      "type": "linear",
+      "domain": { "signal": "[0, dotMax]" },
+      "range": { "signal": "[panelH, panelH - dotMax * dotUnit]" },
+      "nice": false,
+      "zero": false
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "cars", "field": "Origin", "sort": true },
+      "range": { "scheme": "tableau10" }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "type": "symbol",
+      "title": "产地 Origin",
+      "orient": "top",
+      "direction": "horizontal",
+      "symbolType": "circle",
+      "symbolSize": 90,
+      "titleFontSize": 11,
+      "labelFontSize": 11
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "面板小标题：放在 groupTop 让出的空间里（y 为负是相对各自 group 的坐标，所以用绝对坐标画在顶部）",
+      "type": "text",
+      "from": { "data": "panel-titles" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "align": { "value": "left" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#3c3c3c" }
+        },
+        "update": {
+          "x": { "signal": "datum.px * panel2X" },
+          "y": { "value": 0 },
+          "text": { "field": "text" }
+        }
+      }
+    },
+
+    {
+      "description": "左面板：蜂群图。group mark 只是一个坐标系容器，内部 mark 与 axis 的坐标都相对它左上角",
+      "type": "group",
+      "name": "beeswarm-panel",
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "groupTop" },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "x",
+          "title": "Horsepower（马力）",
+          "format": "d",
+          "tickCount": 8,
+          "titleFontSize": 11,
+          "labelFontSize": 10
+        },
+        {
+          "orient": "left",
+          "scale": "origin",
+          "title": "产地",
+          "domain": false,
+          "ticks": false,
+          "titleFontSize": 11,
+          "labelFontSize": 11
+        }
+      ],
+
+      "marks": [
+        {
+          "description": "每组一条基线：forceY 就是把该组所有点往这条线上拉",
+          "type": "rule",
+          "from": { "data": "origins" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 0 },
+              "x2": { "signal": "panelW" },
+              "y": { "scale": "origin", "field": "Origin", "band": 0.5 },
+              "stroke": { "value": "#c8c8c8" },
+              "strokeDash": { "value": [3, 3] }
+            }
+          }
+        },
+        {
+          "description": "蜂群本体。xfocus / yfocus 是写在 enter 编码里的自定义属性 —— force 变换作用在 mark item 上，所以它的 x/y 参数可以直接引用 item 的这两个字段",
+          "name": "swarm",
+          "type": "symbol",
+          "from": { "data": "cars" },
+          "encode": {
+            "enter": {
+              "fill": { "scale": "color", "field": "Origin" },
+              "xfocus": { "scale": "x", "field": "Horsepower" },
+              "yfocus": { "scale": "origin", "field": "Origin", "band": 0.5 }
+            },
+            "update": {
+              "size": { "signal": "pow(2 * nodeRadius, 2)" },
+              "fillOpacity": { "value": 0.85 },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.5 },
+              "tooltip": {
+                "signal": "datum.Name + ' · ' + format(datum.Horsepower, 'd') + ' hp · ' + datum.Origin"
+              },
+              "zindex": { "value": 0 }
+            },
+            "hover": {
+              "stroke": { "value": "#333333" },
+              "strokeWidth": { "value": 1.5 },
+              "zindex": { "value": 1 }
+            }
+          },
+          "transform": [
+            {
+              "type": "force",
+              "static": { "signal": "staticLayout" },
+              "iterations": 300,
+              "forces": [
+                { "force": "collide", "iterations": 2, "radius": { "signal": "nodeRadius" } },
+                { "force": "x", "x": "xfocus", "strength": { "signal": "gravityX" } },
+                { "force": "y", "y": "yfocus", "strength": { "signal": "gravityY" } }
+              ]
+            }
+          ]
+        },
+        {
+          "description": "行尾标注：样本数与中位数马力",
+          "type": "text",
+          "from": { "data": "origins" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": { "value": "right" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#6b6b6b" }
+            },
+            "update": {
+              "x": { "signal": "panelW - 2" },
+              "y": { "scale": "origin", "field": "Origin", "band": 0.5, "offset": -6 },
+              "text": {
+                "signal": "'n = ' + format(datum.n, 'd') + '，中位数 ' + format(datum.medianHp, 'd') + ' hp'"
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "右面板：Wilkinson 点图。纵轴是「同一箱位内的第几个点」，一格高度恰好等于一个点的直径",
+      "type": "group",
+      "name": "dotplot-panel",
+      "encode": {
+        "update": {
+          "x": { "signal": "panel2X" },
+          "y": { "signal": "groupTop" },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "x",
+          "title": "Horsepower（马力）· 点画在箱位中心",
+          "format": "d",
+          "tickCount": 8,
+          "titleFontSize": 11,
+          "labelFontSize": 10
+        },
+        {
+          "orient": "left",
+          "scale": "dotY",
+          "title": "同一箱位内的点数",
+          "format": "d",
+          "tickMinStep": 1,
+          "grid": true,
+          "gridOpacity": 0.25,
+          "titleFontSize": 11,
+          "labelFontSize": 10
+        }
+      ],
+
+      "marks": [
+        {
+          "description": "一个圆 = 一辆车。x 用箱位中心（scale x），y 用堆叠序号（scale dotY，+0.5 让圆心落在格子中间），直径 = dotUnit（symbol 的 size 是直径的平方）",
+          "type": "symbol",
+          "from": { "data": "dots" },
+          "encode": {
+            "enter": {
+              "fill": { "scale": "color", "field": "Origin" }
+            },
+            "update": {
+              "x": { "scale": "x", "field": "hpBin" },
+              "y": { "signal": "scale('dotY', datum.stackLo + 0.5)" },
+              "size": { "signal": "pow(0.9 * dotUnit, 2)" },
+              "fillOpacity": { "value": 0.9 },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.4 },
+              "tooltip": {
+                "signal": "datum.Name + ' · ' + format(datum.Horsepower, 'd') + ' hp → 箱位中心 ' + format(datum.hpBin, '.1f') + ' hp（第 ' + format(datum.stackHi, 'd') + ' 个）'"
+              },
+              "zindex": { "value": 0 }
+            },
+            "hover": {
+              "stroke": { "value": "#333333" },
+              "strokeWidth": { "value": 1.5 },
+              "zindex": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "注释：把当前的箱宽/点直径/箱数/最高列念出来，读者拖滑块时能看到三者的联动",
+          "type": "text",
+          "from": { "data": "dot-stats" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": { "value": "right" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#6b6b6b" }
+            },
+            "update": {
+              "x": { "signal": "panelW - 2" },
+              "y": { "value": 2 },
+              "text": {
+                "signal": "'箱宽 ' + format(dotStep, '.2f') + ' hp = 点直径 ' + format(dotUnit, '.1f') + ' px　|　非空箱 ' + format(datum.binCount, 'd') + ' 个　|　最高列 ' + format(datum.maxStack, 'd') + ' 个点'"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFont": "sans-serif", "titleFont": "sans-serif" },
+    "title": { "font": "sans-serif", "subtitleFont": "sans-serif" }
+  }
+}

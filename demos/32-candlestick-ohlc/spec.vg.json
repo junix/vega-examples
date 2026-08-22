@@ -1,0 +1,490 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "K 线图 + 成交指标副图：一份数据两个纵向面板，x 比例尺在外层共用、只由下面板画轴；rule 画影线、rect 画实体，实体宽度由 bandwidth() 推出；rule+text 组成跟随鼠标的十字光标读数",
+  "width": 780,
+  "height": 470,
+  "padding": 5,
+
+  "title": {
+    "text": "日 K 线（2009-06 ~ 2009-07）：影线 + 实体 + 派生指标副图",
+    "subtitle": "鼠标在图上左右移动即可移动十字光标；读数显示在两个面板之间的空档里",
+    "subtitleFontSize": 11,
+    "fontSize": 14,
+    "anchor": "start"
+  },
+
+  "signals": [
+    {
+      "description": "主图（价格）高度。副图高度由 height - gap - mainH 反推，所以拖动它两个面板总和不变、永远不会溢出画布",
+      "name": "mainH",
+      "value": 300,
+      "bind": { "input": "range", "min": 200, "max": 360, "step": 10 }
+    },
+    {
+      "description": "两个面板之间的空档，用来安放十字光标读数",
+      "name": "gap",
+      "value": 40
+    },
+    { "name": "subY", "update": "mainH + gap" },
+    { "name": "subH", "update": "height - subY" },
+
+    {
+      "description": "实体宽度占 band 带宽的比例：1 = 顶满带宽，0.66 = 两侧各留一点白",
+      "name": "bodyRatio",
+      "value": 0.66,
+      "bind": { "input": "range", "min": 0.2, "max": 1, "step": 0.02 }
+    },
+    {
+      "description": "实体像素宽度完全由 x 比例尺的带宽推出，没有任何写死的像素值",
+      "name": "bodyW",
+      "update": "bandwidth('x') * bodyRatio"
+    },
+    {
+      "description": "doji（开盘=收盘）实体高度为 0 会整根消失，给它兜底 1.5px",
+      "name": "minBodyH",
+      "value": 1.5
+    },
+
+    {
+      "description": "涨跌配色约定：cn = 涨红跌绿（A 股习惯），us = 涨绿跌红（欧美习惯）",
+      "name": "convention",
+      "value": "cn",
+      "bind": { "input": "select", "options": ["cn", "us"] }
+    },
+    {
+      "description": "副图指标。两者都换算成「比例」量纲，所以同一个 y 比例尺和同一个百分号格式都能用",
+      "name": "subMetric",
+      "value": "amp",
+      "bind": { "input": "select", "options": ["amp", "ret"] }
+    },
+    { "name": "subTitle", "update": "subMetric === 'amp' ? '日振幅 (high-low)/open' : '当日收益率 ret'" },
+    { "name": "subFormat", "update": "subMetric === 'amp' ? '.1%' : '+.1%'" },
+    { "name": "subShort", "update": "subMetric === 'amp' ? '振幅' : '收益率'" },
+
+    { "name": "n", "update": "length(data('prices'))" },
+    {
+      "description": "band 比例尺里 paddingOuter = paddingInner/2 时，step 恰好等于 width/n，于是 floor(x()/step) 就是鼠标所在的第几根 K 线",
+      "name": "step",
+      "update": "width / max(n, 1)"
+    },
+    {
+      "description": "纯事件信号：-1 表示鼠标还没进过图。mousemove 不加 mark 选择器，所以鼠标压在 K 线上时事件照样收得到",
+      "name": "hoverIdx",
+      "value": -1,
+      "on": [
+        { "events": "mousemove", "update": "clamp(floor(x() / step), 0, n - 1)" }
+      ]
+    },
+    {
+      "description": "派生信号：没动过鼠标就兜底到最后一个交易日。这样一进来就有读数，cursor 数据集也永远不会为空",
+      "name": "cursorIdx",
+      "update": "hoverIdx < 0 ? n - 1 : hoverIdx"
+    }
+  ],
+
+  "data": [
+    {
+      "description": "date 显式按 %Y-%m-%d 本地解析：直接写 'date' 会走 Date.parse，纯日期串被当成 UTC 午夜，东西时区各差一天",
+      "name": "prices",
+      "url": "../../assets/data/ohlc.json",
+      "format": {
+        "type": "json",
+        "parse": {
+          "date": "date:'%Y-%m-%d'",
+          "open": "number",
+          "high": "number",
+          "low": "number",
+          "close": "number",
+          "ret": "number"
+        }
+      },
+      "transform": [
+        {
+          "description": "row_number 给每行一个序号（配合十字光标定位），lag 取上一行收盘价（算较昨收涨跌）",
+          "type": "window",
+          "sort": { "field": "date" },
+          "ops": ["row_number", "lag"],
+          "fields": [null, "close"],
+          "as": ["rank", "prevClose"]
+        },
+        { "type": "formula", "as": "idx", "expr": "datum.rank - 1" },
+        { "type": "formula", "as": "dir", "expr": "datum.close >= datum.open ? 'up' : 'down'" },
+        { "type": "formula", "as": "bodyTop", "expr": "max(datum.open, datum.close)" },
+        { "type": "formula", "as": "bodyBottom", "expr": "min(datum.open, datum.close)" },
+        {
+          "description": "派生指标一：当日振幅，(high-low)/open，无量纲比例",
+          "type": "formula",
+          "as": "amp",
+          "expr": "(datum.high - datum.low) / datum.open"
+        },
+        {
+          "description": "派生指标二：原始 ret 字段是「百分数数值」（-10.8 表示 -10.8%），除以 100 换成比例，才能用 '%' 格式化",
+          "type": "formula",
+          "as": "retFrac",
+          "expr": "datum.ret / 100"
+        },
+        { "type": "formula", "as": "sub", "expr": "subMetric === 'amp' ? datum.amp : datum.retFrac" },
+        {
+          "description": "副图配色：振幅恒为正，沿用 K 线涨跌方向；收益率有正负，就按指标自身的符号着色",
+          "type": "formula",
+          "as": "subDir",
+          "expr": "subMetric === 'amp' ? datum.dir : (datum.sub >= 0 ? 'up' : 'down')"
+        },
+        {
+          "description": "首行没有上一日收盘价，chg 置 null，读数里显式兜底成破折号，绝不让 null 漏到画面上",
+          "type": "formula",
+          "as": "chg",
+          "expr": "datum.prevClose == null ? null : datum.close / datum.prevClose - 1"
+        }
+      ]
+    },
+    {
+      "description": "十字光标数据集：永远恰好 1 行，用它驱动竖线/横线/高亮/读数四组 mark",
+      "name": "cursor",
+      "source": "prices",
+      "transform": [
+        { "type": "filter", "expr": "datum.idx === cursorIdx" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": { "data": "prices", "field": "date" },
+      "range": "width",
+      "paddingInner": 0.3,
+      "paddingOuter": 0.15
+    },
+    {
+      "name": "dirColor",
+      "type": "ordinal",
+      "domain": ["up", "down"],
+      "range": { "signal": "convention === 'cn' ? ['#d62728', '#2ca02c'] : ['#2ca02c', '#d62728']" }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "dirColor",
+      "orient": "top",
+      "direction": "horizontal",
+      "title": "涨跌配色约定",
+      "titleFontSize": 11,
+      "encode": {
+        "labels": {
+          "update": {
+            "text": {
+              "signal": "datum.value === 'up' ? '涨 · 收盘 ≥ 开盘' : '跌 · 收盘 < 开盘'"
+            }
+          }
+        }
+      }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "主图面板。group 内部把 height 信号遮蔽成 mainH，于是这个 scope 里的比例尺 range:'height' 和轴的定位都以面板高度为准",
+      "type": "group",
+      "name": "mainPanel",
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "value": 0 },
+          "width": { "signal": "width" },
+          "height": { "signal": "mainH" },
+          "stroke": { "value": "#dddddd" }
+        }
+      },
+      "signals": [
+        { "name": "height", "update": "mainH" }
+      ],
+      "scales": [
+        {
+          "name": "price",
+          "type": "linear",
+          "domain": { "data": "prices", "fields": ["low", "high"] },
+          "range": "height",
+          "padding": 10,
+          "nice": true,
+          "zero": false
+        }
+      ],
+      "axes": [
+        {
+          "orient": "left",
+          "scale": "price",
+          "format": "$.0f",
+          "title": "价格（美元）",
+          "titlePadding": 6,
+          "grid": true,
+          "gridOpacity": 0.25,
+          "tickCount": 6
+        }
+      ],
+      "marks": [
+        {
+          "description": "十字光标竖线：贯穿整个主图面板",
+          "type": "rule",
+          "from": { "data": "cursor" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "x", "field": "date", "band": 0.5 },
+              "y": { "value": 0 },
+              "y2": { "signal": "height" },
+              "stroke": { "value": "#888888" },
+              "strokeDash": { "value": [3, 3] }
+            }
+          }
+        },
+        {
+          "description": "十字光标横线：钉在当日收盘价上，右端挂一个价格标签",
+          "type": "rule",
+          "from": { "data": "cursor" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 0 },
+              "x2": { "signal": "width" },
+              "y": { "scale": "price", "field": "close" },
+              "stroke": { "value": "#888888" },
+              "strokeDash": { "value": [3, 3] }
+            }
+          }
+        },
+        {
+          "description": "high-low 影线：一根 rule 就是一天的波动区间",
+          "type": "rule",
+          "from": { "data": "prices" },
+          "encode": {
+            "update": {
+              "x": { "scale": "x", "field": "date", "band": 0.5 },
+              "y": { "scale": "price", "field": "high" },
+              "y2": { "scale": "price", "field": "low" },
+              "stroke": { "scale": "dirColor", "field": "dir" },
+              "strokeWidth": { "value": 1 },
+              "tooltip": {
+                "signal": "timeFormat(datum.date, '%Y-%m-%d') + ' 高 ' + format(datum.high, '$.2f') + ' / 低 ' + format(datum.low, '$.2f')"
+              }
+            }
+          }
+        },
+        {
+          "description": "open-close 实体：宽度 bodyW 由带宽推出；用 minBodyH 兜住 doji（开=收）那一根",
+          "type": "rect",
+          "name": "body",
+          "from": { "data": "prices" },
+          "encode": {
+            "update": {
+              "xc": { "scale": "x", "field": "date", "band": 0.5 },
+              "width": { "signal": "bodyW" },
+              "y": { "scale": "price", "field": "bodyTop" },
+              "y2": {
+                "signal": "max(scale('price', datum.bodyBottom), scale('price', datum.bodyTop) + minBodyH)"
+              },
+              "fill": { "scale": "dirColor", "field": "dir" },
+              "fillOpacity": { "value": 0.9 },
+              "tooltip": {
+                "signal": "timeFormat(datum.date, '%Y-%m-%d') + ' 开 ' + format(datum.open, '$.2f') + ' / 收 ' + format(datum.close, '$.2f')"
+              }
+            },
+            "hover": {
+              "fillOpacity": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "被光标选中的那一根描一圈黑边",
+          "type": "rect",
+          "from": { "data": "cursor" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "xc": { "scale": "x", "field": "date", "band": 0.5 },
+              "width": { "signal": "bodyW + 4" },
+              "y": { "scale": "price", "field": "high", "offset": -2 },
+              "y2": { "scale": "price", "field": "low", "offset": 2 },
+              "fill": { "value": "transparent" },
+              "stroke": { "value": "#333333" },
+              "strokeWidth": { "value": 1 },
+              "strokeDash": { "value": [2, 2] }
+            }
+          }
+        },
+        {
+          "description": "收盘价标签，贴在横线右端",
+          "type": "text",
+          "from": { "data": "cursor" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "width", "offset": -2 },
+              "y": { "scale": "price", "field": "close", "offset": -4 },
+              "text": { "signal": "format(datum.close, '$.2f')" },
+              "align": { "value": "right" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 11 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "scale": "dirColor", "field": "dir" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "面板空档里的十字光标读数。text 传数组即多行渲染（lineHeight 控行距）；数值全部走 format()，不让浮点原样露出来",
+      "type": "text",
+      "from": { "data": "cursor" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "mainH + 6" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 12 },
+          "lineHeight": { "value": 15 },
+          "fill": { "value": "#333333" },
+          "text": {
+            "signal": "[timeFormat(datum.date, '%Y-%m-%d') + '   开 ' + format(datum.open, '$.2f') + '   高 ' + format(datum.high, '$.2f') + '   低 ' + format(datum.low, '$.2f') + '   收 ' + format(datum.close, '$.2f'), '较昨收 ' + (datum.prevClose == null ? '—' : format(datum.chg, '+.2%')) + '   ' + subShort + ' ' + format(datum.sub, subFormat) + '   策略信号 ' + (datum.signal === 'long' ? '看多' : datum.signal === 'short' ? '看空' : '中性')]"
+          }
+        }
+      }
+    },
+
+    {
+      "description": "副图面板。x 比例尺沿用外层那一个（一次定义、两处共用），x 轴只在这里画一次",
+      "type": "group",
+      "name": "subPanel",
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "subY" },
+          "width": { "signal": "width" },
+          "height": { "signal": "subH" },
+          "stroke": { "value": "#dddddd" }
+        }
+      },
+      "signals": [
+        { "name": "height", "update": "subH" }
+      ],
+      "scales": [
+        {
+          "name": "sub",
+          "type": "linear",
+          "domain": { "data": "prices", "field": "sub" },
+          "range": "height",
+          "nice": true,
+          "zero": true
+        }
+      ],
+      "axes": [
+        {
+          "orient": "left",
+          "scale": "sub",
+          "format": { "signal": "subFormat" },
+          "title": { "signal": "subTitle" },
+          "titlePadding": 6,
+          "grid": true,
+          "gridOpacity": 0.25,
+          "tickCount": 4
+        },
+        {
+          "orient": "bottom",
+          "scale": "x",
+          "formatType": "time",
+          "format": "%m/%d",
+          "title": "交易日（band 比例尺只收录有行情的日子，周末自动不占位）",
+          "titlePadding": 4,
+          "labelAngle": -45,
+          "labelAlign": "right",
+          "labelBaseline": "middle",
+          "labelOverlap": "parity",
+          "labelFontSize": 10
+        }
+      ],
+      "marks": [
+        {
+          "description": "指标柱：从 0 线出发，颜色取 subDir（振幅模式沿用 K 线涨跌，收益率模式按指标正负）",
+          "type": "rect",
+          "from": { "data": "prices" },
+          "encode": {
+            "update": {
+              "xc": { "scale": "x", "field": "date", "band": 0.5 },
+              "width": { "signal": "bodyW" },
+              "y": { "scale": "sub", "field": "sub" },
+              "y2": { "scale": "sub", "value": 0 },
+              "fill": { "scale": "dirColor", "field": "subDir" },
+              "fillOpacity": { "value": 0.55 },
+              "tooltip": {
+                "signal": "timeFormat(datum.date, '%Y-%m-%d') + ' ' + subTitle + ' = ' + format(datum.sub, subFormat)"
+              }
+            },
+            "hover": {
+              "fillOpacity": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "0 基准线（振幅指标恒为正时它就落在面板底边）",
+          "type": "rule",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 0 },
+              "x2": { "signal": "width" },
+              "y": { "scale": "sub", "value": 0 },
+              "stroke": { "value": "#999999" },
+              "strokeWidth": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "同一个 cursorIdx 也驱动副图的竖线：两个面板共用一把 x 比例尺，光标天然对齐",
+          "type": "rule",
+          "from": { "data": "cursor" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "x", "field": "date", "band": 0.5 },
+              "y": { "value": 0 },
+              "y2": { "signal": "height" },
+              "stroke": { "value": "#888888" },
+              "strokeDash": { "value": [3, 3] }
+            }
+          }
+        },
+        {
+          "description": "副图当日指标读数，贴在柱子的外端；正负柱子翻转基线，x/y 都用 clamp/max/min 夹住，保证标签不越出面板",
+          "type": "text",
+          "from": { "data": "cursor" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "clamp(scale('x', datum.date) + bandwidth('x') / 2, 18, width - 18)" },
+              "y": {
+                "signal": "datum.sub >= 0 ? max(scale('sub', datum.sub) - 4, 11) : min(scale('sub', datum.sub) + 4, height - 1)"
+              },
+              "text": { "signal": "format(datum.sub, subFormat)" },
+              "align": { "value": "center" },
+              "baseline": [
+                { "test": "datum.sub < 0", "value": "top" },
+                { "value": "bottom" }
+              ],
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#333333" }
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 11, "titleFontSize": 11 },
+    "legend": { "labelFontSize": 11 }
+  }
+}

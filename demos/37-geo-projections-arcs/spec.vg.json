@@ -1,0 +1,727 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "地理投影三联图：① 投影画廊（signal 切换投影 + graticule 经纬网）② 大圆航线（geoshape 画 GeoJSON LineString 与 rule 直连投影点的对比）③ 地震比例符号图（geopoint + symbol）",
+  "width": 960,
+  "height": 1080,
+  "padding": { "left": 12, "right": 12, "top": 40, "bottom": 16 },
+  "autosize": "none",
+  "background": "#ffffff",
+
+  "title": {
+    "text": "地理投影、大圆航线与比例符号：projection / graticule / geoshape / geopoint",
+    "subtitle": "同一份 world-110m.json 换投影就换世界观；同一对经纬度，先投影再连线与先连线再投影结果完全不同",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "anchor": "start",
+    "offset": 4
+  },
+
+  "signals": [
+    {
+      "comment": "① 投影画廊的投影类型。Vega 把 d3-geo 的投影构造器注册成名字，type 可以接 signal，改名字就整幅重投影",
+      "name": "projType",
+      "value": "orthographic",
+      "bind": {
+        "input": "select",
+        "options": [
+          "mercator",
+          "equirectangular",
+          "equalEarth",
+          "naturalEarth1",
+          "mollweide",
+          "orthographic",
+          "azimuthalEqualArea",
+          "stereographic",
+          "conicConformal",
+          "albersUsa"
+        ]
+      }
+    },
+    {
+      "comment": "rotate[0]：绕地轴转（换中央经线）。对 orthographic 就是转地球",
+      "name": "rotateLambda",
+      "value": 100,
+      "bind": { "input": "range", "min": -180, "max": 180, "step": 5 }
+    },
+    {
+      "comment": "rotate[1]：把视点抬高/压低（换中央纬线）",
+      "name": "rotatePhi",
+      "value": -20,
+      "bind": { "input": "range", "min": -90, "max": 90, "step": 5 }
+    },
+    {
+      "comment": "graticule 变换的经纬网间隔（度）",
+      "name": "gridStep",
+      "value": 15,
+      "bind": { "input": "range", "min": 10, "max": 45, "step": 5 }
+    },
+    {
+      "comment": "② 航线阈值：只画双向航班合计 ≥ 该值的机场对",
+      "name": "minFlights",
+      "value": 8000,
+      "bind": { "input": "range", "min": 3000, "max": 25000, "step": 500 }
+    },
+    {
+      "comment": "② 是否叠加“先投影再连直线”的错误画法（红色虚线）",
+      "name": "showStraight",
+      "value": true,
+      "bind": { "input": "checkbox" }
+    },
+    {
+      "comment": "② 机场代码标签的门槛（出发航班数）",
+      "name": "labelMin",
+      "value": 130000,
+      "bind": { "input": "range", "min": 40000, "max": 420000, "step": 10000 }
+    },
+    {
+      "comment": "③ 只画震级不低于该值的地震",
+      "name": "minMag",
+      "value": 2.5,
+      "bind": { "input": "range", "min": -1, "max": 6, "step": 0.5 }
+    },
+
+    {
+      "comment": "以下是版面几何：三块地图各占一个矩形，projection.extent 直接吃这个矩形，fit 会把地理数据缩放平移进去",
+      "name": "galleryExtent",
+      "update": "[[0, 30], [590, 386]]"
+    },
+    { "name": "flightExtent", "update": "[[0, 442], [620, 742]]" },
+    { "name": "quakeExtent", "update": "[[0, 798], [620, 1070]]" },
+    { "name": "infoX", "update": "614" },
+    { "name": "flightNoteX", "update": "648" },
+    { "name": "quakeLegendX", "update": "660" },
+    { "name": "quakeDepthLegendX", "update": "800" }
+  ],
+
+  "data": [
+    {
+      "comment": "① 世界底图：TopoJSON 必须写 format.type=topojson 并指定要提取的 object",
+      "name": "world",
+      "url": "../../assets/data/world-110m.json",
+      "format": { "type": "topojson", "feature": "countries" }
+    },
+    {
+      "comment": "graticule 变换不吃输入数据，它自己生成一个 MultiLineString（整张经纬网就是一行数据）",
+      "name": "grid",
+      "transform": [
+        { "type": "graticule", "step": [ { "signal": "gridStep" }, { "signal": "gridStep" } ] }
+      ]
+    },
+    {
+      "comment": "{type:'Sphere'} 是 d3-geo 认的伪 GeoJSON：整个球面。用它画海洋底色与地球边缘",
+      "name": "sphere",
+      "values": [ { "type": "Sphere" } ]
+    },
+    {
+      "comment": "① 右侧说明栏：投影元数据表，用 filter 按当前 projType 选出一行",
+      "name": "projMeta",
+      "values": [
+        { "type": "mercator", "family": "圆柱 cylindrical", "property": "等角 conformal", "note": "航海图标准：任意点上角度不变形，", "note2": "代价是高纬面积暴涨（格陵兰≈非洲）。" },
+        { "type": "equirectangular", "family": "圆柱 cylindrical", "property": "等距圆柱（都不保）", "note": "把经纬度当 x/y 直接用，最省算力；", "note2": "角度和面积都失真，适合做栅格底图。" },
+        { "type": "equalEarth", "family": "伪圆柱 pseudocylindrical", "property": "等积 equal-area", "note": "2018 年发表的新投影：面积忠实、", "note2": "形状变形温和，全球统计图的首选。" },
+        { "type": "naturalEarth1", "family": "伪圆柱 pseudocylindrical", "property": "折中 compromise", "note": "既不等角也不等积，为“看起来舒服”", "note2": "而设计，常见于纸质挂图。" },
+        { "type": "mollweide", "family": "伪圆柱 pseudocylindrical", "property": "等积 equal-area", "note": "椭圆边界，两极被压扁；天文与全球", "note2": "分布图的经典选择。" },
+        { "type": "orthographic", "family": "方位 azimuthal", "property": "透视（正射）", "note": "一次只能看见半个球，像从太空看；", "note2": "拖 rotate 就是在转地球。" },
+        { "type": "azimuthalEqualArea", "family": "方位 azimuthal", "property": "等积 equal-area", "note": "以投影中心为原点，整球压进一个圆；", "note2": "极地图常用。" },
+        { "type": "stereographic", "family": "方位 azimuthal", "property": "等角 conformal", "note": "保角的方位投影，对面一点跑到无穷远；", "note2": "极区航空图用它。" },
+        { "type": "conicConformal", "family": "圆锥 conic", "property": "等角 conformal", "note": "兰勃特等角圆锥，中纬度国家地图与", "note2": "航空图的标准（法国、美国航图）。" },
+        { "type": "albersUsa", "family": "复合 composite", "property": "等积（三块拼接）", "note": "把本土 48 州 + 阿拉斯加 + 夏威夷三个", "note2": "Albers 拼在一起；美国之外的点直接丢弃。" }
+      ],
+      "transform": [
+        { "type": "filter", "expr": "datum.type === projType" }
+      ]
+    },
+
+    {
+      "comment": "② 机场表：CSV 必须显式 format.type=csv，并把经纬度 parse 成 number，否则 lookup 出来是字符串",
+      "name": "airports",
+      "url": "../../assets/data/airports.csv",
+      "format": {
+        "type": "csv",
+        "parse": { "latitude": "number", "longitude": "number" }
+      },
+      "transform": [
+        {
+          "comment": "只留本土 48 州范围内的机场：阿拉斯加/夏威夷/关岛会把 mercator 底图撑到没法看",
+          "type": "filter",
+          "expr": "datum.longitude > -127 && datum.longitude < -66 && datum.latitude > 24 && datum.latitude < 50"
+        }
+      ]
+    },
+    {
+      "comment": "② 原始 OD 表（origin,destination,count）",
+      "name": "flights",
+      "url": "../../assets/data/flights-airport.csv",
+      "format": {
+        "type": "csv",
+        "parse": { "count": "number" }
+      }
+    },
+    {
+      "comment": "② 每个机场的出发航班数，用来做比例符号",
+      "name": "departures",
+      "source": "flights",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["origin"],
+          "fields": ["count"],
+          "ops": ["sum"],
+          "as": ["total"]
+        }
+      ]
+    },
+    {
+      "comment": "② 把 A→B 与 B→A 归并成一条无向航线：先算规范化端点 a/b，再 aggregate 求和",
+      "name": "routes",
+      "source": "flights",
+      "transform": [
+        { "type": "formula", "as": "a", "expr": "datum.origin < datum.destination ? datum.origin : datum.destination" },
+        { "type": "formula", "as": "b", "expr": "datum.origin < datum.destination ? datum.destination : datum.origin" },
+        {
+          "type": "aggregate",
+          "groupby": ["a", "b"],
+          "fields": ["count"],
+          "ops": ["sum"],
+          "as": ["flights"]
+        },
+        { "type": "filter", "expr": "datum.flights >= minFlights" },
+        {
+          "comment": "两端各做一次 lookup，把机场经纬度接到航线上",
+          "type": "lookup",
+          "from": "airports",
+          "key": "iata",
+          "fields": ["a"],
+          "values": ["longitude", "latitude"],
+          "as": ["alon", "alat"]
+        },
+        {
+          "type": "lookup",
+          "from": "airports",
+          "key": "iata",
+          "fields": ["b"],
+          "values": ["longitude", "latitude"],
+          "as": ["blon", "blat"]
+        },
+        {
+          "comment": "lookup 没命中（被上面过滤掉的机场）会留 null，必须先扔掉再算几何",
+          "type": "filter",
+          "expr": "datum.alon != null && datum.blon != null"
+        },
+        {
+          "comment": "关键一步：手工造一个 GeoJSON LineString。geoshape 会把它交给投影的 stream 做重采样，于是这条“两点线段”被自动切成沿大圆的折线",
+          "type": "formula",
+          "as": "arc",
+          "expr": "{type: 'LineString', coordinates: [[datum.alon, datum.alat], [datum.blon, datum.blat]]}"
+        },
+        {
+          "comment": "对照组：先把两端各自投影成像素坐标，再用 rule 直连 —— 这是错的画法",
+          "type": "geopoint",
+          "projection": "flight",
+          "fields": ["alon", "alat"],
+          "as": ["ax", "ay"]
+        },
+        {
+          "type": "geopoint",
+          "projection": "flight",
+          "fields": ["blon", "blat"],
+          "as": ["bx", "by"]
+        },
+        { "type": "collect", "sort": { "field": "flights" } }
+      ]
+    },
+    {
+      "comment": "② 被画出来的航线的端点集合：fold 把 a/b 两列摊成行，再 aggregate 去重",
+      "name": "hubs",
+      "source": "routes",
+      "transform": [
+        { "type": "fold", "fields": ["a", "b"], "as": ["role", "iata"] },
+        {
+          "comment": "只 groupby 不给 fields，aggregate 默认输出计数 —— 这里就是该机场参与了几条被画出的航线",
+          "type": "aggregate",
+          "groupby": ["iata"],
+          "ops": ["count"],
+          "as": ["nRoutes"]
+        },
+        {
+          "type": "lookup",
+          "from": "departures",
+          "key": "origin",
+          "fields": ["iata"],
+          "values": ["total"],
+          "as": ["total"]
+        },
+        {
+          "type": "lookup",
+          "from": "airports",
+          "key": "iata",
+          "fields": ["iata"],
+          "values": ["longitude", "latitude", "city", "state"],
+          "as": ["lon", "lat", "city", "state"]
+        },
+        { "type": "filter", "expr": "datum.total != null && datum.lon != null" },
+        {
+          "type": "geopoint",
+          "projection": "flight",
+          "fields": ["lon", "lat"],
+          "as": ["x", "y"]
+        },
+        { "type": "collect", "sort": { "field": "total" } }
+      ]
+    },
+    {
+      "comment": "② 只给大机场加代码标签，避免糊成一团",
+      "name": "hub-labels",
+      "source": "hubs",
+      "transform": [
+        { "type": "filter", "expr": "datum.total >= labelMin" }
+      ]
+    },
+    {
+      "comment": "② 航线底图：本土 48 州（剔除 FIPS 2 阿拉斯加 / 15 夏威夷 / 72 波多黎各 / 78 维尔京群岛）",
+      "name": "states",
+      "url": "../../assets/data/us-10m.json",
+      "format": { "type": "topojson", "feature": "states" },
+      "transform": [
+        { "type": "filter", "expr": "indexof([2, 15, 72, 78], datum.id) < 0" }
+      ]
+    },
+
+    {
+      "comment": "③ 地震：GeoJSON FeatureCollection 要用 format.property 指到 features 数组",
+      "name": "quakes",
+      "url": "../../assets/data/earthquakes.json",
+      "format": { "type": "json", "property": "features" },
+      "transform": [
+        { "type": "filter", "expr": "datum.properties.mag != null && datum.properties.mag >= minMag" },
+        { "type": "formula", "as": "mag", "expr": "datum.properties.mag" },
+        { "type": "formula", "as": "lon", "expr": "datum.geometry.coordinates[0]" },
+        { "type": "formula", "as": "lat", "expr": "datum.geometry.coordinates[1]" },
+        {
+          "comment": "coordinates 的第三位是深度（km），负值表示震源在地表以上的参考面之上",
+          "type": "formula",
+          "as": "depth",
+          "expr": "datum.geometry.coordinates[2]"
+        },
+        {
+          "comment": "geopoint 只投影点：把经纬度算成像素 x/y，剩下的交给普通 symbol mark",
+          "type": "geopoint",
+          "projection": "quake",
+          "fields": ["lon", "lat"],
+          "as": ["x", "y"]
+        },
+        {
+          "comment": "投影到球背面的点会得到 undefined（equalEarth 不会，但换成 orthographic 就会），先扔掉",
+          "type": "filter",
+          "expr": "datum.x != null"
+        },
+        { "type": "collect", "sort": { "field": "mag" } }
+      ]
+    }
+  ],
+
+  "projections": [
+    {
+      "comment": "① type/rotate 都接 signal；fit + extent = 把 fit 里的地理数据自动缩放平移到 extent 这个像素矩形里（顺带完成分面板布局）",
+      "name": "gallery",
+      "type": { "signal": "projType" },
+      "rotate": [ { "signal": "rotateLambda" }, { "signal": "rotatePhi" }, 0 ],
+      "fit": { "signal": "data('grid')" },
+      "extent": { "signal": "galleryExtent" }
+    },
+    {
+      "comment": "② 航线面板：mercator + fit 到本土 48 州",
+      "name": "flight",
+      "type": "mercator",
+      "fit": { "signal": "data('states')" },
+      "extent": { "signal": "flightExtent" }
+    },
+    {
+      "comment": "③ 地震面板：等积投影，点密度才不会被面积失真骗到",
+      "name": "quake",
+      "type": "equalEarth",
+      "fit": { "signal": "data('grid')" },
+      "extent": { "signal": "quakeExtent" }
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "arcWidth",
+      "type": "sqrt",
+      "domain": [3000, 27500],
+      "range": [0.4, 3.2],
+      "clamp": true
+    },
+    {
+      "name": "hub",
+      "type": "sqrt",
+      "domain": [0, 420000],
+      "range": [0, 620]
+    },
+    {
+      "name": "quakeSize",
+      "type": "pow",
+      "exponent": 2,
+      "domain": [0, 6.5],
+      "range": [0, 420],
+      "clamp": true
+    },
+    {
+      "name": "quakeDepth",
+      "type": "linear",
+      "domain": [0, 70],
+      "range": { "scheme": "viridis" },
+      "clamp": true,
+      "reverse": true
+    }
+  ],
+
+  "legends": [
+    {
+      "size": "hub",
+      "orient": "none",
+      "legendX": { "signal": "flightNoteX" },
+      "legendY": 462,
+      "title": "机场出发航班数",
+      "titleFontSize": 11,
+      "values": [50000, 150000, 300000, 400000],
+      "format": "~s",
+      "symbolType": "circle",
+      "symbolFillColor": "#f58518",
+      "symbolStrokeColor": "#8a4600",
+      "symbolOpacity": 0.85,
+      "clipHeight": 22
+    },
+    {
+      "size": "quakeSize",
+      "orient": "none",
+      "legendX": { "signal": "quakeLegendX" },
+      "legendY": 906,
+      "title": "震级 M",
+      "titleFontSize": 11,
+      "values": [1, 2, 3, 4, 5, 6],
+      "format": "d",
+      "symbolType": "circle",
+      "symbolFillColor": "#888888",
+      "symbolStrokeColor": "#333333",
+      "symbolOpacity": 0.7,
+      "clipHeight": 24
+    },
+    {
+      "fill": "quakeDepth",
+      "type": "gradient",
+      "orient": "none",
+      "legendX": { "signal": "quakeDepthLegendX" },
+      "legendY": 906,
+      "direction": "vertical",
+      "gradientLength": 150,
+      "gradientThickness": 10,
+      "title": "深度 km",
+      "titleFontSize": 11,
+      "format": "d"
+    }
+  ],
+
+  "marks": [
+    {
+      "comment": "—— 面板 ① 投影画廊 ——",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 16 },
+          "text": { "value": "① 投影画廊：同一份 world-110m.json + graticule 经纬网，projection.type / rotate 由 signal 控制" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#333333" }
+        }
+      }
+    },
+    {
+      "comment": "海洋：整个球面的形状。orthographic 下它就是地球的圆盘",
+      "type": "shape",
+      "from": { "data": "sphere" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "fill": { "value": "#eef3f8" },
+          "stroke": { "value": "#9db3c6" },
+          "strokeWidth": { "value": 1 }
+        }
+      },
+      "transform": [ { "type": "geoshape", "projection": "gallery" } ]
+    },
+    {
+      "type": "shape",
+      "from": { "data": "grid" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "fill": { "value": null },
+          "stroke": { "value": "#b8c6d3" },
+          "strokeWidth": { "value": 0.5 }
+        }
+      },
+      "transform": [ { "type": "geoshape", "projection": "gallery" } ]
+    },
+    {
+      "type": "shape",
+      "from": { "data": "world" },
+      "encode": {
+        "enter": {
+          "tooltip": { "signal": "'country id ' + datum.id" }
+        },
+        "update": {
+          "fill": { "value": "#a9bf8f" },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 0.4 }
+        },
+        "hover": { "fill": { "value": "#e45756" } }
+      },
+      "transform": [ { "type": "geoshape", "projection": "gallery" } ]
+    },
+    {
+      "comment": "右侧说明栏：多行文本用字符串数组表达，Vega 会自动折行",
+      "type": "text",
+      "from": { "data": "projMeta" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "infoX" },
+          "y": { "value": 56 },
+          "text": {
+            "signal": "['投影：' + datum.type, '家族：' + datum.family, '性质：' + datum.property, '', datum.note, datum.note2, '', 'rotate = [' + rotateLambda + '°, ' + rotatePhi + '°, 0]', 'graticule step = ' + gridStep + '°']"
+          },
+          "lineHeight": { "value": 17 },
+          "fontSize": { "value": 11.5 },
+          "fill": { "value": "#333333" },
+          "baseline": { "value": "top" }
+        }
+      }
+    },
+
+    {
+      "comment": "—— 面板 ② 大圆航线 ——",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 424 },
+          "text": { "value": "② 大圆航线：蓝色实线 = geoshape 投影 GeoJSON LineString（沿大圆弯曲）；红色虚线 = 先投影再 rule 直连（错）" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#333333" }
+        }
+      }
+    },
+    {
+      "type": "shape",
+      "from": { "data": "states" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "fill": { "value": "#f2f2ee" },
+          "stroke": { "value": "#d0d0c8" },
+          "strokeWidth": { "value": 0.6 }
+        }
+      },
+      "transform": [ { "type": "geoshape", "projection": "flight" } ]
+    },
+    {
+      "comment": "错误画法：两端点已被 geopoint 投影成像素坐标，rule 只会在屏幕上拉直线",
+      "type": "rule",
+      "from": { "data": "routes" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "field": "ax" },
+          "y": { "field": "ay" },
+          "x2": { "field": "bx" },
+          "y2": { "field": "by" },
+          "stroke": { "value": "#e45756" },
+          "strokeWidth": { "value": 0.7 },
+          "strokeDash": { "value": [3, 2] },
+          "strokeOpacity": { "signal": "showStraight ? 0.7 : 0" }
+        }
+      }
+    },
+    {
+      "comment": "正确画法：把 LineString 交给 geoshape，投影的 resample 会把它折成大圆弧",
+      "type": "shape",
+      "from": { "data": "routes" },
+      "encode": {
+        "enter": {
+          "tooltip": {
+            "signal": "datum.a + ' ↔ ' + datum.b + '：' + format(datum.flights, ',d') + ' 航班'"
+          }
+        },
+        "update": {
+          "fill": { "value": null },
+          "stroke": { "value": "#2a5d8f" },
+          "strokeWidth": { "scale": "arcWidth", "field": "flights" },
+          "strokeOpacity": { "value": 0.55 }
+        },
+        "hover": {
+          "stroke": { "value": "#000000" },
+          "strokeOpacity": { "value": 1 }
+        }
+      },
+      "transform": [
+        { "type": "geoshape", "projection": "flight", "field": "datum.arc" }
+      ]
+    },
+    {
+      "type": "symbol",
+      "from": { "data": "hubs" },
+      "encode": {
+        "enter": {
+          "tooltip": {
+            "signal": "datum.iata + ' · ' + datum.city + ', ' + datum.state + '：出发 ' + format(datum.total, ',d') + ' 班 / 图上 ' + datum.nRoutes + ' 条航线'"
+          }
+        },
+        "update": {
+          "x": { "field": "x" },
+          "y": { "field": "y" },
+          "size": { "scale": "hub", "field": "total" },
+          "fill": { "value": "#f58518" },
+          "fillOpacity": { "value": 0.75 },
+          "stroke": { "value": "#8a4600" },
+          "strokeWidth": { "value": 0.6 }
+        },
+        "hover": { "fill": { "value": "#e45756" }, "fillOpacity": { "value": 1 } }
+      }
+    },
+    {
+      "type": "text",
+      "from": { "data": "hub-labels" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "field": "x" },
+          "y": { "field": "y" },
+          "dy": { "signal": "-(sqrt(scale('hub', datum.total) / PI) + 4)" },
+          "text": { "field": "iata" },
+          "align": { "value": "center" },
+          "baseline": { "value": "bottom" },
+          "fontSize": { "value": 10 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#333333" }
+        }
+      }
+    },
+    {
+      "comment": "面板 ② 的文字注解 + 手工小图例（两条 rule 样例）",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "flightNoteX" },
+          "y": { "value": 600 },
+          "text": {
+            "signal": "['阈值 ≥ ' + format(minFlights, ',d') + ' 班：' + length(data('routes')) + ' 条航线 / ' + length(data('hubs')) + ' 个机场', '', '蓝实线 = geoshape(LineString)：', '　线段先被重采样成 N 段折线，', '　再逐点投影 → 大圆弧', '', '红虚线 = geopoint + rule：', '　只有两端做了投影，', '　中间是屏幕上的直线', '', '偏差最大在东西向长航线（JFK↔SFO 差 33px）']"
+          },
+          "lineHeight": { "value": 15 },
+          "fontSize": { "value": 11 },
+          "fill": { "value": "#444444" },
+          "baseline": { "value": "top" }
+        }
+      }
+    },
+
+    {
+      "comment": "—— 面板 ③ 地震比例符号图 ——",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 780 },
+          "text": { "value": "③ 比例符号图：geopoint 投影震中，symbol 的 size（面积）编码震级、fill 编码震源深度" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#333333" }
+        }
+      }
+    },
+    {
+      "type": "shape",
+      "from": { "data": "sphere" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "fill": { "value": "#eef3f8" },
+          "stroke": { "value": "#9db3c6" },
+          "strokeWidth": { "value": 0.8 }
+        }
+      },
+      "transform": [ { "type": "geoshape", "projection": "quake" } ]
+    },
+    {
+      "type": "shape",
+      "from": { "data": "grid" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "fill": { "value": null },
+          "stroke": { "value": "#c9d6e2" },
+          "strokeWidth": { "value": 0.4 }
+        }
+      },
+      "transform": [ { "type": "geoshape", "projection": "quake" } ]
+    },
+    {
+      "type": "shape",
+      "from": { "data": "world" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "fill": { "value": "#e6e6de" },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 0.35 }
+        }
+      },
+      "transform": [ { "type": "geoshape", "projection": "quake" } ]
+    },
+    {
+      "type": "symbol",
+      "from": { "data": "quakes" },
+      "encode": {
+        "enter": {
+          "tooltip": {
+            "signal": "datum.properties.title + '（深 ' + format(datum.depth, '.1f') + ' km）'"
+          }
+        },
+        "update": {
+          "x": { "field": "x" },
+          "y": { "field": "y" },
+          "size": { "scale": "quakeSize", "field": "mag" },
+          "fill": { "scale": "quakeDepth", "field": "depth" },
+          "fillOpacity": { "value": 0.7 },
+          "stroke": { "value": "#333333" },
+          "strokeWidth": { "value": 0.3 }
+        },
+        "hover": { "fillOpacity": { "value": 1 }, "strokeWidth": { "value": 1.2 } }
+      }
+    },
+    {
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "quakeLegendX" },
+          "y": { "value": 802 },
+          "text": {
+            "signal": "['M ≥ ' + format(minMag, '.1f') + ' 的地震 ' + length(data('quakes')) + ' 次', '（USGS 一周实时目录）', '底图 equalEarth 是等积投影：', '　点密度不会被面积失真误导', '半径 ∝ M，而 size 编码的是面积，', '　所以要用 pow(exponent=2)', '颜色 = 震源深度，≥70 km 按 70 取色']"
+          },
+          "lineHeight": { "value": 14 },
+          "fontSize": { "value": 11 },
+          "fill": { "value": "#444444" },
+          "baseline": { "value": "top" }
+        }
+      }
+    }
+  ]
+}

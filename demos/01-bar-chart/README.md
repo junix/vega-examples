@@ -7,8 +7,8 @@
 ## 运行
 
 ```sh
-../../serve.sh        # 在 vega 仓库根启动静态服务器
-# 浏览器打开 http://localhost:8000/vega-examples/demos/01-bar-chart/
+../../serve.sh        # 在本项目根目录启动静态服务器
+# 浏览器打开 http://localhost:8000/demos/01-bar-chart/
 ```
 
 ## spec 逐段讲解
@@ -37,9 +37,18 @@
 ## 试一试（改练）
 
 1. 把 `"padding": 0.15` 改成 `0.5`，观察柱宽变化。
-2. 给 y 轴加 `"format": "d"` 或把 `nice` 去掉，看刻度差异。
+2. 试 y 轴的 `nice` 与轴 `format`——先想清楚“为什么直接改没反应”：本例 uv 最大值 260
+   恰好是默认刻度步长 20 的整数倍，`nice: true` 无事可做，去掉它 domain 仍是 `[0, 260]`；
+   刻度又全是三位以内的整数，`"format": "d"` 与默认格式化输出一模一样。这两处改动
+   **一个刻度标签都不会变**。想看出差别，试下面三种：
+   - 把周六的 `uv` 改成 `263`：留着 `nice: true` 时 domain 被撑到 `[0, 280]`，多出一个 `280` 刻度；
+     去掉 `nice` 则 domain 就是 `[0, 263]`，顶端刻度停在 `260`、轴线末端不再落在刻度上。
+   - 把 `"nice": true` 改成 `"nice": 5`，再给左轴加 `"tickCount": 6`：domain 变成 `[0, 300]`，
+     刻度从 `0,20,…,260` 变成 `0,50,…,300`（只改 `nice: 5` 不加 `tickCount`，domain 变了但步长仍是 20）。
+   - 把 `"zero": true` 改成 `false`，并给左轴加 `"format": ",.1f"`：domain 变成 `[80, 260]`，
+     刻度变成 `80.0 … 260.0`——基线起点与小数位的差别一次看全。
 3. 新增一个 `hover` 属性，比如 `"fillOpacity": 0.6`。
-4. 把 `values` 换成 `"url": "../../../docs/data/cars.json"` 并把字段改成
+4. 把 `values` 换成 `"url": "../../assets/data/cars.json"` 并把字段改成
    `Origin` / `Horsepower`（聚合见 demo 06）。
 
 ## 参考

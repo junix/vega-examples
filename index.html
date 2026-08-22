@@ -11,7 +11,7 @@
   <h1>vega-examples</h1>
   <div class="crumb">
     通过渐进式 demo 学习 Vega（可视化语法）的 JSON spec 与 JS 运行时 API。
-    所有 demo 直接引用本仓库 <code>docs/vega.min.js</code> 构建与 <code>docs/data/</code> 数据集，零安装、可离线。
+    所有 demo 直接引用项目自带的 <code>assets/vega.min.js</code> 构建与 <code>assets/data/</code> 数据集，零安装、可离线。
   </div>
   <div class="links">
     <a href="./README.md" target="_blank">README</a>
@@ -51,8 +51,30 @@ var GROUPS = [
   ]},
   { name: 'E. 运行时 API 与工程化', demos: [
     ['19-runtime-api-tour', 'View API 全览：监听/导出/缩放', ['parse', 'View', 'toSVG', 'resize']],
-    ['20-custom-transform-expr', '自定义 Transform 与表达式函数', ['transforms.extend', 'expressionFunction']],
+    ['20-custom-transform-expr', '自定义 Transform 与表达式函数', ['transforms 注册表', 'expressionFunction']],
     ['21-node-headless-render', 'Node 无头渲染导出 SVG', ['node', 'headless', 'toSVG']]
+  ]},
+  { name: 'F. 稀有与复杂图形', demos: [
+    ['22-sankey-alluvial', '桑基图 / 冲积图：多级流量分配', ['stack ×3', 'path 贝塞尔', '手工布局']],
+    ['23-chord-arc-diagram', '弦图与弧线邻接图：同一张网络的两种手工几何', ['pie', 'arc', '贝塞尔 / 椭圆弧']],
+    ['24-radial-rose-stack', '南丁格尔玫瑰图与径向堆叠柱', ['极坐标', 'arc', 'sqrt scale']],
+    ['25-contour-density2d', '等值线与二维核密度', ['isocontour', 'kde2d', 'grid 栅格']],
+    ['26-hexbin-matrix', '六边形分箱 vs 矩阵热力图', ['手算蜂巢格', 'bin', '自定义 shape']],
+    ['27-beeswarm-dotplot', '蜂群图与 Wilkinson 点图', ['force collide', 'dotbin', 'static 布局']],
+    ['28-violin-ridgeline', '小提琴图与山脊线图', ['kde', 'area 对称展开', '重叠行布局']],
+    ['29-boxplot-errorbar', '箱线图与误差棒：手工拼复合 mark', ['aggregate 五数', 'Tukey 围栏', 'stderr']],
+    ['30-parallel-coordinates', '平行坐标图：多轴归一化', ['fold', '归一化', '逐轴刻度反算']],
+    ['31-streamgraph', '流图：stack 的三种基线', ['offset center', 'inside-out', 'interpolate']],
+    ['32-candlestick-ohlc', 'K 线图：双面板共享 x + 十字光标', ['rule + rect', '共享 scale', 'window lag']],
+    ['33-calendar-heatmap', '日历热力图：一格一天的年度网格', ['手算 周/星期', 'facet 分面板', 'gradient 图例']],
+    ['34-vector-field', '矢量场 / 风场图', ['自定义箭头字形', 'angle 编码', 'pow(2) size']],
+    ['35-pack-dendrogram', '圆填充与径向树状图', ['pack', 'tree', 'linkpath radial']],
+    ['36-custom-shapes-gradients', '自定义形状与渐变：path / trail / clip', ['symbol path', 'gradient', 'trail']],
+    ['37-geo-projections-arcs', '投影画廊、大圆航线与比例符号图', ['projection', 'graticule', 'geoshape']],
+    ['38-waterfall-marimekko', '瀑布图与马赛克图', ['window 累计和', '两级 stack', 'normalize']],
+    ['39-bump-slope-chart', 'Bump 图与斜率图：数值 → 名次', ['window rank', 'point 反向轴', 'first_value']],
+    ['40-gantt-timeline', '甘特图与历史时间线', ['区间 rect', '依赖折线', 'time + band']],
+    ['41-matrix-adjacency', '邻接矩阵：signal 驱动行列顺序', ['镜像边表', 'scale.domain 用 signal', '十字高亮']]
   ]}
 ];
 

@@ -1,0 +1,352 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "平行坐标图：六个数值维度各一条竖轴，每辆车是一条穿过所有轴的折线；所有维度共用一条归一化 0–1 比例尺，每条轴的刻度标签由该维度的 min/max 反算回真实数值",
+  "width": 780,
+  "height": 400,
+  "padding": 5,
+
+  "title": {
+    "text": "平行坐标图 · 1970s 汽车的六个数值维度",
+    "subtitle": "六条竖轴共用一条归一化 y 比例尺；刻度标签由每个维度自己的 min/max 反算成真实数值",
+    "anchor": "start",
+    "offset": 36,
+    "fontSize": 16,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#666666"
+  },
+
+  "signals": [
+    {
+      "comment": "折线不透明度：平行坐标唯一的过绘对策。398 条线叠在 6 条轴上，必须靠 alpha 叠加看密度",
+      "name": "lineOpacity",
+      "value": 0.22,
+      "bind": { "input": "range", "min": 0.02, "max": 0.9, "step": 0.01 }
+    },
+    {
+      "comment": "折线插值方式：linear 是标准平行坐标；monotone 让线束更容易用眼睛跟随",
+      "name": "interpolate",
+      "value": "linear",
+      "bind": { "input": "select", "options": ["linear", "monotone", "cardinal", "step-after"] }
+    },
+    {
+      "comment": "每条轴生成几个刻度。刻度在归一化空间等分，所以首尾一定是该维度的真实 min/max",
+      "name": "tickCount",
+      "value": 6,
+      "bind": { "input": "range", "min": 3, "max": 9, "step": 1 }
+    },
+    {
+      "comment": "不可见命中层的线宽。1px 的细线太难悬停，所以每条折线额外叠一条透明粗线专门吃鼠标事件",
+      "name": "hitWidth",
+      "value": 7,
+      "bind": { "input": "range", "min": 2, "max": 14, "step": 1 }
+    },
+    {
+      "comment": "悬停中的记录（命中层 mouseover 时拿到的是该 facet 的第一行，仍带全部原始字段）",
+      "name": "hovered",
+      "value": null,
+      "on": [
+        { "events": "@carline:mouseover", "update": "datum" },
+        { "events": "@carline:mouseout", "update": "null" }
+      ]
+    },
+    {
+      "comment": "图例点击筛选产地；点空白处清空",
+      "name": "originFilter",
+      "value": null,
+      "on": [
+        {
+          "events": "@legendSymbol:click, @legendLabel:click",
+          "update": "originFilter === datum.value ? null : datum.value",
+          "force": true
+        },
+        { "events": "pointerup[!event.item]", "update": "null", "force": true }
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "comment": "Horsepower / Miles_per_Gallon 有 null；任一维度缺失的行必须先剔掉，否则该维度的 min/max 会被污染",
+      "name": "cars",
+      "url": "../../assets/data/cars.json",
+      "format": { "type": "json" },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum.Miles_per_Gallon) && isValid(datum.Cylinders) && isValid(datum.Displacement) && isValid(datum.Horsepower) && isValid(datum.Weight_in_lbs) && isValid(datum.Acceleration) && isValid(datum.Origin)"
+        },
+        { "type": "identifier", "as": "recordId" }
+      ]
+    },
+    {
+      "comment": "维度元数据表：轴顺序、中文轴标题、以及该维度刻度标签的 d3-format 串。轴的 x 位置就是这张表的 point 比例尺",
+      "name": "dims",
+      "values": [
+        { "key": "Miles_per_Gallon", "label": "油耗 (MPG)", "order": 1, "fmt": ",.1f" },
+        { "key": "Cylinders", "label": "气缸数", "order": 2, "fmt": ",.0f" },
+        { "key": "Displacement", "label": "排量 (in³)", "order": 3, "fmt": ",.0f" },
+        { "key": "Horsepower", "label": "马力 (hp)", "order": 4, "fmt": ",.0f" },
+        { "key": "Weight_in_lbs", "label": "整车重 (lbs)", "order": 5, "fmt": ",.0f" },
+        { "key": "Acceleration", "label": "0–60mph 加速 (s)", "order": 6, "fmt": ",.1f" }
+      ]
+    },
+    {
+      "comment": "宽表 → 长表：每辆车 6 行（dim=维度名, value=原始值），derive 会保留 recordId / Name / Origin 等全部原字段",
+      "name": "folded",
+      "source": "cars",
+      "transform": [
+        {
+          "type": "fold",
+          "fields": ["Miles_per_Gallon", "Cylinders", "Displacement", "Horsepower", "Weight_in_lbs", "Acceleration"],
+          "as": ["dim", "value"]
+        }
+      ]
+    },
+    {
+      "comment": "每个维度的真实值域，归一化和刻度标签都靠它（6 行）",
+      "name": "extent",
+      "source": "folded",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["dim"],
+          "fields": ["value", "value"],
+          "ops": ["min", "max"],
+          "as": ["dmin", "dmax"]
+        }
+      ]
+    },
+    {
+      "comment": "把值归一化到 0–1，于是 6 个量级完全不同的维度可以共用同一条 y 比例尺；最后按 dimOrder 排序，facet 出来的每条折线才会按轴顺序连线",
+      "name": "paths",
+      "source": "folded",
+      "transform": [
+        { "type": "lookup", "from": "extent", "key": "dim", "fields": ["dim"], "values": ["dmin", "dmax"] },
+        { "type": "lookup", "from": "dims", "key": "key", "fields": ["dim"], "values": ["order"], "as": ["dimOrder"] },
+        {
+          "type": "formula",
+          "expr": "datum.dmax > datum.dmin ? (datum.value - datum.dmin) / (datum.dmax - datum.dmin) : 0.5",
+          "as": "norm"
+        },
+        { "type": "collect", "sort": { "field": "dimOrder" } }
+      ]
+    },
+    {
+      "comment": "每轴自己的刻度：先给每个维度挂一个等分比例数组（表达式函数 sequence），flatten 成一行一个刻度，再按该维度的 min/max 反算成真实数值",
+      "name": "axis-ticks",
+      "source": "dims",
+      "transform": [
+        { "type": "formula", "expr": "sequence(0, 1.0000001, 1 / (tickCount - 1))", "as": "fracs" },
+        { "type": "flatten", "fields": ["fracs"], "as": ["frac"] },
+        { "type": "lookup", "from": "extent", "key": "dim", "fields": ["key"], "values": ["dmin", "dmax"] },
+        { "type": "formula", "expr": "datum.dmin + datum.frac * (datum.dmax - datum.dmin)", "as": "tickValue" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "xDim",
+      "type": "point",
+      "domain": { "data": "dims", "field": "key" },
+      "range": "width",
+      "padding": 0
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [0, 1],
+      "range": "height"
+    },
+    {
+      "name": "origin",
+      "type": "ordinal",
+      "domain": { "data": "cars", "field": "Origin", "sort": true },
+      "range": { "scheme": "tableau10" }
+    }
+  ],
+
+  "legends": [
+    {
+      "stroke": "origin",
+      "title": "产地 Origin",
+      "orient": "right",
+      "offset": 26,
+      "symbolType": "stroke",
+      "symbolStrokeWidth": 3,
+      "titleFontSize": 12,
+      "labelFontSize": 11,
+      "encode": {
+        "symbols": {
+          "name": "legendSymbol",
+          "interactive": true,
+          "update": {
+            "cursor": { "value": "pointer" },
+            "opacity": [
+              { "test": "!originFilter || datum.value === originFilter", "value": 1 },
+              { "value": 0.25 }
+            ]
+          }
+        },
+        "labels": {
+          "name": "legendLabel",
+          "interactive": true,
+          "update": {
+            "cursor": { "value": "pointer" },
+            "opacity": [
+              { "test": "!originFilter || datum.value === originFilter", "value": 1 },
+              { "value": 0.35 }
+            ]
+          }
+        }
+      }
+    }
+  ],
+
+  "marks": [
+    {
+      "comment": "一条折线 = 一个 facet 分组。line mark 只会把 from.data 的所有行连成一条路径，所以想画 398 条线就得 facet 出 398 个 group",
+      "type": "group",
+      "from": {
+        "facet": { "data": "paths", "name": "one", "groupby": ["recordId"] }
+      },
+      "encode": {
+        "update": {
+          "zindex": { "signal": "hovered && hovered.recordId === datum.recordId ? 1 : 0" }
+        }
+      },
+      "marks": [
+        {
+          "comment": "可见折线本身不吃事件，全部高亮状态由 hovered / originFilter 两个 signal 驱动",
+          "type": "line",
+          "from": { "data": "one" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "stroke": { "scale": "origin", "field": "Origin" },
+              "strokeJoin": { "value": "round" }
+            },
+            "update": {
+              "x": { "scale": "xDim", "field": "dim" },
+              "y": { "scale": "y", "field": "norm" },
+              "interpolate": { "signal": "interpolate" },
+              "strokeWidth": { "signal": "hovered && hovered.recordId === datum.recordId ? 2.5 : 1" },
+              "strokeOpacity": {
+                "signal": "hovered ? (hovered.recordId === datum.recordId ? 1 : lineOpacity * 0.25) : (!originFilter || originFilter === datum.Origin ? lineOpacity : lineOpacity * 0.12)"
+              }
+            }
+          }
+        },
+        {
+          "comment": "不可见命中层：同样的路径、透明描边、粗线宽，只为把 1px 细线变成好点的鼠标目标。line mark 被拾取时交出的 item 是该分组的第一行，所以 datum 里带着 Name / Origin",
+          "type": "line",
+          "name": "carline",
+          "from": { "data": "one" },
+          "encode": {
+            "enter": {
+              "stroke": { "value": "#000000" },
+              "strokeOpacity": { "value": 0 },
+              "cursor": { "value": "pointer" }
+            },
+            "update": {
+              "x": { "scale": "xDim", "field": "dim" },
+              "y": { "scale": "y", "field": "norm" },
+              "interpolate": { "signal": "interpolate" },
+              "strokeWidth": { "signal": "hitWidth" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "comment": "六条竖轴：y 从归一化 0 画到 1，也就是从绘图区底边到顶边",
+      "type": "rule",
+      "from": { "data": "dims" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "stroke": { "value": "#555555" },
+          "strokeWidth": { "value": 1 }
+        },
+        "update": {
+          "x": { "scale": "xDim", "field": "key" },
+          "y": { "scale": "y", "value": 0 },
+          "y2": { "scale": "y", "value": 1 }
+        }
+      }
+    },
+    {
+      "comment": "刻度短线：向轴左侧伸出 6px",
+      "type": "rule",
+      "from": { "data": "axis-ticks" },
+      "interactive": false,
+      "encode": {
+        "enter": { "stroke": { "value": "#555555" } },
+        "update": {
+          "x": { "signal": "scale('xDim', datum.key) - 6" },
+          "x2": { "scale": "xDim", "field": "key" },
+          "y": { "scale": "y", "field": "frac" }
+        }
+      }
+    },
+    {
+      "comment": "刻度标签：显示的是反算回去的真实数值，格式串来自维度元数据表",
+      "type": "text",
+      "from": { "data": "axis-ticks" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "align": { "value": "right" },
+          "baseline": { "value": "middle" },
+          "fill": { "value": "#444444" },
+          "fontSize": { "value": 10 }
+        },
+        "update": {
+          "x": { "signal": "scale('xDim', datum.key) - 9" },
+          "y": { "scale": "y", "field": "frac" },
+          "text": { "signal": "format(datum.tickValue, datum.fmt)" }
+        }
+      }
+    },
+    {
+      "comment": "轴标题放在绘图区上方（y 为负即在 height=0 的上边之外）",
+      "type": "text",
+      "from": { "data": "dims" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "align": { "value": "center" },
+          "baseline": { "value": "bottom" },
+          "fill": { "value": "#222222" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "text": { "field": "label" }
+        },
+        "update": {
+          "x": { "scale": "xDim", "field": "key" },
+          "y": { "value": -10 }
+        }
+      }
+    },
+    {
+      "comment": "无 from 的 mark 只产生一个 item，正好用来做一行随 signal 变化的读数",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "align": { "value": "left" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 12 },
+          "x": { "value": 0 }
+        },
+        "update": {
+          "y": { "signal": "height + 16" },
+          "fill": { "signal": "hovered ? '#1b1b1b' : '#888888'" },
+          "text": {
+            "signal": "hovered ? hovered.Name + '（' + hovered.Origin + '）· ' + format(hovered.Miles_per_Gallon, ',.1f') + ' MPG · ' + format(hovered.Cylinders, ',.0f') + ' 缸 · ' + format(hovered.Displacement, ',.0f') + ' in³ · ' + format(hovered.Horsepower, ',.0f') + ' hp · ' + format(hovered.Weight_in_lbs, ',.0f') + ' lbs · ' + format(hovered.Acceleration, ',.1f') + ' s' : '悬停任意一条折线看车型明细；点击右侧图例按产地筛选，点空白处还原'"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,342 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "同一棵 flare 层级树的两种画法：左 pack 圆填充（面积编码 size），右 tree + linkpath 径向树状图（极坐标手工换算）",
+  "width": 1120,
+  "height": 700,
+  "padding": { "left": 5, "top": 40, "right": 5, "bottom": 5 },
+  "autosize": "none",
+
+  "title": {
+    "text": "flare 层级树 · 圆填充（pack）与径向树状图（tree + linkpath）",
+    "anchor": "start",
+    "offset": 6,
+    "fontSize": 15,
+    "subtitle": "同一份父子表、同一套 depth 配色；左图用面积表达 size，右图用角度表达叶子顺序",
+    "subtitleFontSize": 11
+  },
+
+  "signals": [
+    {
+      "description": "画到第几层（同时决定右图 tree 布局用的叶子集合）",
+      "name": "maxDepth",
+      "value": 2,
+      "bind": { "input": "select", "options": [1, 2, 3, 4] }
+    },
+    {
+      "description": "pack 的同层圆间距，像素；越大留白越多、圆越小",
+      "name": "packPadding",
+      "value": 2,
+      "bind": { "input": "range", "min": 0, "max": 8, "step": 0.5 }
+    },
+    {
+      "description": "tree 布局算法：cluster 把所有叶子对齐到最外圈（树状图/dendrogram），tidy 按 Reingold-Tilford 把节点按层压紧",
+      "name": "treeMethod",
+      "value": "cluster",
+      "bind": { "input": "select", "options": ["cluster", "tidy"] }
+    },
+    {
+      "description": "径向布局占用的角度跨度（度）。小于 360 就会留出一道缺口",
+      "name": "extent",
+      "value": 360,
+      "bind": { "input": "range", "min": 180, "max": 360, "step": 10 }
+    },
+    {
+      "description": "整棵径向树的旋转量（度）。270 让第一个叶子指向正上方",
+      "name": "rotate",
+      "value": 270,
+      "bind": { "input": "range", "min": 0, "max": 360, "step": 15 }
+    },
+
+    {
+      "description": "画布内顶部留给图例与面板小标题的高度（大标题画在 y<0，由 padding.top 承担，不占 height）",
+      "name": "bandTop",
+      "value": 58
+    },
+    { "description": "左面板（pack）正方形区域边长", "name": "packSide", "value": 440 },
+    { "description": "左面板左上角 x", "name": "packX0", "value": 12 },
+    { "description": "左面板左上角 y：让 pack 方块在下半幅画布里垂直居中", "name": "packY0", "update": "(bandTop + height) / 2 - packSide / 2" },
+    { "description": "右面板可用横向起点", "name": "radialX0", "update": "packX0 + packSide + 24" },
+    { "description": "右面板半个可用宽度 = 径向图的总外接半径（含标签）", "name": "radialR0", "update": "(width - 8 - radialX0) / 2" },
+    { "name": "radialCx", "update": "radialX0 + radialR0" },
+    { "name": "radialCy", "update": "(bandTop + height) / 2" },
+    { "description": "留给叶子标签的径向宽度：本例最长叶子名 19 字符，按 Vega 无 canvas 时的宽度上界 19 × 8 × 0.8 ≈ 122px 估，再留 12px 余量", "name": "labelPad", "value": 134 },
+    { "description": "tree 布局的深度方向尺寸：外接半径减去标签带", "name": "treeRadius", "update": "radialR0 - labelPad" },
+    { "description": "径向叶子标签字号", "name": "leafLabelSize", "value": 8 }
+  ],
+
+  "data": [
+    {
+      "description": "flare.json 本身就是摊平的父子表：{id, name, parent?, size?}，可以直接喂给 stratify",
+      "name": "flare",
+      "url": "../../assets/data/flare.json"
+    },
+    {
+      "description": "pack 跑在完整树上：只有原始叶子带 size，父节点的半径由 root.sum('size') 自底向上累加得到。sort 按 size 降序排兄弟（Vega 的 sort 比较的是数据字段，父节点没有 size 字段，所以实际只对叶子生效，父节点保持输入顺序）。as 用 p* 前缀，避免和右图 tree 的输出字段互相覆盖（两个布局写的是同一批 tuple 对象）",
+      "name": "packNodes",
+      "source": "flare",
+      "transform": [
+        { "type": "stratify", "key": "id", "parentKey": "parent" },
+        {
+          "type": "pack",
+          "field": "size",
+          "sort": { "field": "size", "order": "descending" },
+          "padding": { "signal": "packPadding" },
+          "size": [ { "signal": "packSide" }, { "signal": "packSide" } ],
+          "as": ["px", "py", "pr", "pdepth", "pchildren"]
+        }
+      ]
+    },
+    {
+      "description": "只画到 maxDepth 层：pack 的几何不变，剪的只是渲染，所以被剪掉的那个圆的面积仍然代表它整棵子树的 size 之和",
+      "name": "packDraw",
+      "source": "packNodes",
+      "transform": [
+        { "type": "filter", "expr": "datum.pdepth <= maxDepth" }
+      ]
+    },
+    {
+      "description": "pack 的标签策略：字号不写死，而是【按圆能给多宽反算】。表达式语言没有测字宽的函数，用 length(name) * 字号 * 0.8 当宽度上界（0.8 正是 Vega 无 canvas 时的估算常数，真实浏览器测量必然更窄），反解出 fs = 可用宽度 / (0.8 * 字数)，再和上限取 min；算出来不足 6px 的圆干脆不标",
+      "name": "packLabels",
+      "source": "packDraw",
+      "transform": [
+        { "type": "filter", "expr": "datum.pdepth >= 1" },
+        { "type": "formula", "as": "isParent", "expr": "datum.pdepth < maxDepth && datum.pchildren > 0" },
+        { "type": "formula", "as": "labelWidth", "expr": "(datum.isParent ? 1.4 : 1.9) * datum.pr" },
+        { "type": "formula", "as": "fs", "expr": "min(datum.isParent ? 11 : 9, datum.labelWidth / (0.8 * length(datum.name)))" },
+        { "type": "filter", "expr": "datum.fs >= 6" }
+      ]
+    },
+    {
+      "description": "右图必须真剪枝：tree/cluster 的角度是按叶子个数均分的，叶子集合变了布局就得重算。这里复用 pack 算出的 pdepth 做剪枝条件（父节点一定被保留，stratify 不会断链）",
+      "name": "pruned",
+      "source": "packNodes",
+      "transform": [
+        { "type": "filter", "expr": "datum.pdepth <= maxDepth" }
+      ]
+    },
+    {
+      "description": "tree 的两路输出被 as 重命名成极坐标语义：alpha = 广度方向（0~1 的归一化角度位置），radius = 深度方向（像素半径）。随后五个 formula 把 (alpha, radius) 换算成角度、弧度、左右半圆标志和笛卡尔坐标 (tx, ty)",
+      "name": "treeNodes",
+      "source": "pruned",
+      "transform": [
+        { "type": "stratify", "key": "id", "parentKey": "parent" },
+        {
+          "type": "tree",
+          "method": { "signal": "treeMethod" },
+          "size": [ 1, { "signal": "treeRadius" } ],
+          "as": ["alpha", "radius", "tdepth", "tchildren"]
+        },
+        { "type": "formula", "as": "angle", "expr": "(rotate + extent * datum.alpha) % 360" },
+        { "type": "formula", "as": "radians", "expr": "PI * datum.angle / 180" },
+        { "type": "formula", "as": "leftside", "expr": "inrange(datum.angle, [90, 270])" },
+        { "type": "formula", "as": "tx", "expr": "radialCx + datum.radius * cos(datum.radians)" },
+        { "type": "formula", "as": "ty", "expr": "radialCy + datum.radius * sin(datum.radians)" }
+      ]
+    },
+    {
+      "description": "treelinks 从 stratify 挂在数据源上的 root 里取出每条父子边（{source, target} 两个 tuple 引用），linkpath 再把 (弧度, 半径) 两端连成一条径向 Bezier；生成的 path 以 (0,0) 为极点，所以 path mark 要用 x/y 平移到圆心",
+      "name": "treeLinks",
+      "source": "treeNodes",
+      "transform": [
+        { "type": "treelinks" },
+        {
+          "type": "linkpath",
+          "shape": "diagonal",
+          "orient": "radial",
+          "sourceX": "source.radians",
+          "sourceY": "source.radius",
+          "targetX": "target.radians",
+          "targetY": "target.radius"
+        }
+      ]
+    },
+    {
+      "description": "右图只给『剪枝后的叶子』写名字（tchildren == 0 就是剪枝后的叶子），标签按角度旋转",
+      "name": "treeLeafLabels",
+      "source": "treeNodes",
+      "transform": [
+        { "type": "filter", "expr": "!datum.tchildren" }
+      ]
+    },
+    {
+      "description": "两个面板的小标题，坐标由 signal 算出",
+      "name": "panels",
+      "values": [ { "key": "pack" }, { "key": "tree" } ],
+      "transform": [
+        { "type": "formula", "as": "cx", "expr": "datum.key == 'pack' ? packX0 + packSide / 2 : radialCx" },
+        {
+          "type": "formula", "as": "caption",
+          "expr": "datum.key == 'pack' ? 'pack · 圆填充：圆面积 = size（画到 depth ≤ ' + maxDepth + '）' : 'tree(' + treeMethod + ') + linkpath · 径向树状图（depth ≤ ' + maxDepth + ' 剪枝后重新布局）'"
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "depthColor",
+      "type": "ordinal",
+      "domain": [0, 1, 2, 3, 4],
+      "range": { "scheme": "tableau10" }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "depthColor",
+      "type": "symbol",
+      "symbolType": "circle",
+      "orient": "none",
+      "legendX": 452,
+      "legendY": 6,
+      "direction": "horizontal",
+      "title": "depth 层级",
+      "titleOrient": "left",
+      "titleFontSize": 11,
+      "labelFontSize": 10,
+      "symbolSize": 90
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "面板小标题",
+      "type": "text",
+      "from": { "data": "panels" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "text": { "field": "caption" },
+          "align": { "value": "center" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#444444" }
+        },
+        "update": {
+          "x": { "field": "cx" },
+          "y": { "signal": "bandTop - 16" }
+        }
+      }
+    },
+
+    {
+      "description": "左图：pack 输出 (px, py, pr)。symbol 的 size 是【外接正方形的面积】—— Vega 按 r = sqrt(size)/2 作图，所以要写 pow(2*r, 2)。写 PI*r*r 是 d3 的口径，会让圆整体缩到 88.6%、彼此不再相切",
+      "type": "symbol",
+      "from": { "data": "packDraw" },
+      "encode": {
+        "enter": {
+          "shape": { "value": "circle" },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 1 },
+          "tooltip": {
+            "signal": "datum.name + ' · depth=' + datum.pdepth + (datum.size ? ' · size=' + format(datum.size, ',d') : '')"
+          }
+        },
+        "update": {
+          "x": { "signal": "packX0 + datum.px" },
+          "y": { "signal": "packY0 + datum.py" },
+          "size": { "signal": "pow(2 * datum.pr, 2)" },
+          "fill": { "scale": "depthColor", "field": "pdepth" },
+          "fillOpacity": { "signal": "datum.pdepth == 0 ? 0.18 : 1" },
+          "zindex": { "value": 0 }
+        },
+        "hover": {
+          "stroke": { "value": "#222222" },
+          "strokeWidth": { "value": 2 },
+          "zindex": { "value": 1 }
+        }
+      }
+    },
+    {
+      "description": "左图标签：还有子圆要画的节点（isParent）把名字贴到圆的上沿，免得和子圆的标签抢中心；显示层的叶子写在圆心。limit 是硬保证：估算只决定要不要画，limit 决定画出来一定不超宽",
+      "type": "text",
+      "from": { "data": "packLabels" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "align": { "value": "center" },
+          "baseline": { "value": "middle" },
+          "fill": { "value": "#1b1b1b" }
+        },
+        "update": {
+          "x": { "signal": "packX0 + datum.px" },
+          "y": { "signal": "packY0 + datum.py + (datum.isParent ? datum.fs - datum.pr : 0)" },
+          "text": { "field": "name" },
+          "fontSize": { "field": "fs" },
+          "fontWeight": { "signal": "datum.isParent ? 'bold' : 'normal'" },
+          "limit": { "field": "labelWidth" }
+        }
+      }
+    },
+
+    {
+      "description": "右图连边：linkpath 生成的 path 以极点为原点，x/y 把它平移到圆心；按子节点 depth 上色",
+      "type": "path",
+      "from": { "data": "treeLinks" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "fill": { "value": null },
+          "strokeWidth": { "value": 1.2 }
+        },
+        "update": {
+          "x": { "signal": "radialCx" },
+          "y": { "signal": "radialCy" },
+          "path": { "field": "path" },
+          "stroke": { "scale": "depthColor", "field": "target.tdepth" },
+          "strokeOpacity": { "value": 0.55 }
+        }
+      }
+    },
+    {
+      "description": "右图节点：formula 已经把极坐标换成了 tx/ty，这里直接用",
+      "type": "symbol",
+      "from": { "data": "treeNodes" },
+      "encode": {
+        "enter": {
+          "shape": { "value": "circle" },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 0.8 },
+          "tooltip": {
+            "signal": "datum.name + ' · depth=' + datum.tdepth + ' · angle=' + format(datum.angle, '.1f') + '°'"
+          }
+        },
+        "update": {
+          "x": { "field": "tx" },
+          "y": { "field": "ty" },
+          "size": { "signal": "datum.tchildren ? 34 : 22" },
+          "fill": { "scale": "depthColor", "field": "tdepth" },
+          "zindex": { "value": 0 }
+        },
+        "hover": {
+          "size": { "value": 90 },
+          "stroke": { "value": "#222222" },
+          "zindex": { "value": 1 }
+        }
+      }
+    },
+    {
+      "description": "右图叶子标签：角度在右半圆时向外朝右排（align left、旋转 angle），落到左半圆就整体转 180° 并改成 align right —— 这样文字永远『头朝外、正着读』",
+      "type": "text",
+      "from": { "data": "treeLeafLabels" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "baseline": { "value": "middle" },
+          "fill": { "value": "#333333" }
+        },
+        "update": {
+          "x": { "field": "tx" },
+          "y": { "field": "ty" },
+          "text": { "field": "name" },
+          "fontSize": { "signal": "leafLabelSize" },
+          "limit": { "signal": "labelPad - 10" },
+          "dx": { "signal": "datum.leftside ? -6 : 6" },
+          "angle": { "signal": "datum.leftside ? datum.angle - 180 : datum.angle" },
+          "align": { "signal": "datum.leftside ? 'right' : 'left'" }
+        }
+      }
+    }
+  ]
+}

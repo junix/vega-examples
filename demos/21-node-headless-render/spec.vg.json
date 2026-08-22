@@ -41,7 +41,7 @@
   ],
 
   "axes": [
-    {"orient": "bottom", "scale": "x", "labelAngle": -30},
+    {"orient": "bottom", "scale": "x", "labelAngle": -30, "labelAlign": "right", "labelBaseline": "top"},
     {"orient": "left", "scale": "y", "title": "营收（万元）", "grid": true, "gridOpacity": 0.2}
   ],
 

@@ -5,6 +5,17 @@
   "height": 630,
   "padding": 8,
 
+  "signals": [
+    {
+      "comment": "两个面板的几何。抽成信号是为了让 group 的 encode 与它的**局部 height 信号**共用同一个数字：group mark 里 scale 的 \"range\": \"height\" 解析的是作用域里名为 height 的信号，不声明就会拿到顶层的 630",
+      "name": "foldTop",
+      "value": 30
+    },
+    { "name": "foldHeight", "value": 280 },
+    { "name": "pivotTop", "value": 440 },
+    { "name": "pivotHeight", "value": 180 }
+  ],
+
   "data": [
     {
       "name": "sales-wide",
@@ -66,20 +77,28 @@
     {
       "type": "group",
       "name": "fold-section",
+      "comment": "两处易错点都在本 group 里：(1) 局部 height 信号 —— 少了它，下面 y 比例尺的 \"range\": \"height\" 会拿到顶层的 630；(2) x 比例尺必须写 \"zero\": false —— 线性比例尺默认把 0 纳入 domain，年份轴一旦从 0 起，2019~2024 会被压成画布右边缘的一条竖线。",
       "encode": {
         "enter": {
-          "y": { "value": 30 },
+          "y": { "signal": "foldTop" },
           "width": { "signal": "width" },
-          "height": { "value": 280 }
+          "height": { "signal": "foldHeight" }
         }
       },
+
+      "signals": [
+        { "name": "height", "update": "foldHeight" }
+      ],
 
       "scales": [
         {
           "name": "x",
           "type": "linear",
           "domain": { "data": "sales-long", "field": "year" },
-          "range": "width"
+          "range": "width",
+          "zero": false,
+          "nice": false,
+          "padding": 14
         },
         {
           "name": "y",
@@ -147,11 +166,15 @@
       "name": "pivot-section",
       "encode": {
         "enter": {
-          "y": { "value": 440 },
+          "y": { "signal": "pivotTop" },
           "width": { "signal": "width" },
-          "height": { "value": 180 }
+          "height": { "signal": "pivotHeight" }
         }
       },
+
+      "signals": [
+        { "name": "height", "update": "pivotHeight" }
+      ],
 
       "scales": [
         {

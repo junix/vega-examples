@@ -11,7 +11,7 @@ window.DEMO_META = {
   slug: '17-wordcloud',
   group: 'D. 高级布局与扩展',
   title: '17 · 词云：wordcloud 变换与文字布局回写',
-  concepts: ['transform: wordcloud', 'mark: text', 'data.values', 'signal: bind', 'scale: ordinal', '布局字段回写']
+  concepts: ['transform: wordcloud', 'mark: text', 'data.values', 'signal: bind', 'scale: ordinal', 'legend: 类别图例', '布局字段回写']
 };
 </script>
 </head>
@@ -19,10 +19,13 @@ window.DEMO_META = {
 <main class="demo-main">
   <div class="demo-view">
     <div class="demo-notes">
-      拖动图表上方的 <code>padding</code> / <code>maxFont</code> 滑杆：词之间的间距与最大字号是
+      拖动图表下方的 <code>wordPadding</code> / <code>maxFont</code> 滑杆：词之间的间距与最大字号是
       <strong>signal 驱动的 wordcloud 变换参数</strong>，改动后布局会整体重排。
+      间距 signal 特意<strong>不</strong>叫 <code>padding</code> —— 那是 Vega 内建的画布外边距 signal，
+      同名会被合并顶替，连带把整张图的外边距一起改掉。
       悬停到单词上可看到 <code>hover</code> 编码集的半透明效果；颜色按概念类别
-      （语法 / 变换 / 布局 / 交互 / 运行时）经 ordinal 比例尺映射。
+      （grammar / transform / layout / interaction / runtime）经 ordinal 比例尺映射，
+      对应关系见图下方的 <strong>图例</strong>。
     </div>
     <div id="view"></div>
   </div>

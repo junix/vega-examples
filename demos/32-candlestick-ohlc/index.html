@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>32 K 线图与成交指标副图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+window.DEMO_META = {
+  slug: '32-candlestick-ohlc',
+  group: 'F. 稀有与复杂图形',
+  title: '32 · K 线图：双面板共享 x 比例尺 + 十字光标',
+  concepts: ['mark: group（纵向双面板）', '共享 scale / 单面板画轴', 'group 内遮蔽 height 信号', 'scale: band + bandwidth()', 'mark: rule（影线）', 'mark: rect（实体）', 'transform: window（row_number / lag）', 'transform: formula', '事件信号 mousemove + x()', 'format() / timeFormat() 格式化']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      鼠标在图上左右移动即可拖动<strong>十字光标</strong>，当日 OHLC 读数显示在两个面板之间的空档里；
+      悬停单根 K 线还有 tooltip。右侧可以切换<strong>涨跌配色约定</strong>（涨红跌绿 / 涨绿跌红）、
+      切换副图指标（振幅 / 当日收益率），以及拖动主图高度 —— 副图高度会自动反推，两个面板永远填满画布。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

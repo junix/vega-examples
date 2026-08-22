@@ -1,0 +1,780 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "两种核密度图形：左面板用 kde + area(orient=horizontal) 把每个物种的体重密度对称展开成小提琴，右面板用 kde + from.facet + area(默认 orient=vertical) 把 12 个月的气温密度叠成山脊线",
+  "width": 980,
+  "height": 560,
+  "padding": 12,
+
+  "title": {
+    "text": "核密度的两种画法：小提琴图（对称展开）与山脊线图（错行重叠）",
+    "subtitle": "左：Palmer Penguins 体重按物种分组 · 右：西雅图逐时气温正常值按月份分组 · 两张图共用同一个 kde 变换",
+    "anchor": "start",
+    "fontSize": 15,
+    "subtitleFontSize": 11.5,
+    "subtitlePadding": 4,
+    "offset": 8
+  },
+
+  "signals": [
+    {
+      "description": "小提琴的核带宽（单位：克）。0 = 交给 kde 自己估：1.06 · min(σ, IQR/1.34) · n^(-1/5)，即 R 里的 bw.nrd。调大 → 曲线越来越平滑、最后只剩一个包；调小 → 抖出锯齿与假峰",
+      "name": "bwMass",
+      "value": 0,
+      "bind": { "input": "range", "min": 0, "max": 400, "step": 20 }
+    },
+    {
+      "description": "kde 的取样域解析方式：independent = 每组只在自己的 min~max 上取样（小提琴两端正好收在该组极值处），shared = 所有组共用全体数据的取样域（尾部拖出长长的近零段，但组间可以逐点相减）",
+      "name": "resolveMode",
+      "value": "independent",
+      "bind": { "input": "select", "options": ["independent", "shared"] }
+    },
+    {
+      "description": "小提琴宽度的归一化口径：count = 面积正比于样本量（counts:true，样本多的组更胖）；density = 每组密度积分都为 1；equal = 每组各自拉满（只比形状，不比规模）",
+      "name": "widthMode",
+      "value": "count",
+      "bind": {
+        "input": "select",
+        "options": ["count", "density", "equal"],
+        "labels": ["count 面积∝样本量", "density 积分归一", "equal 每组等宽"]
+      }
+    },
+    {
+      "description": "小提琴占分类带宽的比例。几何完全由它派生：像素半宽 = w · bandwidth('xcat') · violinFill / 2",
+      "name": "violinFill",
+      "value": 0.9,
+      "bind": { "input": "range", "min": 0.2, "max": 1, "step": 0.05 }
+    },
+
+    {
+      "description": "山脊线的核带宽（单位：°C）。0 = 自动",
+      "name": "bwTemp",
+      "value": 0.8,
+      "bind": { "input": "range", "min": 0, "max": 3, "step": 0.1 }
+    },
+    {
+      "description": "行高：相邻两个月基线之间的像素距离。只决定「行画在哪」，与曲线多高无关",
+      "name": "rowStep",
+      "value": 34,
+      "bind": { "input": "range", "min": 18, "max": 36, "step": 1 }
+    },
+    {
+      "description": "振幅：密度最大值对应的曲线高度（像素）。只决定「曲线多高」，与行距无关。重叠量 = amplitude / rowStep，等于 1 时最高的峰刚好顶到上一行基线",
+      "name": "amplitude",
+      "value": 68,
+      "bind": { "input": "range", "min": 16, "max": 90, "step": 2 }
+    },
+    {
+      "description": "取样域两侧要留的余量：3 个带宽。高斯核在距样本 3 个带宽处已衰减到峰值的 1.1%，留够这段密度尾部才收得到 0。bwTemp = 0（自动）时按自动带宽的量级估：各月实测 0.29~0.94 °C，取 1 有余量",
+      "name": "tempPad",
+      "update": "3 * (bwTemp > 0 ? bwTemp : 1)"
+    },
+    {
+      "description": "山脊线 kde 的显式取样域 = 全年气温 [min, max] 两侧各放宽 tempPad。signal 里可以用 data() 读数据流的聚合结果，所以这个区间不含任何写死的数字；数据还没到时先给 null，kde 会退回数据自身的 [min, max]",
+      "name": "tempExtent",
+      "update": "length(data('temp-overall')) ? [data('temp-overall')[0].minT - tempPad, data('temp-overall')[0].maxT + tempPad] : null"
+    },
+
+    {
+      "description": "以下为布局派生信号：两个面板并排，中间的 gap 要放得下右面板的月份标签与轴标题",
+      "name": "panelTop",
+      "value": 68
+    },
+    { "name": "violinW", "value": 300 },
+    { "name": "panelGap", "value": 96 },
+    { "name": "ridgeW", "update": "width - violinW - panelGap" },
+    { "name": "panelH", "update": "height - panelTop" },
+    {
+      "description": "山脊线自下往上排：最下一行（12 月）的基线离 x 轴 10px，往上每行抬高 rowStep",
+      "name": "ridgeBottom",
+      "update": "panelH - 10"
+    },
+    { "name": "ridgeTopRow", "update": "ridgeBottom - 11 * rowStep" },
+    {
+      "name": "bwMassLabel",
+      "update": "bwMass > 0 ? format(bwMass, 'd') + ' g' : '自动'"
+    },
+    {
+      "name": "bwTempLabel",
+      "update": "bwTemp > 0 ? format(bwTemp, '.1f') + ' °C' : '自动'"
+    }
+  ],
+
+  "data": [
+    {
+      "description": "原始 344 行企鹅测量数据（JSON 不需要 format）",
+      "name": "penguins",
+      "url": "../../assets/data/penguins.json"
+    },
+    {
+      "description": "清洗：体重缺失的 2 行必须先剔除，否则 kde 会把 null 当 0 参与核平滑，y 轴 domain 也被拉到 0",
+      "name": "obs",
+      "source": "penguins",
+      "transform": [
+        { "type": "filter", "expr": "datum['Body Mass (g)'] != null" },
+        {
+          "description": "字段名带空格只能用 datum['...'] 取；顺手改成短名 mass，后面所有变换都用它",
+          "type": "formula",
+          "expr": "datum['Body Mass (g)']",
+          "as": "mass"
+        }
+      ]
+    },
+    {
+      "description": "核密度估计：每个物种一条密度曲线。counts 由 widthMode 决定、resolve 由 resolveMode 决定，bandwidth=0 时 kde 自己估",
+      "name": "violin-density",
+      "source": "obs",
+      "transform": [
+        {
+          "type": "kde",
+          "groupby": ["Species"],
+          "field": "mass",
+          "bandwidth": { "signal": "bwMass" },
+          "counts": { "signal": "widthMode === 'count'" },
+          "resolve": { "signal": "resolveMode" },
+          "minsteps": 40,
+          "maxsteps": 200,
+          "as": ["value", "density"]
+        },
+        {
+          "description": "组内最大密度：equal 口径下每组各自拉满",
+          "type": "joinaggregate",
+          "groupby": ["Species"],
+          "fields": ["density"],
+          "ops": ["max"],
+          "as": ["grpMax"]
+        },
+        {
+          "description": "不带 groupby 的 joinaggregate = 全体最大密度，贴回每一行；count / density 口径共用它做分母，组间宽度才可比",
+          "type": "joinaggregate",
+          "fields": ["density"],
+          "ops": ["max"],
+          "as": ["allMax"]
+        },
+        {
+          "description": "归一化成 w ∈ (0,1]，几何只跟 w 有关：像素半宽 = w · 带宽 · violinFill / 2",
+          "type": "formula",
+          "expr": "widthMode === 'equal' ? datum.density / datum.grpMax : datum.density / datum.allMax",
+          "as": "w"
+        }
+      ]
+    },
+    {
+      "description": "小提琴内部的箱线摘要：aggregate 直接给 q1/median/q3/mean/max/count，无需自己排序",
+      "name": "violin-stats",
+      "source": "obs",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["Species"],
+          "fields": ["mass", "mass", "mass", "mass", "mass", null],
+          "ops": ["q1", "median", "q3", "mean", "max", "count"],
+          "as": ["q1", "median", "q3", "mean", "maxMass", "n"]
+        }
+      ]
+    },
+    {
+      "description": "全体样本量，用于面板脚注（不把 342 写死）",
+      "name": "obs-count",
+      "source": "obs",
+      "transform": [
+        { "type": "aggregate", "fields": [null], "ops": ["count"], "as": ["n"] }
+      ]
+    },
+
+    {
+      "description": "逐时气温正常值。CSV 必须显式声明 format.type，日期还要给出 %Y-%m-%dT%H:%M:%S（中间那个 T 是字面量）；漏掉 parse 的话 temperature 会是字符串，kde 直接报废",
+      "name": "hourly",
+      "url": "../../assets/data/seattle-weather-hourly-normals.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "date": "date:'%Y-%m-%dT%H:%M:%S'",
+          "temperature": "number",
+          "pressure": "number",
+          "wind": "number"
+        }
+      },
+      "transform": [
+        {
+          "description": "month() 取本地时月份 0~11；解析与取月份都按本地时区，两边抵消，所以换时区结果不变",
+          "type": "formula",
+          "expr": "month(datum.date)",
+          "as": "month"
+        },
+        { "type": "formula", "expr": "(month(datum.date) + 1) + ' 月'", "as": "monthName" }
+      ]
+    },
+    {
+      "description": "每个月的均温（山脊配色与提示框用）；min/max 只进提示框",
+      "name": "month-stats",
+      "source": "hourly",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["month", "monthName"],
+          "fields": ["temperature", "temperature", "temperature", null],
+          "ops": ["mean", "min", "max", "count"],
+          "as": ["meanT", "minT", "maxT", "n"]
+        }
+      ]
+    },
+    {
+      "description": "12 条密度曲线。extent + steps + resolve:shared 是官方文档推荐的「可堆叠密度」三件套：extent 钉住取样区间（比数据范围两侧各宽 3 个带宽，密度尾部才收得到 0）、steps 钉住取样点数、resolve:shared 保证 12 组共用同一份栅格；再 lookup 回月均温用于填色",
+      "name": "ridge-density",
+      "source": "hourly",
+      "transform": [
+        {
+          "type": "kde",
+          "groupby": ["month", "monthName"],
+          "field": "temperature",
+          "bandwidth": { "signal": "bwTemp" },
+          "extent": { "signal": "tempExtent" },
+          "resolve": "shared",
+          "steps": 200,
+          "as": ["value", "density"]
+        },
+        {
+          "description": "全体最大密度做分母：峰高于是可比 —— 冬季气温集中所以峰高，夏季跨度大所以峰低",
+          "type": "joinaggregate",
+          "fields": ["density"],
+          "ops": ["max"],
+          "as": ["allMax"]
+        },
+        { "type": "formula", "expr": "datum.density / datum.allMax", "as": "w" },
+        {
+          "type": "lookup",
+          "from": "month-stats",
+          "key": "monthName",
+          "fields": ["monthName"],
+          "values": ["meanT", "minT", "maxT"]
+        }
+      ]
+    },
+    {
+      "description": "全年均温参考线 + 真实行数（不把 8760 写死：CSV 第一行是表头，且首行数据从 01:00 开始，实际 8759 行）；min/max 供 tempExtent 信号算取样域",
+      "name": "temp-overall",
+      "source": "hourly",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": ["temperature", "temperature", "temperature", null],
+          "ops": ["mean", "min", "max", "count"],
+          "as": ["meanT", "minT", "maxT", "n"]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "xcat",
+      "type": "band",
+      "domain": { "data": "violin-stats", "field": "Species", "sort": true },
+      "range": [0, { "signal": "violinW" }],
+      "padding": 0.18
+    },
+    {
+      "name": "yMass",
+      "type": "linear",
+      "domain": { "data": "obs", "field": "mass" },
+      "range": [{ "signal": "panelH" }, 0],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "species",
+      "type": "ordinal",
+      "domain": { "data": "violin-stats", "field": "Species", "sort": true },
+      "range": { "scheme": "tableau10" }
+    },
+    {
+      "name": "xTemp",
+      "type": "linear",
+      "domain": { "data": "ridge-density", "field": "value" },
+      "range": [0, { "signal": "ridgeW" }],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "rowY",
+      "type": "point",
+      "domain": {
+        "data": "ridge-density",
+        "field": "monthName",
+        "sort": { "op": "min", "field": "month" }
+      },
+      "range": [{ "signal": "ridgeTopRow" }, { "signal": "ridgeBottom" }],
+      "padding": 0
+    },
+    {
+      "name": "tempColor",
+      "type": "linear",
+      "domain": { "data": "month-stats", "field": "meanT" },
+      "range": { "scheme": "magma", "extent": [0.15, 0.82] }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "species",
+      "title": "物种",
+      "orient": "none",
+      "direction": "vertical",
+      "legendX": 6,
+      "legendY": { "signal": "panelTop + 8" },
+      "symbolType": "square",
+      "symbolSize": 90,
+      "titleFontSize": 11,
+      "labelFontSize": 11,
+      "rowPadding": 3
+    },
+    {
+      "description": "温度色带放进右面板右上角的空白区（冷月的曲线都挤在左侧，这块天然是空的）",
+      "fill": "tempColor",
+      "type": "gradient",
+      "title": "月均温 (°C)",
+      "orient": "none",
+      "direction": "horizontal",
+      "legendX": { "signal": "width - 158" },
+      "legendY": { "signal": "panelTop + 6" },
+      "gradientLength": 146,
+      "gradientThickness": 10,
+      "format": ".0f",
+      "tickCount": 4,
+      "titleFontSize": 11,
+      "labelFontSize": 10.5
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "两个面板各三行页头：标题 / kde 参数回显 / 图元含义。都是普通 text mark，x 用面板起点信号定位",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 12 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 12.5 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#2f343a" },
+          "text": { "value": "① 小提琴图：kde 对称展开" }
+        }
+      }
+    },
+    {
+      "description": "左面板第二行：三个 kde 参数的实时回显（拖滑块能看到它变）",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 31 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 10.5 },
+          "fill": { "value": "#6b7280" }
+        },
+        "update": {
+          "text": {
+            "signal": "'bw ' + bwMassLabel + ' · resolve ' + resolveMode + ' · 口径 ' + widthMode"
+          }
+        }
+      }
+    },
+    {
+      "description": "左面板第三行：图元含义 + 样本量（n 从数据流读，不写死 342）",
+      "type": "text",
+      "from": { "data": "obs-count" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 50 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 10.5 },
+          "fill": { "value": "#6b7280" }
+        },
+        "update": {
+          "text": {
+            "signal": "'深条 = IQR · 白线 = 中位数 · 空心点 = 均值 · n = ' + datum.n"
+          }
+        }
+      }
+    },
+    {
+      "description": "右面板标题：行高与振幅是两个独立参数，重叠量是它们的比值",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "y": { "value": 12 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 12.5 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#2f343a" }
+        },
+        "update": {
+          "x": { "signal": "violinW + panelGap" },
+          "text": {
+            "signal": "'② 山脊线图：行高 ' + rowStep + ' px · 振幅 ' + amplitude + ' px · 重叠 ' + format(amplitude / rowStep, '.2f') + ' 行'"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": { "data": "temp-overall" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "y": { "value": 31 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 10.5 },
+          "fill": { "value": "#6b7280" }
+        },
+        "update": {
+          "x": { "signal": "violinW + panelGap" },
+          "text": {
+            "signal": "'每行 = 一个月 · bw ' + bwTempLabel + ' · 圆点 = 月均温 · n = ' + format(datum.n, ',d') + ' 小时'"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "y": { "value": 50 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 10.5 },
+          "fill": { "value": "#6b7280" },
+          "text": { "value": "12 个月共用一个 200 点取样栅格（kde extent + steps + resolve: shared）" }
+        },
+        "update": {
+          "x": { "signal": "violinW + panelGap" }
+        }
+      }
+    },
+
+    {
+      "description": "面板一：小提琴。group 自带局部 width/height 信号，面板内的 axis grid 才会按面板尺寸铺（顶层 height=560 ≠ panelH=492）",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "violinW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "signals": [
+        { "name": "width", "update": "violinW" },
+        { "name": "height", "update": "panelH" }
+      ],
+      "axes": [
+        {
+          "orient": "left",
+          "scale": "yMass",
+          "title": "体重 Body Mass (g)",
+          "format": ",d",
+          "tickCount": 8,
+          "grid": true,
+          "gridOpacity": 0.25,
+          "labelFontSize": 10.5,
+          "titlePadding": 6
+        },
+        {
+          "orient": "bottom",
+          "scale": "xcat",
+          "title": "物种 Species",
+          "labelFontSize": 11,
+          "labelPadding": 3,
+          "titlePadding": 4
+        }
+      ],
+      "marks": [
+        {
+          "description": "每个物种一个 facet 子组：一个 area mark 只画一条连通路径，所以「多条密度曲线」必须靠 from.facet 拆组",
+          "type": "group",
+          "from": {
+            "facet": { "name": "one-violin", "data": "violin-density", "groupby": ["Species"] }
+          },
+          "marks": [
+            {
+              "description": "小提琴本体。orient:horizontal 表示 y 是自变量轴、x/x2 是宽度区间；band:0.5 取带心，offset 左右各推半宽",
+              "type": "area",
+              "from": { "data": "one-violin" },
+              "encode": {
+                "enter": {
+                  "fill": { "scale": "species", "field": "Species" },
+                  "fillOpacity": { "value": 0.85 },
+                  "stroke": { "value": "#33383d" },
+                  "strokeWidth": { "value": 1 },
+                  "orient": { "value": "horizontal" }
+                },
+                "update": {
+                  "y": { "scale": "yMass", "field": "value" },
+                  "x": {
+                    "scale": "xcat",
+                    "field": "Species",
+                    "band": 0.5,
+                    "offset": { "signal": "-datum.w * bandwidth('xcat') * violinFill / 2" }
+                  },
+                  "x2": {
+                    "scale": "xcat",
+                    "field": "Species",
+                    "band": 0.5,
+                    "offset": { "signal": "datum.w * bandwidth('xcat') * violinFill / 2" }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "description": "IQR 深条：y=Q3 是上沿、y2=Q1 是下沿，高度就是四分位距",
+          "type": "rect",
+          "from": { "data": "violin-stats" },
+          "encode": {
+            "enter": {
+              "width": { "value": 10 },
+              "fill": { "value": "#33383d" },
+              "cornerRadius": { "value": 2 }
+            },
+            "update": {
+              "x": { "scale": "xcat", "field": "Species", "band": 0.5, "offset": -5 },
+              "y": { "scale": "yMass", "field": "q3" },
+              "y2": { "scale": "yMass", "field": "q1" },
+              "tooltip": {
+                "signal": "{'物种': datum.Species, 'n': datum.n, 'Q1': format(datum.q1, ',.4~f') + ' g', '中位数': format(datum.median, ',.4~f') + ' g', 'Q3': format(datum.q3, ',.4~f') + ' g', 'IQR': format(datum.q3 - datum.q1, ',.4~f') + ' g', '均值': format(datum.mean, ',.1f') + ' g'}"
+              }
+            }
+          }
+        },
+        {
+          "description": "中位数白线",
+          "type": "rule",
+          "from": { "data": "violin-stats" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 2 }
+            },
+            "update": {
+              "x": { "scale": "xcat", "field": "Species", "band": 0.5, "offset": -6 },
+              "x2": { "scale": "xcat", "field": "Species", "band": 0.5, "offset": 6 },
+              "y": { "scale": "yMass", "field": "median" }
+            }
+          }
+        },
+        {
+          "description": "均值空心点：与中位数错开就说明分布偏斜",
+          "type": "symbol",
+          "from": { "data": "violin-stats" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "shape": { "value": "circle" },
+              "size": { "value": 44 },
+              "fill": { "value": "#ffffff" },
+              "stroke": { "value": "#33383d" },
+              "strokeWidth": { "value": 1.2 }
+            },
+            "update": {
+              "x": { "scale": "xcat", "field": "Species", "band": 0.5 },
+              "y": { "scale": "yMass", "field": "mean" }
+            }
+          }
+        },
+        {
+          "description": "每组样本量：贴在该组最大体重之上，跟着小提琴顶端走",
+          "type": "text",
+          "from": { "data": "violin-stats" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": { "value": "center" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#6b7280" }
+            },
+            "update": {
+              "x": { "scale": "xcat", "field": "Species", "band": 0.5 },
+              "y": { "scale": "yMass", "field": "maxMass", "offset": -7 },
+              "text": { "signal": "'n = ' + datum.n" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "面板二：山脊线。同样声明局部 width/height，底轴的网格线才按 panelH 铺满面板而不是按顶层 height",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "signal": "violinW + panelGap" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "ridgeW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "signals": [
+        { "name": "width", "update": "ridgeW" },
+        { "name": "height", "update": "panelH" }
+      ],
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "xTemp",
+          "title": "气温 Temperature (°C)",
+          "format": ".0f",
+          "tickCount": 8,
+          "grid": true,
+          "gridOpacity": 0.22,
+          "labelFontSize": 10.5,
+          "titlePadding": 4
+        },
+        {
+          "description": "月份轴：point 比例尺的每个点就是一行的基线，所以标签天然落在曲线脚下",
+          "orient": "left",
+          "scale": "rowY",
+          "domain": false,
+          "ticks": false,
+          "labelPadding": 8,
+          "labelFontSize": 10.5,
+          "title": "月份 Month",
+          "titlePadding": 10
+        }
+      ],
+      "marks": [
+        {
+          "description": "全年均温参考线",
+          "type": "rule",
+          "from": { "data": "temp-overall" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xTemp", "field": "meanT" },
+              "y": { "value": 0 },
+              "y2": { "signal": "panelH" },
+              "stroke": { "value": "#9aa1a9" },
+              "strokeWidth": { "value": 1 },
+              "strokeDash": { "value": [4, 3] }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "temp-overall" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xTemp", "field": "meanT", "offset": 4 },
+              "y": { "value": 2 },
+              "align": { "value": "left" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#6b7280" },
+              "text": { "signal": "'全年均温 ' + format(datum.meanT, '.1f') + ' °C'" }
+            }
+          }
+        },
+        {
+          "description": "每个月一个 facet 子组。sort 按月份升序 → 12 月最后画、压在 11 月之上；山脊线的遮挡关系全靠这个绘制顺序",
+          "type": "group",
+          "from": {
+            "facet": { "name": "one-ridge", "data": "ridge-density", "groupby": ["month", "monthName"] }
+          },
+          "sort": { "field": "datum.month", "order": "ascending" },
+          "marks": [
+            {
+              "description": "山脊面：默认 orient=vertical，x 是自变量轴，y/y2 是高度区间。y2 固定在基线，y = 基线 - w·amplitude",
+              "type": "area",
+              "from": { "data": "one-ridge" },
+              "encode": {
+                "enter": {
+                  "fill": { "scale": "tempColor", "field": "meanT" },
+                  "fillOpacity": { "value": 0.95 }
+                },
+                "update": {
+                  "x": { "scale": "xTemp", "field": "value" },
+                  "y": {
+                    "scale": "rowY",
+                    "field": "monthName",
+                    "offset": { "signal": "-datum.w * amplitude" }
+                  },
+                  "y2": { "scale": "rowY", "field": "monthName" },
+                  "tooltip": {
+                    "signal": "{'月份': datum.monthName, '月均温': format(datum.meanT, '.1f') + ' °C', '最低': format(datum.minT, '.1f') + ' °C', '最高': format(datum.maxT, '.1f') + ' °C'}"
+                  }
+                }
+              }
+            },
+            {
+              "description": "脊线：只描上边缘，靠它把重叠的相邻行分开。描边色按填充色的 WCAG 相对亮度自动翻转 —— 深紫的冬月用白线、浅橙的夏月用深线，一个表达式解决整条色带的对比度",
+              "type": "line",
+              "from": { "data": "one-ridge" },
+              "interactive": false,
+              "encode": {
+                "enter": {
+                  "stroke": {
+                    "signal": "luminance(scale('tempColor', datum.meanT)) > 0.28 ? '#43301f' : '#ffffff'"
+                  },
+                  "strokeWidth": { "value": 1.1 }
+                },
+                "update": {
+                  "x": { "scale": "xTemp", "field": "value" },
+                  "y": {
+                    "scale": "rowY",
+                    "field": "monthName",
+                    "offset": { "signal": "-datum.w * amplitude" }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "description": "月均温圆点：画在所有山脊之后，保证不被后面的行盖住；填色同样按亮度翻转，深色行用白点、浅色行用深点",
+          "type": "symbol",
+          "from": { "data": "month-stats" },
+          "encode": {
+            "enter": {
+              "shape": { "value": "circle" },
+              "size": { "value": 34 },
+              "fill": {
+                "signal": "luminance(scale('tempColor', datum.meanT)) > 0.28 ? '#43301f' : '#ffffff'"
+              },
+              "stroke": {
+                "signal": "luminance(scale('tempColor', datum.meanT)) > 0.28 ? '#ffffff' : '#43301f'"
+              },
+              "strokeWidth": { "value": 1.2 }
+            },
+            "update": {
+              "x": { "scale": "xTemp", "field": "meanT" },
+              "y": { "scale": "rowY", "field": "monthName" },
+              "tooltip": {
+                "signal": "{'月份': datum.monthName, '月均温': format(datum.meanT, '.1f') + ' °C', '逐时样本': datum.n + ' 条'}"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "config": {
+    "axis": { "labelColor": "#4b5158", "titleColor": "#33383d", "titleFontSize": 11 },
+    "legend": { "labelColor": "#4b5158", "titleColor": "#33383d" }
+  }
+}

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>37 地理投影与大圆航线 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '37-geo-projections-arcs',
+  group: 'F. 稀有与复杂图形',
+  title: '37 · 地理投影画廊、大圆航线与比例符号图',
+  concepts: [
+    'projection: type/rotate 接 signal',
+    'projection: fit + extent 分面板',
+    'transform: graticule',
+    'transform: geoshape',
+    'transform: geopoint',
+    'transform: lookup / aggregate / fold',
+    'GeoJSON LineString 大圆重采样',
+    'mark: shape / rule / symbol',
+    'scale: sqrt / pow（面积 vs 半径）'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      右侧面板可以玩三件事：<b>①</b> 换 <code>projType</code> 看同一个世界在 10 种投影下的样子，
+      拖 <code>rotateLambda</code> / <code>rotatePhi</code> 转地球（选 <code>orthographic</code> 最直观；
+      选 <code>albersUsa</code> 会看到美国之外的地方被投影直接丢弃）。
+      <b>②</b> 拖 <code>minFlights</code> 增减航线：<span style="color:#2a5d8f"><b>蓝色实线</b></span>是
+      <code>geoshape</code> 投影 GeoJSON <code>LineString</code> 得到的<b>大圆弧</b>，
+      <span style="color:#e45756"><b>红色虚线</b></span>（<code>showStraight</code> 可关）是先用
+      <code>geopoint</code> 把两端投影成像素坐标、再用 <code>rule</code> 连出来的<b>屏幕直线</b>——
+      两者的差就是"先投影再连线"的错误代价。
+      <b>③</b> 拖 <code>minMag</code> 看地震比例符号图：面积编码震级、颜色编码震源深度。
+      悬停任意国家 / 航线 / 机场 / 震中都有 tooltip。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

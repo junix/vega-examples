@@ -1,0 +1,1067 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "图形能力展示柜：六个面板分别演示自定义 symbol shape（SVG path 字符串）、size 的面积语义、sequence+formula 生成的参数方程曲线、线性/径向渐变填充、trail 变宽线，以及 group mark 的三种 clip 形式",
+  "width": 940,
+  "height": 690,
+  "padding": 10,
+  "background": "#ffffff",
+
+  "title": {
+    "text": "Vega 图形能力展示柜：自定义形状 · 参数方程 · 渐变 · trail · 裁剪",
+    "subtitle": "全部图形都由一份声明式 spec 生成；六个面板的坐标由 signal 算出，没有任何硬编码的画布偏移",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "anchor": "start",
+    "offset": 6
+  },
+
+  "signals": [
+    {
+      "description": "P1：symbol 的 size 通道（外接正方形面积，单位 px²）",
+      "name": "shapeSize",
+      "value": 400,
+      "bind": { "input": "range", "min": 100, "max": 1600, "step": 25 }
+    },
+    {
+      "description": "P3：参数方程种类",
+      "name": "curveKind",
+      "value": "rose",
+      "bind": { "input": "select", "options": ["rose", "lissajous", "spiral"] }
+    },
+    {
+      "description": "P3：玫瑰线的 k（也用作利萨如曲线的频率 a，b = a + 1）",
+      "name": "roseK",
+      "value": 5,
+      "bind": { "input": "range", "min": 2, "max": 9, "step": 1 }
+    },
+    {
+      "description": "P3：采样段数。调到 90 就能看见 line mark 其实是折线",
+      "name": "samples",
+      "value": 720,
+      "bind": { "input": "range", "min": 45, "max": 1080, "step": 45 }
+    },
+    {
+      "description": "P5：trail 末端线宽（px）",
+      "name": "trailMax",
+      "value": 18,
+      "bind": { "input": "range", "min": 2, "max": 30, "step": 1 }
+    },
+    {
+      "description": "P5：螺线圈数",
+      "name": "spiralTurns",
+      "value": 3,
+      "bind": { "input": "range", "min": 1, "max": 5, "step": 1 }
+    },
+    {
+      "description": "P6：中间那个 group 的 clip 开关（clip 支持 {signal}）",
+      "name": "clipOn",
+      "value": true,
+      "bind": { "input": "checkbox" }
+    },
+
+    { "description": "以下是布局尺寸，不绑控件", "name": "pw", "value": 440 },
+    { "name": "ph", "value": 190 },
+    { "name": "gapX", "value": 60 },
+    { "name": "gapY", "value": 46 },
+    { "name": "topPad", "value": 26 },
+    { "name": "colA", "update": "0" },
+    { "name": "colB", "update": "pw + gapX" },
+    { "name": "rowA", "update": "topPad" },
+    { "name": "rowB", "update": "topPad + ph + gapY" },
+    { "name": "rowC", "update": "topPad + 2 * (ph + gapY)" },
+
+    {
+      "description": "P3：θ 的上限。螺线要多转几圈才好看，所以走 6π",
+      "name": "tMax",
+      "update": "curveKind === 'spiral' ? 6 * PI : 2 * PI"
+    },
+    { "name": "curveCx", "update": "132" },
+    { "name": "curveCy", "update": "96" },
+    { "name": "curveR", "update": "80" },
+    {
+      "description": "P3：面板右侧那行方程说明，由 signal 拼出来",
+      "name": "curveEq",
+      "update": "curveKind === 'rose' ? 'r = cos(' + roseK + ' θ)' : (curveKind === 'lissajous' ? 'x = sin(' + roseK + ' θ)   y = sin(' + (roseK + 1) + ' θ)' : 'r = θ / 6π')"
+    },
+    {
+      "name": "curveRange",
+      "update": "'θ ∈ [0, ' + (curveKind === 'spiral' ? '6π' : '2π') + ']，采样 ' + samples + ' 段'"
+    },
+    { "name": "dotStride", "update": "max(1, floor(samples / 36))" },
+
+    { "name": "trailCx", "update": "110" },
+    { "name": "trailCy", "update": "92" },
+    { "name": "trailR", "update": "70" }
+  ],
+
+  "data": [
+    {
+      "description": "面板骨架：col/row 是网格坐标，px/py 由布局 signal 算出",
+      "name": "panels",
+      "values": [
+        { "n": "①", "title": "自定义 symbol shape", "note": "shape 直接吃 SVG path 字符串", "col": 0, "row": 0 },
+        { "n": "②", "title": "size 是面积，不是长度", "note": "边长 = √size", "col": 1, "row": 0 },
+        { "n": "③", "title": "参数方程曲线", "note": "sequence + formula + line", "col": 0, "row": 1 },
+        { "n": "④", "title": "线性 / 径向渐变填充", "note": "fill: {gradient: …}", "col": 1, "row": 1 },
+        { "n": "⑤", "title": "trail：沿线变宽的轨迹", "note": "trail 的 size = 线宽 px", "col": 0, "row": 2 },
+        { "n": "⑥", "title": "group 裁剪的三种写法", "note": "clip: false / {signal} / {path}", "col": 1, "row": 2 }
+      ],
+      "transform": [
+        { "type": "formula", "as": "px", "expr": "datum.col * (pw + gapX)" },
+        { "type": "formula", "as": "py", "expr": "topPad + datum.row * (ph + gapY)" }
+      ]
+    },
+
+    {
+      "description": "P1：四个自定义 path（写在 [-1,1] 的方框里、原点在图形中心）+ 四个内置形状",
+      "name": "shapes",
+      "values": [
+        { "label": "五角星 path", "shape": "M0.000,-1.000 L0.225,-0.309 L0.951,-0.309 L0.363,0.118 L0.588,0.809 L0.000,0.382 L-0.588,0.809 L-0.363,0.118 L-0.951,-0.309 L-0.225,-0.309 Z" },
+        { "label": "心形 path", "shape": "M0,0.95 C-1.05,0.15 -0.85,-0.95 0,-0.40 C0.85,-0.95 1.05,0.15 0,0.95 Z" },
+        { "label": "雪花 path", "shape": "M0.000,-1.000 L0.170,-0.294 L0.866,-0.500 L0.340,0.000 L0.866,0.500 L0.170,0.294 L0.000,1.000 L-0.170,0.294 L-0.866,0.500 L-0.340,0.000 L-0.866,-0.500 L-0.170,-0.294 Z" },
+        { "label": "闪电 path", "shape": "M-0.150,-1.000 L0.620,-1.000 L0.100,-0.160 L0.580,-0.160 L-0.320,1.000 L-0.050,0.060 L-0.500,0.060 Z" },
+        { "label": "内置 circle", "shape": "circle" },
+        { "label": "内置 cross", "shape": "cross" },
+        { "label": "内置 wedge", "shape": "wedge" },
+        { "label": "内置 arrow", "shape": "arrow" }
+      ],
+      "transform": [
+        { "type": "window", "ops": ["row_number"], "as": ["i"] },
+        { "type": "formula", "as": "cx", "expr": "55 + ((datum.i - 1) % 4) * 110" },
+        { "type": "formula", "as": "cy", "expr": "46 + floor((datum.i - 1) / 4) * 84" }
+      ]
+    },
+
+    {
+      "description": "P2：五个 size 值。edge 由 sqrt(size) 算出，正是 Vega 内部的缩放因子 √size/2 的两倍",
+      "name": "sizes",
+      "values": [
+        { "size": 100, "cx": 42 },
+        { "size": 225, "cx": 98 },
+        { "size": 400, "cx": 164 },
+        { "size": 900, "cx": 252 },
+        { "size": 1600, "cx": 362 }
+      ],
+      "transform": [
+        { "type": "formula", "as": "edge", "expr": "sqrt(datum.size)" }
+      ]
+    },
+
+    {
+      "description": "P3：sequence 变换凭空生成 θ 序列，无需任何外部数据文件",
+      "name": "theta",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": 0,
+          "stop": { "signal": "tMax + tMax / samples / 2" },
+          "step": { "signal": "tMax / samples" },
+          "as": "t"
+        }
+      ]
+    },
+    {
+      "description": "P3：极坐标 / 参数方程 → 面板内的像素坐标。formula 是逐条顺序执行的，后面的 formula 能用前面的结果",
+      "name": "curve",
+      "source": "theta",
+      "transform": [
+        { "type": "formula", "as": "rr", "expr": "curveKind === 'rose' ? cos(roseK * datum.t) : (curveKind === 'spiral' ? datum.t / tMax : 1)" },
+        { "type": "formula", "as": "ux", "expr": "curveKind === 'lissajous' ? sin(roseK * datum.t) : datum.rr * cos(datum.t)" },
+        { "type": "formula", "as": "uy", "expr": "curveKind === 'lissajous' ? sin((roseK + 1) * datum.t) : datum.rr * sin(datum.t)" },
+        { "type": "formula", "as": "cx", "expr": "curveCx + curveR * datum.ux" },
+        { "type": "formula", "as": "cy", "expr": "curveCy + curveR * datum.uy" },
+        { "type": "window", "ops": ["row_number"], "as": ["i"] }
+      ]
+    },
+    {
+      "description": "P3：抽稀出的采样点，用来说明 line mark 画的是折线",
+      "name": "curve-dots",
+      "source": "curve",
+      "transform": [
+        { "type": "filter", "expr": "(datum.i - 1) % dotStride === 0" }
+      ]
+    },
+
+    {
+      "description": "P4：给线性渐变 area 用的正弦波，同样由 sequence 生成",
+      "name": "wave",
+      "transform": [
+        { "type": "sequence", "start": 0, "stop": 121, "step": 1, "as": "k" },
+        { "type": "formula", "as": "wx", "expr": "12 + datum.k * 1.4" },
+        { "type": "formula", "as": "wy", "expr": "92 - 30 * sin(datum.k / 120 * 4 * PI)" }
+      ]
+    },
+
+    {
+      "description": "P5：螺线 r = R·θ/θmax；w 是 trail 的线宽（px），沿线线性增长",
+      "name": "spiral",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": 0,
+          "stop": { "signal": "spiralTurns * 2 * PI + 0.02" },
+          "step": { "signal": "spiralTurns * 2 * PI / 540" },
+          "as": "t"
+        },
+        { "type": "formula", "as": "frac", "expr": "datum.t / (spiralTurns * 2 * PI)" },
+        { "type": "formula", "as": "sx", "expr": "trailCx + trailR * datum.frac * cos(datum.t)" },
+        { "type": "formula", "as": "sy", "expr": "trailCy + trailR * datum.frac * sin(datum.t)" },
+        { "type": "formula", "as": "w", "expr": "1 + (trailMax - 1) * datum.frac" }
+      ]
+    },
+
+    {
+      "description": "唯一的外部数据：100 个按角度排好序的点（一圈带噪声的环），P5 P6 共用",
+      "name": "points",
+      "url": "../../assets/data/points.json"
+    },
+    {
+      "description": "P5：给 line / trail 对照用。n 由 joinaggregate 数出来，避免把 100 写死",
+      "name": "walk",
+      "source": "points",
+      "transform": [
+        { "type": "window", "ops": ["row_number"], "as": ["i"] },
+        { "type": "joinaggregate", "ops": ["count"], "as": ["n"] },
+        { "type": "formula", "as": "frac", "expr": "(datum.i - 1) / (datum.n - 1)" },
+        { "type": "formula", "as": "w", "expr": "1 + (trailMax - 1) * datum.frac" }
+      ]
+    },
+    {
+      "description": "P6：同一批点，按到原点的距离上色",
+      "name": "clipDots",
+      "source": "points",
+      "transform": [
+        { "type": "formula", "as": "rad", "expr": "sqrt(datum.x * datum.x + datum.y * datum.y)" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "shapeColor",
+      "type": "ordinal",
+      "domain": { "data": "shapes", "field": "label" },
+      "range": { "scheme": "tableau10" }
+    },
+    {
+      "name": "ramp",
+      "type": "linear",
+      "domain": [0, 1],
+      "range": { "scheme": "viridis" }
+    },
+    {
+      "name": "ramp2",
+      "type": "linear",
+      "domain": [0, 1],
+      "range": { "scheme": "blueorange" }
+    },
+    {
+      "name": "curveColor",
+      "type": "linear",
+      "domain": { "data": "curve", "field": "i" },
+      "range": { "scheme": "plasma" }
+    },
+    {
+      "name": "trailColor",
+      "type": "linear",
+      "domain": { "data": "spiral", "field": "frac" },
+      "range": { "scheme": "viridis" }
+    },
+    {
+      "name": "walkX",
+      "type": "linear",
+      "domain": [-0.72, 0.72],
+      "range": [274, 404]
+    },
+    {
+      "name": "walkY",
+      "type": "linear",
+      "domain": [-0.72, 0.72],
+      "range": [160, 30]
+    },
+    {
+      "name": "clipX",
+      "type": "linear",
+      "domain": [-0.72, 0.72],
+      "range": [-10, 134]
+    },
+    {
+      "name": "clipY",
+      "type": "linear",
+      "domain": [-0.72, 0.72],
+      "range": [127, -17]
+    },
+    {
+      "name": "radColor",
+      "type": "linear",
+      "domain": { "data": "clipDots", "field": "rad" },
+      "range": { "scheme": "magma" }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "六个面板的底板",
+      "type": "rect",
+      "from": { "data": "panels" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "field": "px" },
+          "y": { "field": "py" },
+          "width": { "signal": "pw" },
+          "height": { "signal": "ph" },
+          "fill": { "value": "#fbfbfd" },
+          "stroke": { "value": "#d5d9e0" },
+          "strokeWidth": { "value": 1 }
+        }
+      }
+    },
+    {
+      "description": "面板标题（左上）",
+      "type": "text",
+      "from": { "data": "panels" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "field": "px" },
+          "y": { "signal": "datum.py - 8" },
+          "text": { "signal": "datum.n + ' ' + datum.title" },
+          "align": { "value": "left" },
+          "baseline": { "value": "alphabetic" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#2b3138" }
+        }
+      }
+    },
+    {
+      "description": "面板要点（右上，与标题同一基线）",
+      "type": "text",
+      "from": { "data": "panels" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "datum.px + pw" },
+          "y": { "signal": "datum.py - 8" },
+          "text": { "field": "note" },
+          "align": { "value": "right" },
+          "baseline": { "value": "alphabetic" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#7b838d" }
+        }
+      }
+    },
+
+    {
+      "description": "P1：自定义 shape 与内置 shape 并排。shape 通道给字符串：认识的名字走内置，认不出的整串当 SVG path",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "signal": "colA" },
+          "y": { "signal": "rowA" },
+          "width": { "signal": "pw" },
+          "height": { "signal": "ph" }
+        }
+      },
+      "marks": [
+        {
+          "type": "symbol",
+          "from": { "data": "shapes" },
+          "encode": {
+            "enter": {
+              "tooltip": { "signal": "datum.label" }
+            },
+            "update": {
+              "x": { "field": "cx" },
+              "y": { "field": "cy" },
+              "shape": { "field": "shape" },
+              "size": { "signal": "shapeSize" },
+              "fill": { "scale": "shapeColor", "field": "label" },
+              "fillOpacity": { "value": 0.9 },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 1 }
+            },
+            "hover": {
+              "stroke": { "value": "#2b3138" },
+              "strokeWidth": { "value": 1.5 }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "shapes" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "cx" },
+              "y": { "signal": "datum.cy + 34" },
+              "text": { "field": "label" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#4a5158" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 10 },
+              "y": { "value": 180 },
+              "text": { "signal": "'当前 size = ' + shapeSize + ' → 边长 √size = ' + format(sqrt(shapeSize), '.1f') + ' px（所有图形都画在这么大的方框里）'" },
+              "align": { "value": "left" },
+              "baseline": { "value": "alphabetic" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#7b838d" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "P2：同一个 path 在五个 size 下的实际尺寸。红色虚线框边长 = √size",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "signal": "colB" },
+          "y": { "signal": "rowA" },
+          "width": { "signal": "pw" },
+          "height": { "signal": "ph" }
+        }
+      },
+      "marks": [
+        {
+          "type": "rect",
+          "from": { "data": "sizes" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "datum.cx - datum.edge / 2" },
+              "y": { "signal": "80 - datum.edge / 2" },
+              "width": { "field": "edge" },
+              "height": { "field": "edge" },
+              "fill": { "value": null },
+              "stroke": { "value": "#e45756" },
+              "strokeWidth": { "value": 1 },
+              "strokeDash": { "value": [3, 2] }
+            }
+          }
+        },
+        {
+          "type": "symbol",
+          "from": { "data": "sizes" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "cx" },
+              "y": { "value": 80 },
+              "shape": { "value": "M0.000,-1.000 L0.225,-0.309 L0.951,-0.309 L0.363,0.118 L0.588,0.809 L0.000,0.382 L-0.588,0.809 L-0.363,0.118 L-0.951,-0.309 L-0.225,-0.309 Z" },
+              "size": { "field": "size" },
+              "fill": { "value": "#4c78a8" },
+              "fillOpacity": { "value": 0.85 }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "sizes" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "cx" },
+              "y": { "value": 124 },
+              "text": { "signal": "'size ' + format(datum.size, 'd')" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#4a5158" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "sizes" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "cx" },
+              "y": { "value": 138 },
+              "text": { "signal": "'边长 ' + format(datum.edge, 'd') + ' px'" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#e45756" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 10 },
+              "y": { "value": 166 },
+              "text": { "value": "size 从 100 涨到 400（×4），边长只从 10 涨到 20（×2）" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#4a5158" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 10 },
+              "y": { "value": 180 },
+              "text": { "value": "内部实现：自定义 path 按 √size / 2 等比缩放，所以 [-1,1] 的框 → √size px" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#7b838d" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "P3：sequence 生成 θ，formula 求参数方程，line mark 串成曲线",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "signal": "colA" },
+          "y": { "signal": "rowB" },
+          "width": { "signal": "pw" },
+          "height": { "signal": "ph" }
+        }
+      },
+      "marks": [
+        {
+          "type": "line",
+          "from": { "data": "curve" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "cx" },
+              "y": { "field": "cy" },
+              "stroke": { "value": "#4c78a8" },
+              "strokeWidth": { "value": 1.6 },
+              "interpolate": { "value": "linear" }
+            }
+          }
+        },
+        {
+          "type": "symbol",
+          "from": { "data": "curve-dots" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "cx" },
+              "y": { "field": "cy" },
+              "size": { "value": 22 },
+              "fill": { "scale": "curveColor", "field": "i" },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.5 }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 236 },
+              "y": { "value": 76 },
+              "text": { "signal": "curveEq" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 12 },
+              "fill": { "value": "#2b3138" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 236 },
+              "y": { "value": 96 },
+              "text": { "signal": "curveRange" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#7b838d" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 236 },
+              "y": { "value": 116 },
+              "text": { "value": "彩色圆点 = 抽稀后的采样点" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#7b838d" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 236 },
+              "y": { "value": 132 },
+              "text": { "value": "把 samples 拖到 45 就能看出是折线" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#7b838d" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "P4：三种渐变填充。线性渐变直接用 gradient(scaleName, p0, p1) 从内置 scheme 生成；径向渐变只能手写 stops",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "signal": "colB" },
+          "y": { "signal": "rowB" },
+          "width": { "signal": "pw" },
+          "height": { "signal": "ph" }
+        }
+      },
+      "marks": [
+        {
+          "type": "area",
+          "from": { "data": "wave" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "wx" },
+              "y": { "field": "wy" },
+              "y2": { "value": 142 },
+              "fill": { "signal": "gradient('ramp', [0, 0], [0, 1], 8)" },
+              "stroke": { "value": "#3b5a7a" },
+              "strokeWidth": { "value": 1 }
+            }
+          }
+        },
+        {
+          "type": "arc",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 250 },
+              "y": { "value": 84 },
+              "startAngle": { "value": 0 },
+              "endAngle": { "signal": "2 * PI" },
+              "innerRadius": { "value": 22 },
+              "outerRadius": { "value": 58 },
+              "fill": {
+                "value": {
+                  "gradient": "radial",
+                  "r2": 0.5,
+                  "stops": [
+                    { "offset": 0, "color": "#fde725" },
+                    { "offset": 0.5, "color": "#21918c" },
+                    { "offset": 1, "color": "#440154" }
+                  ]
+                }
+              },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 1 }
+            }
+          }
+        },
+        {
+          "type": "symbol",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 366 },
+              "y": { "value": 84 },
+              "shape": { "value": "circle" },
+              "size": { "value": 4900 },
+              "fill": {
+                "value": {
+                  "gradient": "radial",
+                  "x1": 0.35,
+                  "y1": 0.32,
+                  "r1": 0.02,
+                  "x2": 0.5,
+                  "y2": 0.5,
+                  "r2": 0.55,
+                  "stops": [
+                    { "offset": 0, "color": "#ffffff" },
+                    { "offset": 0.45, "color": "#e45756" },
+                    { "offset": 1, "color": "#5c1616" }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 96 },
+              "y": { "value": 162 },
+              "text": { "value": "linear · area" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#4a5158" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 250 },
+              "y": { "value": 162 },
+              "text": { "value": "radial · arc" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#4a5158" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 366 },
+              "y": { "value": 162 },
+              "text": { "value": "radial · symbol" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#4a5158" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 10 },
+              "y": { "value": 180 },
+              "text": { "value": "渐变坐标是 0~1 的相对值，锚在每个 mark 自己的包围盒上" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#7b838d" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "P5：trail mark 的 size 沿线变化。左边是 sequence 生成的螺线，右边是同一组点的 line / trail 对照",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "signal": "colA" },
+          "y": { "signal": "rowC" },
+          "width": { "signal": "pw" },
+          "height": { "signal": "ph" }
+        }
+      },
+      "marks": [
+        {
+          "type": "trail",
+          "from": { "data": "spiral" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "field": "sx" },
+              "y": { "field": "sy" },
+              "size": { "field": "w" },
+              "fill": { "signal": "gradient('trailColor', [0, 0], [1, 0], 8)" },
+              "fillOpacity": { "value": 0.95 }
+            }
+          }
+        },
+        {
+          "type": "line",
+          "from": { "data": "walk" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "walkX", "field": "x" },
+              "y": { "scale": "walkY", "field": "y" },
+              "stroke": { "value": "#b6bcc4" },
+              "strokeWidth": { "value": 2 },
+              "interpolate": { "value": "linear" }
+            }
+          }
+        },
+        {
+          "type": "trail",
+          "from": { "data": "walk" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "walkX", "field": "x" },
+              "y": { "scale": "walkY", "field": "y" },
+              "size": { "field": "w" },
+              "fill": { "value": "#f58518" },
+              "fillOpacity": { "value": 0.55 }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "trailCx" },
+              "y": { "value": 186 },
+              "text": { "signal": "'螺线：线宽 1 → ' + trailMax + ' px，' + spiralTurns + ' 圈'" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#4a5158" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 339 },
+              "y": { "value": 186 },
+              "text": { "value": "同一组点：line（灰·等宽）vs trail（橙·变宽）" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#4a5158" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "P6：三个尺寸完全相同的子 group，内容也完全相同（一块超出边界的渐变矩形 + 一圈点），只有 clip 不同",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "signal": "colB" },
+          "y": { "signal": "rowC" },
+          "width": { "signal": "pw" },
+          "height": { "signal": "ph" }
+        }
+      },
+      "marks": [
+        {
+          "description": "clip 默认 false：子 mark 想画到哪就画到哪",
+          "type": "group",
+          "clip": false,
+          "encode": {
+            "update": {
+              "x": { "value": 10 },
+              "y": { "value": 20 },
+              "width": { "value": 124 },
+              "height": { "value": 110 },
+              "stroke": { "value": "#8c939b" },
+              "strokeWidth": { "value": 1 },
+              "strokeDash": { "value": [4, 3] }
+            }
+          },
+          "marks": [
+            {
+              "type": "rect",
+              "interactive": false,
+              "encode": {
+                "update": {
+                  "x": { "value": -10 },
+                  "y": { "value": -16 },
+                  "width": { "value": 144 },
+                  "height": { "value": 142 },
+                  "fill": { "signal": "gradient('ramp2', [0, 0], [1, 0], 6)" },
+                  "fillOpacity": { "value": 0.35 }
+                }
+              }
+            },
+            {
+              "type": "symbol",
+              "from": { "data": "clipDots" },
+              "interactive": false,
+              "encode": {
+                "update": {
+                  "x": { "scale": "clipX", "field": "x" },
+                  "y": { "scale": "clipY", "field": "y" },
+                  "size": { "value": 70 },
+                  "fill": { "scale": "radColor", "field": "rad" }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "description": "clip 支持 {signal}：true 时裁到 group 的 width×height 矩形",
+          "type": "group",
+          "clip": { "signal": "clipOn" },
+          "encode": {
+            "update": {
+              "x": { "value": 158 },
+              "y": { "value": 20 },
+              "width": { "value": 124 },
+              "height": { "value": 110 },
+              "stroke": { "value": "#8c939b" },
+              "strokeWidth": { "value": 1 },
+              "strokeDash": { "value": [4, 3] }
+            }
+          },
+          "marks": [
+            {
+              "type": "rect",
+              "interactive": false,
+              "encode": {
+                "update": {
+                  "x": { "value": -10 },
+                  "y": { "value": -16 },
+                  "width": { "value": 144 },
+                  "height": { "value": 142 },
+                  "fill": { "signal": "gradient('ramp2', [0, 0], [1, 0], 6)" },
+                  "fillOpacity": { "value": 0.35 }
+                }
+              }
+            },
+            {
+              "type": "symbol",
+              "from": { "data": "clipDots" },
+              "interactive": false,
+              "encode": {
+                "update": {
+                  "x": { "scale": "clipX", "field": "x" },
+                  "y": { "scale": "clipY", "field": "y" },
+                  "size": { "value": 70 },
+                  "fill": { "scale": "radColor", "field": "rad" }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "description": "clip 还支持 {path}：裁剪区域是任意 SVG path（坐标就是该 group 的局部坐标，不做归一化）",
+          "type": "group",
+          "clip": { "path": "M62.0,-17.0 L78.6,34.1 L132.4,34.1 L88.9,65.7 L105.5,116.9 L62.0,85.3 L18.5,116.9 L35.1,65.7 L-8.4,34.1 L45.4,34.1 Z" },
+          "encode": {
+            "update": {
+              "x": { "value": 306 },
+              "y": { "value": 20 },
+              "width": { "value": 124 },
+              "height": { "value": 110 },
+              "stroke": { "value": "#8c939b" },
+              "strokeWidth": { "value": 1 },
+              "strokeDash": { "value": [4, 3] }
+            }
+          },
+          "marks": [
+            {
+              "type": "rect",
+              "interactive": false,
+              "encode": {
+                "update": {
+                  "x": { "value": -10 },
+                  "y": { "value": -16 },
+                  "width": { "value": 144 },
+                  "height": { "value": 142 },
+                  "fill": { "signal": "gradient('ramp2', [0, 0], [1, 0], 6)" },
+                  "fillOpacity": { "value": 0.35 }
+                }
+              }
+            },
+            {
+              "type": "symbol",
+              "from": { "data": "clipDots" },
+              "interactive": false,
+              "encode": {
+                "update": {
+                  "x": { "scale": "clipX", "field": "x" },
+                  "y": { "scale": "clipY", "field": "y" },
+                  "size": { "value": 70 },
+                  "fill": { "scale": "radColor", "field": "rad" }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 72 },
+              "y": { "value": 152 },
+              "text": { "value": "clip: false" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 11 },
+              "fill": { "value": "#2b3138" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 220 },
+              "y": { "value": 152 },
+              "text": { "signal": "'clip: {signal} → ' + clipOn" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 11 },
+              "fill": { "value": "#2b3138" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 368 },
+              "y": { "value": 152 },
+              "text": { "value": "clip: {path: 五角星}" },
+              "align": { "value": "center" },
+              "fontSize": { "value": 11 },
+              "fill": { "value": "#2b3138" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 10 },
+              "y": { "value": 180 },
+              "text": { "value": "灰虚线 = 子 group 的 width×height；三块内容一模一样，差别全在 clip" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#7b838d" }
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "config": {
+    "text": { "font": "system-ui, -apple-system, \"Noto Sans CJK SC\", sans-serif" },
+    "title": { "font": "system-ui, -apple-system, \"Noto Sans CJK SC\", sans-serif", "subtitleFont": "system-ui, -apple-system, \"Noto Sans CJK SC\", sans-serif" }
+  }
+}

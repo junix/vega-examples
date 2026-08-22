@@ -13,8 +13,8 @@ spec 只负责「骨架」：空的 `data "live"`、一条 line + 一组 symbol 
 ## 运行
 
 ```sh
-../../serve.sh        # 在 vega 仓库根启动静态服务器
-# 浏览器打开 http://localhost:8000/vega-examples/demos/13-dynamic-data-runtime/
+../../serve.sh        # 在本项目根目录启动静态服务器
+# 浏览器打开 http://localhost:8000/demos/13-dynamic-data-runtime/
 ```
 
 ## spec 逐段讲解
@@ -23,11 +23,13 @@ spec 只负责「骨架」：空的 `data "live"`、一条 line + 一组 symbol 
 | --- | --- | --- |
 | `signals.window` | 控制 x 域显示的窗口宽度 | `bind: {"input": "range", ...}` 让 Vega 自动生成滑块控件；值是数字，右侧 Signals 面板可实时观察 |
 | `data.live` | 实时数据集 | `values: []` 初始为空——本 demo 的数据 100% 来自运行时推入；每个元组是 `{t, v}` |
-| `data.stats` | live 的派生统计 | `source: "live"` 表示以另一个数据集为输入；`aggregate` 变换求出 `maxT / minV / maxV`，随 insert/remove 自动增量重算；**空输入时输出零个元组**，所以下面要判 `length` |
-| `scales.x.domain` | x 域 | signal 表达式：有数据时取 `[maxT - window + 1, maxT]`（域宽恒为 window，随新点右移），空态回落 `[0, window - 1]`；**必须显式 `zero: false`**——Vega 线性比例尺默认 `zero: true` 会把 0 扩展进 domain，滚动窗口左侧会被钉死在 0 |
+| `data.stats` | live 的派生统计 | `source: "live"` 表示以另一个数据集为输入；`aggregate` 变换用一条 `fields`/`ops`/`as` 三元组求出 `minT / maxT / minV / maxV`（同一字段可以出现多次，配不同的 op），随 insert/remove 自动增量重算；**空输入时输出零个元组**，所以下面要判 `length` |
+| `scales.x.domain` | x 域 | signal 表达式：有数据时取 `[max(minT, maxT - window + 1), maxT]`——域宽**最多**为 window，随新点右移；在场点数不足 window 时（拖大滑块、或「清空」后按「单步」）左边界被 `minT` 夹住，收缩到数据实际范围 `[minT, maxT]`。**这个 `max()` 不能省**：`t` 从 1 起单调递增，不夹住的话「清空」后单步一次域就是 `[-38, 1]`，坐标轴会打出 −35/−30/… 这种根本不存在的「采样序号」，唯一的点还被挤到最右边。空态回落 `[0, window - 1]`；**必须显式 `zero: false`**——Vega 线性比例尺默认 `zero: true` 会把 0 扩展进 domain，滚动窗口左侧会被钉死在 0 |
+| `scales.x.padding` | x 域两端的像素余量 | `padding: 6` 让比例尺把 domain 往两侧各撑开 6px 对应的量（所以 `view.scale('x').domain()` 会比 signal 算出的数略宽一点，例如 `[1, 40]` → `[0.63, 40.37]`；signal 表达式本身语义不变）。没有它，最新点的 `t` 恰好等于 domain 上界、最旧点恰好等于下界，两个点都正好压在下面 `clip` 的边界上被切成半圆（symbol `size: 36` → 半径 3px）。实测加上后点落在 x∈[6, 634]，离裁剪边 6px > 3px |
+| `axes[0].tickMinStep` | x 轴刻度最小步长 | 和 `format: "d"` 配套用。域宽被 `max()` 夹小之后（清空后连按「单步」，域可能只有 `[1, 2]`），`tickCount: 10` 会生成 0.1/0.2 这类小数刻度，`format: "d"` 再把它们截断成同一个整数 → 轴上出现 `1,1,1,1,1,2,2,…` 的重复标签。`tickMinStep: 1` 强制步长 ≥ 1，恢复成 `1,2`（`[1, 4]` 恢复成 `1,2,3,4`）；域宽够大时它不起作用，例如 200 个点 @ window=40 → 域 `[161, 200]`，标签照旧是 165,170,…,200 |
 | `scales.y.domain` | y 域 | 同样用 signal 表达式：`[minV - 2, maxV + 2]` 留出边距，空态回落 `[-10, 10]`；`nice` 让刻度取整 |
 | `domain` 里的 `data('stats')` | signal 表达式访问数据集 | 表达式里用 `data('名字')` 读数据集元组数组，并自动建立依赖——数据一变，域就重算 |
-| `marks` | line 折线 + symbol 点 | 都从 `data "live"` 取数；`clip: true` 把越出坐标域的部分裁掉（流式数据必备） |
+| `marks` | line 折线 + symbol 点 | 都从 `data "live"` 取数；`clip: true` 把越出坐标域的部分裁掉（流式数据必备）。裁剪矩形就是 `width × height` 的绘图区，顶层 `padding: 8` 只给整个 view 加外边距、救不了压在裁剪边上的点——那要靠上面 x 比例尺的 `padding: 6` |
 | `tooltip` | 点的悬停提示 | 复习 demo 12：signal 表达式拼文本 |
 
 ## main.js 逐段讲解
@@ -63,6 +65,10 @@ spec 只负责「骨架」：空的 `data "live"`、一条 line + 一组 symbol 
 4. 把 y 域的 signal 表达式换成固定 `[-30, 30]`，对比「自适应域」与「固定域」在
    长时间游走下的观感差异。
 5. 用 `view.addDataListener('live', ...)` 在控制台打印每次变更后的元组数。
+6. 把 x 比例尺的 `padding: 6` 删掉，看最新/最旧那两个点怎么被 `clip` 切成半圆；再把 domain 里的
+   `max(minT, ...)` 换回裸的 `maxT - window + 1`，按「清空」再按「单步」，看坐标轴打出负的采样序号；
+   最后把 `tickMinStep: 1` 也删掉，在同一状态下看 `format: "d"` 怎么打出 `1,1,1,1,1,2,2,…` 的重复标签。
+   三处改动各自防的是一个具体坑，缺一不可。
 
 ## 参考
 

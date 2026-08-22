@@ -22,7 +22,9 @@ window.DEMO_META = {
       本图的教学主线是 <code>spec.vg.json</code> 里 <code>data</code> 段的变换管线：
       <code>cars_clean</code>（filter → formula）→ <code>top3</code>（window → filter → collect），
       旁路 <code>origin_avg</code>（aggregate）给每组一个均值脚注。
-      三个面板由 <strong>group mark + facet</strong> 按 Origin 切分；面板内的比例尺、坐标轴都是各自独立的。
+      三个面板由 <strong>group mark + facet</strong> 按 Origin 切分；面板内的比例尺、坐标轴各建一份，
+      但 x 的 <code>domain</code> 特意指向<strong>未分面</strong>的 <code>top3</code>——若指向 facet 子数据 <code>cells</code>，
+      三块面板会各自缩放成「柱长几乎一样」，读图必错（README「分面的三个坑」有实测数字）。
       右侧 Signals 面板可看到 <code>cellWidth</code> 如何用 <code>bandwidth('gpos')</code> 自动跟随画布宽度。
     </div>
     <div id="view"></div>

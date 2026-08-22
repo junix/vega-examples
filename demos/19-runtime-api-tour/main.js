@@ -86,6 +86,10 @@
       /* 第 6 步：runAsync 跑数据流并渲染首帧，两个 View 并行 */
       return Promise.all([viewCanvas.runAsync(), viewSvg.runAsync()]).then(function () {
         log('两个 View 首帧渲染完成（runAsync resolve）');
+        /* 手工构造的 View 自己接入页面顶部的共享导出工具栏（renderDemo 会自动做这一步）。
+         * 注册两个 → 工具栏上会多出一个 View 选择框。 */
+        registerDemoView(viewCanvas, 'canvas');
+        registerDemoView(viewSvg, 'svg');
         wireButtons(viewCanvas, viewSvg);
       });
     })

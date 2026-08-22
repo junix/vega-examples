@@ -10,6 +10,19 @@
     "fontSize": 14
   },
 
+  "signals": [
+    {
+      "comment": "两个面板的几何。写成 signal 而不是散落的字面量，是因为下面每个 group mark 都要用它来声明自己的局部 height 信号",
+      "name": "panelHeight",
+      "value": 220
+    },
+    {
+      "comment": "上面板顶部 → 下面板顶部的距离（面板高 + 轴与轴标题占的空间）",
+      "name": "panelGap",
+      "value": 290
+    }
+  ],
+
   "data": [
     {
       "name": "population",
@@ -75,10 +88,15 @@
           "x": { "value": 0 },
           "y": { "value": 0 },
           "width": { "signal": "width" },
-          "height": { "value": 220 },
+          "height": { "signal": "panelHeight" },
           "stroke": { "value": "#e0e0e0" }
         }
       },
+
+      "comment": "关键：group mark 内部的 scale 写 \"range\": \"height\" 时，解析的是**这个作用域里**名为 height 的信号。不声明这条局部信号，它就会拿到顶层的 510，柱子按整幅画布高度画、直接溢出面板。",
+      "signals": [
+        { "name": "height", "update": "panelHeight" }
+      ],
 
       "scales": [
         {
@@ -148,12 +166,16 @@
       "encode": {
         "enter": {
           "x": { "value": 0 },
-          "y": { "value": 290 },
+          "y": { "signal": "panelGap" },
           "width": { "signal": "width" },
-          "height": { "value": 220 },
+          "height": { "signal": "panelHeight" },
           "stroke": { "value": "#e0e0e0" }
         }
       },
+
+      "signals": [
+        { "name": "height", "update": "panelHeight" }
+      ],
 
       "scales": [
         {
@@ -212,9 +234,15 @@
               "x": { "scale": "x-age-gr", "field": "age" },
               "y": { "value": 0 },
               "width": { "signal": "bandwidth('x-age-gr')" },
-              "height": { "signal": "height" }
+              "height": { "signal": "panelHeight" }
             }
           },
+
+          "comment": "同一个陷阱的第二处：x-sex 的 \"range\": \"width\" 必须解析成**这一格的带宽**，所以这里要把局部 width 信号声明成 bandwidth('x-age-gr')。官方 Grouped Bar Chart 例子里那句 signals 就是干这件事的。",
+          "signals": [
+            { "name": "width", "update": "bandwidth('x-age-gr')" },
+            { "name": "height", "update": "panelHeight" }
+          ],
 
           "scales": [
             {

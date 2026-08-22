@@ -11,7 +11,7 @@ window.DEMO_META = {
   slug: '18-voronoi-labels',
   group: 'D. 高级布局与扩展',
   title: '18 · Voronoi 单元格拾取与 label 防重叠标签',
-  concepts: ['transform: voronoi', 'transform: label', '事件: @mark:mouseover', 'signal 联动过滤', 'transform: window rank', 'mark 作为数据源']
+  concepts: ['transform: voronoi', 'transform: label', '事件: @mark:mouseover', 'signal 联动过滤', 'transform: window row_number', 'mark 作为数据源']
 };
 </script>
 </head>
@@ -21,7 +21,7 @@ window.DEMO_META = {
     <div class="demo-notes">
       在散点区域<strong>随意移动鼠标</strong>：事件其实由一层透明的 Voronoi 单元格
       （<code>@cells:mouseover</code>）捕获，离鼠标最近的那个点会被放大高亮并显示车名——
-      不需要给 300 多个点逐个挂监听。带红圈的点是「每个产地马力最大的前 2 名」，
+      不需要给 392 个点逐个挂监听。6 个带红圈的点是「每个产地马力最大的前 2 名」，
       它们的名字由 <code>label</code> 变换自动摆放、彼此不重叠也不压点。
       右侧 Signals 面板可实时看到 <code>hovered</code> 的当前值。
     </div>

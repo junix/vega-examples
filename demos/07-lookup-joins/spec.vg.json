@@ -13,14 +13,36 @@
     "subtitleColor": "#666666"
   },
 
+  "signals": [
+    {
+      "comment": "两个面板的几何抽成信号。group mark 里 scale 的 \"range\": \"width\"/\"height\" 解析的是**作用域里**名为 width/height 的信号，group 不会自动重绑 —— 所以 panelA 的 encode 与它的局部 width/height 信号必须共用同一个数字，否则比例尺会拿顶层的 780×320 去画",
+      "name": "panelAW",
+      "value": 380
+    },
+    { "name": "panelAH", "value": 210 },
+    { "name": "panelBX", "value": 430 },
+    { "name": "panelBW", "value": 340 },
+    { "name": "panelBH", "value": 230 },
+    { "name": "panelTop", "value": 20 }
+  ],
+
   "data": [
     {
+      "comment": "CSV 必须显式声明 format.type：Vega 不会按扩展名推断，缺了就会当成 JSON 解析而整表报废",
       "name": "people",
-      "url": "../../assets/data/lookup_people.csv"
+      "url": "../../assets/data/lookup_people.csv",
+      "format": {
+        "type": "csv",
+        "parse": { "age": "number", "height": "number" }
+      }
     },
     {
       "name": "groups",
-      "url": "../../assets/data/lookup_groups.csv"
+      "url": "../../assets/data/lookup_groups.csv",
+      "format": {
+        "type": "csv",
+        "parse": { "group": "number" }
+      }
     },
     {
       "name": "newcomers",
@@ -131,16 +153,21 @@
         "fontWeight": "bold",
         "offset": 4
       },
+      "comment": "panelA 的框 = 绘图区：轴按 group **item** 的 width/height 定位，比例尺 range 按作用域**信号**取值，两者必须一致，所以下面的局部 signals 与这里的 encode 都读同一对 panelAW/panelAH",
       "encode": {
         "enter": {
           "x": { "value": 0 },
-          "y": { "value": 20 },
-          "width": { "value": 380 },
-          "height": { "value": 210 },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "panelAW" },
+          "height": { "signal": "panelAH" },
           "fill": { "value": "#fafafa" },
           "stroke": { "value": "#dddddd" }
         }
       },
+      "signals": [
+        { "name": "width", "update": "panelAW" },
+        { "name": "height", "update": "panelAH" }
+      ],
       "scales": [
         {
           "name": "xg",
@@ -153,6 +180,7 @@
           "name": "yg",
           "type": "linear",
           "domain": { "data": "group_stats", "field": "avg_height" },
+          "domainMax": 200,
           "range": "height",
           "nice": true,
           "zero": true
@@ -164,6 +192,7 @@
       ],
       "marks": [
         {
+          "comment": "hover 集必须配一个 update 集：pointerout 时 Vega 发的编码指令是 ['update','hover']，两个集合缺一个就整条指令被 StopPropagation 吞掉，fillOpacity 0.7 会永久留在柱子上",
           "type": "rect",
           "from": { "data": "group_stats" },
           "encode": {
@@ -173,6 +202,9 @@
               "y": { "scale": "yg", "field": "avg_height" },
               "y2": { "scale": "yg", "value": 0 },
               "fill": { "value": "#4e79a7" }
+            },
+            "update": {
+              "fillOpacity": { "value": 1 }
             },
             "hover": {
               "fillOpacity": { "value": 0.7 }
@@ -200,7 +232,7 @@
           "encode": {
             "enter": {
               "x": { "scale": "xg", "field": "group", "band": 0.5 },
-              "y": { "value": 250 },
+              "y": { "signal": "panelAH + 26" },
               "align": { "value": "center" },
               "baseline": { "value": "top" },
               "fontSize": { "value": 10 },
@@ -224,10 +256,10 @@
       },
       "encode": {
         "enter": {
-          "x": { "value": 430 },
-          "y": { "value": 20 },
-          "width": { "value": 340 },
-          "height": { "value": 230 },
+          "x": { "signal": "panelBX" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "panelBW" },
+          "height": { "signal": "panelBH" },
           "fill": { "value": "#fafafa" },
           "stroke": { "value": "#dddddd" }
         }

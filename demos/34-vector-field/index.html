@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>34 矢量场 / 风场图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '34-vector-field',
+  group: 'F. 稀有与复杂图形',
+  title: '34 · 矢量场 / 风场图：自定义箭头字形 + angle 编码方向 + pow(2) size 编码长度',
+  concepts: [
+    'mark: symbol + 自定义 SVG path shape',
+    'encode: angle（度、顺时针、0°=正上）',
+    'scale: pow(exponent=2) —— size 是面积，长度 = √size',
+    'transform: formula + filter（按格点下标取模抽稀）',
+    'transform: aggregate / joinaggregate / sequence',
+    'mark: arc 极坐标风玫瑰',
+    '嵌套 group + clip（外层放轴、内层裁图元）',
+    'legend: gradient + 手工画的长度参考尺'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      左图每个箭头是一个 0.25° 格点：<strong>方向</strong>由 <code>angle</code> 通道编码，
+      <strong>长度</strong>由 <code>size</code>（面积！）通道经 <code>pow</code> 比例尺换算而来，
+      <strong>颜色</strong>是风速。右侧 Signals 面板可以调
+      <code>step</code>（抽稀步长）、<code>arrowScale</code>（箭头缩放）、
+      <code>arrowStyle</code>（箭头字形），以及关键的
+      <code>pointDownwind</code> —— 勾选=箭头指向风吹去的方向（<code>dir + 180°</code>），
+      取消=箭头指回风的来向（<code>dir</code>）。悬停任一箭头可看到该格点的风速、风向与实际箭头像素长度；
+      悬停右图花瓣可看到该来向的频率与平均风速。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

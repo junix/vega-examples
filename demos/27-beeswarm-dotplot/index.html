@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>27 蜂群图与 Wilkinson 点图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '27-beeswarm-dotplot',
+  group: 'F. 稀有与复杂图形',
+  title: '27 · 蜂群图与 Wilkinson 点图：保留每一个个体的分布图',
+  concepts: [
+    'transform: force（forceX / forceY / collide）',
+    'force static: true',
+    'transform: dotbin',
+    'transform: stack',
+    'mark: group（双面板共享比例尺）',
+    'signal 里用 domain() / scale() / data()',
+    'mark: symbol'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      两个面板画的是同一批 400 辆车的马力，都<strong>不做聚合</strong>：每个圆点就是一辆车。
+      左边拖 <code>nodeRadius</code> / <code>gravityX</code> 看 force 布局在「忠实于 x 值」和
+      「不重叠」之间怎么权衡；右边拖 <code>dotStep</code> 看 <code>dotbin</code> 的箱宽如何同时
+      决定点的直径和列高。把 <code>force static</code> 的勾去掉可以看到仿真动画（默认打开，
+      这样无头渲染才拿得到稳定结果）。鼠标悬停任意点可看车名。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

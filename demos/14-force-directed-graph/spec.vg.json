@@ -10,7 +10,7 @@
     { "name": "cx", "update": "width / 2" },
     { "name": "cy", "update": "height / 2" },
     {
-      "description": "节点半径（像素），同时驱动 symbol 面积与 collide 力半径",
+      "description": "节点半径（像素），同时驱动 symbol 的 size 与 collide 力半径。Vega 内建 circle 形状按 r = sqrt(size)/2 作图，所以 size 必须写成直径的平方 pow(2*nodeRadius, 2)，视觉半径才等于碰撞半径。",
       "name": "nodeRadius", "value": 6,
       "bind": { "input": "range", "min": 2, "max": 20, "step": 1 }
     },
@@ -123,7 +123,7 @@
           "tooltip": { "field": "name" }
         },
         "update": {
-          "size": { "signal": "2 * nodeRadius * nodeRadius" },
+          "size": { "signal": "pow(2 * nodeRadius, 2)" },
           "cursor": { "value": "pointer" }
         },
         "hover": {

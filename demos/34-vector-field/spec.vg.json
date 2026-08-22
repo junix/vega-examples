@@ -1,0 +1,554 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "矢量场/风场图：symbol mark 用自定义 SVG path 当箭头，angle 编码风向、pow(2) size 让箭头长度线性正比于风速，右侧配一张同数据的风玫瑰",
+  "width": 920,
+  "height": 400,
+  "padding": 6,
+  "autosize": { "type": "pad" },
+
+  "title": {
+    "text": "北大西洋东岸 0.25° 风场快照",
+    "subtitle": "左：矢量场（箭头方向=风向，长度与颜色=风速） · 右：同一份数据的风玫瑰（各来向出现频率）",
+    "subtitleFontSize": 11,
+    "subtitlePadding": 4,
+    "anchor": "start",
+    "fontSize": 15,
+    "offset": 4
+  },
+
+  "signals": [
+    {
+      "description": "抽稀步长：原网格 0.25°×0.25°（80×60=4800 点），每 step 个格点取一个",
+      "name": "step",
+      "value": 4,
+      "bind": { "input": "range", "min": 1, "max": 8, "step": 1 }
+    },
+    {
+      "description": "箭头缩放：最长箭头 = 抽稀后网格间距 × 该系数。>1 表示相邻箭头会互相搭接",
+      "name": "arrowScale",
+      "value": 1.1,
+      "bind": { "input": "range", "min": 0.4, "max": 1.6, "step": 0.05 }
+    },
+    {
+      "description": "true=箭头指向下风向（风往哪吹，即真正的速度矢量，需要 dir+180）；false=箭头指回上风向（风从哪来，直接用 dir）",
+      "name": "pointDownwind",
+      "value": true,
+      "bind": { "input": "checkbox" }
+    },
+    {
+      "description": "箭头字形：三种自定义 SVG path，都以原点为中心、竖直方向长度为 2（即 y 从 -1 到 1）",
+      "name": "arrowStyle",
+      "value": "arrow",
+      "bind": { "input": "select", "options": ["arrow", "wedge", "triangle"] }
+    },
+    {
+      "description": "把 arrowStyle 翻译成真正的 path 字符串。三条 path 的竖直跨度都必须是 2，否则长度换算公式失效",
+      "name": "arrowPath",
+      "update": "arrowStyle === 'arrow' ? 'M0,-1L-0.36,-0.30L-0.12,-0.30L-0.12,1L0.12,1L0.12,-0.30L0.36,-0.30Z' : arrowStyle === 'wedge' ? 'M0,-1L-0.28,1L0,0.60L0.28,1Z' : 'M0,-1L-0.42,1L0.42,1Z'"
+    },
+
+    { "description": "左侧矢量场面板的几何：经度跨 21.2°、纬度跨 15.8°，等经纬度线性映射（Plate Carrée）", "name": "vfW", "value": 470 },
+    { "name": "lonSpan", "value": 21.2 },
+    { "name": "latSpan", "value": 15.8 },
+    { "name": "vfH", "update": "round(vfW * latSpan / lonSpan)" },
+    { "name": "panelTop", "value": 22 },
+
+    { "description": "每经度多少像素 → 抽稀后格点间距的像素数 → 最长箭头像素长度 → 对应的 size（面积）", "name": "pxPerDeg", "update": "vfW / lonSpan" },
+    { "name": "cellPx", "update": "step * 0.25 * pxPerDeg" },
+    { "name": "maxArrowPx", "update": "cellPx * arrowScale" },
+    { "name": "maxArrowArea", "update": "pow(maxArrowPx, 2)" },
+
+    { "description": "中间一列：颜色图例 + 手工画的箭头长度参考尺", "name": "refX", "value": 505 },
+    { "name": "refY", "value": 282 },
+    { "name": "refDy", "value": 26 },
+
+    { "description": "右侧风玫瑰面板：径向刻度固定到 12.5%，方便与别的风玫瑰直接对照", "name": "roseX", "value": 615 },
+    { "name": "roseW", "value": 305 },
+    { "name": "roseCx", "update": "roseW / 2" },
+    { "name": "roseCy", "value": 178 },
+    { "name": "roseR", "value": 118 },
+    { "name": "roseFracMax", "value": 0.125 },
+    { "name": "roseRingStep", "value": 0.025 },
+    { "description": "dirCat 是 15° 一档，所以每个花瓣占 15°（中心 ±7.5°）", "name": "sectorHalf", "value": 7.5 }
+  ],
+
+  "data": [
+    {
+      "description": "CSV 必须显式声明 format.type，并把全部数值字段 parse 成 number，否则 dir/speed 会是字符串",
+      "name": "wind",
+      "url": "../../assets/data/windvectors.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "longitude": "number",
+          "latitude": "number",
+          "dir": "number",
+          "dirCat": "number",
+          "speed": "number"
+        }
+      }
+    },
+    {
+      "description": "抽稀 + 求箭头朝向。col/row 是格点在 0.25° 网格里的整数下标，用取模抽稀；heading 是最终喂给 angle 通道的罗盘方位角",
+      "name": "grid",
+      "source": "wind",
+      "transform": [
+        { "type": "formula", "as": "col", "expr": "round((datum.longitude + 9.875) * 4)" },
+        { "type": "formula", "as": "row", "expr": "round((datum.latitude - 45.125) * 4)" },
+        { "type": "filter", "expr": "datum.col % step === 0 && datum.row % step === 0" },
+        { "type": "formula", "as": "heading", "expr": "(datum.dir + (pointDownwind ? 180 : 0)) % 360" }
+      ]
+    },
+    {
+      "description": "风玫瑰用全量 4800 点统计（不受抽稀影响）：dirCat 的 0 与 360 是同一个方位，先 %360 合并",
+      "name": "rose",
+      "source": "wind",
+      "transform": [
+        { "type": "formula", "as": "sector", "expr": "datum.dirCat % 360" },
+        {
+          "type": "aggregate",
+          "groupby": ["sector"],
+          "fields": [null, "speed"],
+          "ops": ["count", "mean"],
+          "as": ["n", "meanSpeed"]
+        },
+        { "type": "joinaggregate", "fields": ["n"], "ops": ["sum"], "as": ["total"] },
+        { "type": "formula", "as": "frac", "expr": "datum.n / datum.total" }
+      ]
+    },
+    {
+      "description": "风玫瑰的径向网格圈：sequence 生成 2.5% / 5% / ... / 12.5%",
+      "name": "roseRings",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": { "signal": "roseRingStep" },
+          "stop": { "signal": "roseFracMax + roseRingStep / 2" },
+          "step": { "signal": "roseRingStep" },
+          "as": "frac"
+        }
+      ]
+    },
+    {
+      "name": "compass",
+      "values": [
+        { "deg": 0, "label": "N" },
+        { "deg": 45, "label": "NE" },
+        { "deg": 90, "label": "E" },
+        { "deg": 135, "label": "SE" },
+        { "deg": 180, "label": "S" },
+        { "deg": 225, "label": "SW" },
+        { "deg": 270, "label": "W" },
+        { "deg": 315, "label": "NW" }
+      ]
+    },
+    {
+      "description": "箭头长度参考尺：手工列几个风速，用同一个 arrowSize 比例尺画出对应长度的箭头",
+      "name": "refSpeeds",
+      "values": [{ "speed": 3 }, { "speed": 6 }, { "speed": 9 }, { "speed": 12 }]
+    },
+    {
+      "name": "panelTitles",
+      "values": [
+        { "x": 0, "text": "① 矢量场（每格一个箭头）" },
+        { "x": 615, "text": "② 风玫瑰（来向频率分布）" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": [-10.6, 10.6],
+      "zero": false,
+      "range": [0, { "signal": "vfW" }]
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [44.6, 60.4],
+      "zero": false,
+      "range": [{ "signal": "vfH" }, 0]
+    },
+    {
+      "name": "arrowSize",
+      "type": "pow",
+      "exponent": 2,
+      "domain": { "data": "wind", "field": "speed" },
+      "zero": true,
+      "range": [0, { "signal": "maxArrowArea" }]
+    },
+    {
+      "name": "speedColor",
+      "type": "linear",
+      "domain": { "data": "wind", "field": "speed" },
+      "zero": true,
+      "range": { "scheme": "viridis" }
+    },
+    {
+      "name": "roseRadius",
+      "type": "sqrt",
+      "domain": [0, { "signal": "roseFracMax" }],
+      "range": [0, { "signal": "roseR" }],
+      "clamp": true
+    }
+  ],
+
+  "legends": [
+    {
+      "type": "gradient",
+      "fill": "speedColor",
+      "title": "风速 (m/s)",
+      "titleFontSize": 11,
+      "orient": "none",
+      "direction": "vertical",
+      "legendX": { "signal": "refX" },
+      "legendY": 56,
+      "gradientLength": 150,
+      "gradientThickness": 14,
+      "format": ".0f",
+      "labelFontSize": 10
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "两块面板的小标题",
+      "type": "text",
+      "from": { "data": "panelTitles" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "y": { "value": 12 },
+          "text": { "field": "text" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#3b3b46" },
+          "baseline": { "value": "bottom" }
+        },
+        "update": { "x": { "field": "x" } }
+      }
+    },
+
+    {
+      "description": "① 矢量场面板：外层 group 负责比例尺与坐标轴，内层 group 开 clip 只裁箭头（如果直接给外层开 clip，轴标签也会被裁掉）",
+      "type": "group",
+      "name": "vfPanel",
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "vfW" },
+          "height": { "signal": "vfH" }
+        }
+      },
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "x",
+          "title": "经度",
+          "tickCount": 5,
+          "grid": true,
+          "gridColor": "#ffffff",
+          "gridOpacity": 0.75,
+          "encode": {
+            "labels": {
+              "update": {
+                "text": {
+                  "signal": "format(abs(datum.value), '.0f') + '°' + (datum.value < 0 ? 'W' : datum.value > 0 ? 'E' : '')"
+                }
+              }
+            }
+          }
+        },
+        {
+          "orient": "left",
+          "scale": "y",
+          "title": "纬度",
+          "tickCount": 4,
+          "grid": true,
+          "gridColor": "#ffffff",
+          "gridOpacity": 0.75,
+          "encode": {
+            "labels": {
+              "update": {
+                "text": { "signal": "format(datum.value, '.0f') + '°N'" }
+              }
+            }
+          }
+        }
+      ],
+      "marks": [
+        {
+          "type": "rect",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 0 },
+              "y": { "value": 0 },
+              "width": { "signal": "vfW" },
+              "height": { "signal": "vfH" },
+              "fill": { "value": "#f2f3f6" }
+            }
+          }
+        },
+        {
+          "type": "group",
+          "clip": true,
+          "encode": {
+            "update": {
+              "x": { "value": 0 },
+              "y": { "value": 0 },
+              "width": { "signal": "vfW" },
+              "height": { "signal": "vfH" }
+            }
+          },
+          "marks": [
+            {
+              "description": "核心：symbol + 自定义 path 当箭头。angle 单位是度、顺时针、0°=正上（北），刚好等于罗盘方位角；size 是面积，箭头长度 = sqrt(size)",
+              "type": "symbol",
+              "from": { "data": "grid" },
+              "encode": {
+                "enter": {
+                  "stroke": { "value": "#ffffff" },
+                  "strokeWidth": { "value": 0.4 },
+                  "strokeOpacity": { "value": 0.6 }
+                },
+                "update": {
+                  "x": { "scale": "x", "field": "longitude" },
+                  "y": { "scale": "y", "field": "latitude" },
+                  "shape": { "signal": "arrowPath" },
+                  "angle": { "field": "heading" },
+                  "size": { "scale": "arrowSize", "field": "speed" },
+                  "fill": { "scale": "speedColor", "field": "speed" },
+                  "fillOpacity": { "value": 0.95 },
+                  "tooltip": {
+                    "signal": "{'经度': format(datum.longitude, '.3f') + '°', '纬度': format(datum.latitude, '.3f') + '°', '风速': format(datum.speed, '.2f') + ' m/s', '风向(来向)': format(datum.dir, '.0f') + '°', '箭头方位': format(datum.heading, '.0f') + '°', '箭头长度': format(sqrt(scale('arrowSize', datum.speed)), '.1f') + ' px'}"
+                  }
+                },
+                "hover": {
+                  "stroke": { "value": "#d62728" },
+                  "strokeWidth": { "value": 1.2 },
+                  "strokeOpacity": { "value": 1 }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "description": "箭头长度参考尺的小标题。不写 from 的 mark 只生成一个实例，比绑数据再用 opacity 藏掉多余实例干净（后者仍会进 SVG）",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "refX" },
+          "y": { "signal": "refY - 22" },
+          "text": { "value": "箭头长度 ∝ 风速" },
+          "fontSize": { "value": 11 },
+          "fill": { "value": "#3b3b46" },
+          "baseline": { "value": "middle" }
+        }
+      }
+    },
+    {
+      "description": "参考箭头：全部朝正东（angle=90），尾端对齐在 refX。x 取中心点，所以要 refX + 长度/2",
+      "type": "symbol",
+      "from": { "data": "refSpeeds" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "refX + sqrt(scale('arrowSize', datum.speed)) / 2" },
+          "y": { "signal": "refY + refDy * (datum.speed / 3 - 1)" },
+          "shape": { "signal": "arrowPath" },
+          "angle": { "value": 90 },
+          "size": { "scale": "arrowSize", "field": "speed" },
+          "fill": { "scale": "speedColor", "field": "speed" }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": { "data": "refSpeeds" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "refX + maxArrowPx + 8" },
+          "y": { "signal": "refY + refDy * (datum.speed / 3 - 1)" },
+          "text": { "signal": "format(datum.speed, 'd') + ' m/s'" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#55555f" },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" }
+        }
+      }
+    },
+
+    {
+      "description": "② 风玫瑰面板：极坐标柱状图。arc 的 0 弧度指正上方、顺时针增大，和 symbol 的 angle 约定一致，所以方位角直接换算成弧度即可",
+      "type": "group",
+      "name": "rosePanel",
+      "encode": {
+        "update": {
+          "x": { "signal": "roseX" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "roseW" },
+          "height": { "signal": "vfH" }
+        }
+      },
+      "marks": [
+        {
+          "description": "八条方位辐条",
+          "type": "rule",
+          "from": { "data": "compass" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "roseCx" },
+              "y": { "signal": "roseCy" },
+              "x2": { "signal": "roseCx + roseR * sin(datum.deg * PI / 180)" },
+              "y2": { "signal": "roseCy - roseR * cos(datum.deg * PI / 180)" },
+              "stroke": { "value": "#c9c9d2" },
+              "strokeWidth": { "value": 0.7 }
+            }
+          }
+        },
+        {
+          "description": "花瓣：半径用 sqrt 比例尺，让扇形面积正比于频率；填色复用左图的风速色标（取该来向的平均风速）",
+          "type": "arc",
+          "from": { "data": "rose" },
+          "encode": {
+            "update": {
+              "x": { "signal": "roseCx" },
+              "y": { "signal": "roseCy" },
+              "startAngle": { "signal": "(datum.sector - sectorHalf) * PI / 180" },
+              "endAngle": { "signal": "(datum.sector + sectorHalf) * PI / 180" },
+              "innerRadius": { "value": 0 },
+              "outerRadius": { "scale": "roseRadius", "field": "frac" },
+              "fill": { "scale": "speedColor", "field": "meanSpeed" },
+              "fillOpacity": { "value": 0.9 },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.8 },
+              "tooltip": {
+                "signal": "{'来向': format(datum.sector, 'd') + '° ± ' + format(sectorHalf, '.1f') + '°', '格点数': format(datum.n, 'd'), '占比': format(datum.frac, '.2%'), '平均风速': format(datum.meanSpeed, '.2f') + ' m/s'}"
+              }
+            },
+            "hover": {
+              "stroke": { "value": "#d62728" },
+              "strokeWidth": { "value": 1.6 }
+            }
+          }
+        },
+        {
+          "description": "径向网格圈：shape='circle' 时半径也是 sqrt(size)/2，所以 size = (2r)²",
+          "type": "symbol",
+          "from": { "data": "roseRings" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "roseCx" },
+              "y": { "signal": "roseCy" },
+              "shape": { "value": "circle" },
+              "size": { "signal": "pow(2 * scale('roseRadius', datum.frac), 2)" },
+              "fill": { "value": null },
+              "stroke": { "value": "#8a8a96" },
+              "strokeWidth": { "value": 0.6 },
+              "strokeDash": { "value": [2, 3] }
+            }
+          }
+        },
+        {
+          "description": "网格圈刻度标签的白色底衬，避免压在花瓣上看不清",
+          "type": "rect",
+          "from": { "data": "roseRings" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "roseCx - 17" },
+              "y": { "signal": "roseCy - scale('roseRadius', datum.frac) - 6" },
+              "width": { "value": 34 },
+              "height": { "value": 12 },
+              "fill": { "value": "#ffffff" },
+              "fillOpacity": { "value": 0.85 }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "roseRings" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "roseCx" },
+              "y": { "signal": "roseCy - scale('roseRadius', datum.frac)" },
+              "text": { "signal": "format(datum.frac, '.1%')" },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#55555f" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "compass" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "roseCx + (roseR + 16) * sin(datum.deg * PI / 180)" },
+              "y": { "signal": "roseCy - (roseR + 16) * cos(datum.deg * PI / 180)" },
+              "text": { "field": "label" },
+              "fontSize": { "value": 11 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#3b3b46" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "roseCx" },
+              "y": { "signal": "roseCy + roseR + 34" },
+              "text": { "value": ["径向 = 该来向格点占全部 4800 个格点的比例", "颜色 = 该来向平均风速"] },
+              "fontSize": { "value": 9.5 },
+              "lineHeight": { "value": 13 },
+              "fill": { "value": "#6b6b76" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "底部注记：把当前抽稀设置和箭头约定写在图上",
+      "type": "text",
+      "interactive": false,
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "panelTop + vfH + 52" },
+          "text": {
+            "signal": "'抽稀步长 ' + step + '（' + format(step * 0.25, '.2f') + '° 一格，共 ' + length(data('grid')) + ' / 4800 个格点） · 箭头' + (pointDownwind ? '指向下风向（angle = dir + 180°）' : '指回上风向（angle = dir）') + ' · 最长箭头 ' + format(maxArrowPx, '.1f') + ' px'"
+          },
+          "fontSize": { "value": 10.5 },
+          "fill": { "value": "#55555f" },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" }
+        }
+      }
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 10, "titleFontSize": 11, "domainColor": "#b9b9c2", "tickColor": "#b9b9c2" }
+  }
+}

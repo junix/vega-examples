@@ -20,9 +20,13 @@ window.DEMO_META = {
   <div class="demo-view">
     <div class="demo-notes">
       灰线：MSFT 原始收盘价（<code>spec.vg.json</code> 自带，纯内置语法）。
+      <code>stocks.csv</code> 是<b>月频</b>数据（2000-01 … 2010-03，每月 1 条，共 123 行），
+      所以窗口单位是<b>月</b>，不是「交易日」。
       红线：<b>自定义 Transform</b> <code>MovingAverage</code> 算出的滑动平均，
       窗口大小由 <code>maWindow</code> 滑块控制（拖动即触发参数变化 → 全量重算）。
-      左上角注释里的百分比由<b>自定义表达式函数</b> <code>pctChange</code> 计算。
+      红线左端会比灰线短 <code>maWindow - 1</code> 个点 —— 窗口未填满时算子写 <code>null</code>，
+      由 <code>defined</code> 通道断开，避免把「前 k 期均值」冒充成 n 期均线。
+      左上角注释里的<b>月环比</b>涨跌由<b>自定义表达式函数</b> <code>pctChange</code> 计算。
       两个扩展都在 <code>main.js</code> 里注册，且<b>必须先于</b> <code>vega.parse</code>。
     </div>
     <div id="view"></div>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>29 箱线图与误差棒 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '29-boxplot-errorbar',
+  group: 'F. 稀有与复杂图形',
+  title: '29 · 箱线图与误差棒：手工拼出 Vega 没有的复合 mark',
+  concepts: [
+    'transform: aggregate（q1/median/q3/mean/stdev/stderr/count）',
+    'transform: lookup（把组内围栏反连回原始观测）',
+    'transform: formula（IQR 与 Tukey 围栏）',
+    'mark: group（两个独立坐标系的面板）',
+    'mark: rect / rule / symbol',
+    'band 偏移几何（band 取信号值）',
+    'expr: quantileNormal（95% CI 的 1.96）'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      左边是<strong>箱线图</strong>，右边是<strong>均值 ± 误差棒</strong>，共用同一份
+      <code>aggregate</code> 统计表。拖 <code>iqrK</code> 看须端与离群点的取舍如何变化（调到
+      3.0 离群点会被须吞回去）；切换 <code>errMode</code> 看「标准误 / 95% 置信区间 / 标准差」
+      三种区间的宽度差一个数量级 —— 这是论文图里最容易被写错的一笔。
+      悬停盒子或误差棒可看该组的完整五数概括。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

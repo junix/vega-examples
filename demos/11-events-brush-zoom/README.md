@@ -5,23 +5,23 @@
 ## 学习目标
 
 - 看懂 Vega **事件流（event stream）**的完整语法：`source` / `type` / `between` / `filter` / `consume`，以及字符串简写（`"window:mouseup"`、`"wheel!"`、`"[a, b] > c"`）。
-- 用 `mousedown → mousemove → mouseup` 事件序列维护一个 **interval brush**（区间框选）：按下锚定起点、拖动更新终点、松手保留结果、双击清除。
+- 用 `mousedown → mousemove → mouseup` 事件序列维护一个 **interval brush**（区间框选）：按下锚定起点、拖动更新终点、松手时**归一化掉退化区间**、双击清除。
 - 掌握官方 **anchor/zoom 缩放模式**：滚轮处以 `invert()` 记录数据域锚点，再按比例缩放 `xdom`/`ydom` 两个 domain signal。
 - 理解事件流里的 `filter` **只能访问 `event` 对象**（编译期不挂 signal 作用域），所以"Shift+拖拽平移、裸拖拽框选"的分流要写成 `event.shiftKey` 判断。
-- 认识 `extent` 变换：把数据的实际取值范围输出成 signal，作为缩放前的初始 domain。
+- 认识 `extent` 变换：把数据的实际取值范围输出成 signal，作为缩放前的初始 domain —— 并知道为什么要在它两端各留一点余量。
 
 ## spec 逐段讲解
 
 | 段落 | 作用 | 本例要点 |
 | --- | --- | --- |
-| `signals.brush` | 框选区间（像素坐标 `[x0, y0, x1, y1]`） | 三个 `on` 处理器：① `mousedown`（filter `!event.shiftKey`）把四角都锚在按下点；② `window:mousemove` + `between` 在"按下…抬起"区间内持续更新终点；③ `dblclick` 清空 |
+| `signals.brush` | 框选区间（像素坐标 `[x0, y0, x1, y1]`） | 四个 `on` 处理器：① `mousedown`（filter `!event.shiftKey`）把四角都锚在按下点；② `window:mousemove` + `between` 在"按下…抬起"区间内持续更新终点；③ `window:mouseup` **归一化** —— 两轴位移都不超过 2px 就置回 `null`（见下方「退化区间必须归一化」）；④ `dblclick` 清空 |
 | `signals.panDown / xcur / ycur` | 平移的起点快照 | Shift+`mousedown` 时用 `xy()` 记下指针像素位置、用 `slice(xdom)` 克隆当前 domain——快照让拖动全程以"按下那一刻"为基准 |
 | `signals.delta` | 平移的像素位移 | 同样是 `between` 区间流，但起点事件 filter 是 `event.shiftKey`；`update` 里 `panDown[0] - x()` 表示"指针向左移，视图向右跟着走" |
 | `signals.anchor / zoom` | 缩放锚点与倍率 | `wheel` 时用 `invert('xscale', x())` 把指针像素位置反算成数据值；`"wheel!"` 的 `!` 等价 `consume: true`（阻止页面滚动）；`pow(1.0015, deltaY * pow(16, deltaMode))` 同时兼容行模式与像素模式的滚轮 |
-| `signals.xdom / ydom` | 两个比例尺的 domain | 初始 `update: "slice(xext)"` 取数据全范围；`on` 监听 `{"signal": "delta"}` / `{"signal": "zoom"}`——**signal 也能当事件源**，这是 signal 之间接力更新的关键 |
+| `signals.xdom / ydom` | 两个比例尺的 domain | 初始 `update` 取数据 `extent` 再向两端各扩 2%（裸 `slice(xext)` 会让极值点被 `clip` 切掉一半，见 `marks.points` 一行）；`on` 监听 `{"signal": "delta"}` / `{"signal": "zoom"}`——**signal 也能当事件源**，这是 signal 之间接力更新的关键 |
 | `data.penguins.transform` | 清洗 + 输出范围 | `filter` 去掉缺失行（字段名含空格，用 `datum['Beak Length (mm)']` 访问）；两个 `extent` 把 x/y 字段的 `[min, max]` 写进 `xext` / `yext` signal |
 | `scales.xscale / yscale` | domain 由 signal 驱动 | `domain: {"signal": "xdom"}`：domain 一变，坐标轴、网格、点的位置全部自动重算——这就是缩放/平移的实现方式 |
-| `marks.points` | 散点 | `fill` 用带 `test` 的产生式：`!brush` 或落在 brush 像素区间内 → 按 Species 着色，否则灰色；`scale('xscale', …)` 把数据值投影到像素再与 brush 比较 |
+| `marks.points` | 散点 | `fill` 用带 `test` 的产生式：`!brush` 或落在 brush 像素区间内 → 按 Species 着色，否则灰色；`scale('xscale', …)` 把数据值投影到像素再与 brush 比较；`clip: true` 让平移/缩放后越界的点不画到坐标轴外面，代价是**圆心正好落在 domain 端点上的点会被裁掉一半** —— 所以 `xdom`/`ydom` 的初值要留余量 |
 | `marks.brushRect` | 半透明框选矩形 | `interactive: false` 让它不拦截鼠标事件；`x/x2/y/y2` 由 `brush` signal 经 `min/max` 归一化（允许向任意方向拖） |
 
 ### 事件流语法要点
@@ -32,7 +32,8 @@
   - `between: [A, B]`：只在"A 发生之后、B 发生之前"放行事件——`mousedown` 后接 `[mousedown, window:mouseup]` 区间的写法是刷选/拖拽的标准配方；`between` 里的每个事件同样支持自己的 `filter`（本 demo 用它区分是否按住 Shift）。
   - `filter`：表达式，**只能引用 `event`**（如 `event.shiftKey`），不能引用 signal。
   - `consume: true`：`preventDefault()`，阻止浏览器默认行为（如滚轮滚动页面）。
-- **字符串简写**：`"window:mouseup"` = source+type；`"wheel!"` 结尾 `!` = consume；`"[a, b] > c"` = between 区间，官方示例 `brushing-scatter-plots` 用的就是这种（如 `"[@cell:pointerdown, window:pointerup] > window:pointermove"`）。对象写法能带 filter，字符串写法不能。
+- **字符串简写**：`"window:mouseup"` = source+type；`"wheel!"` 结尾 `!` = consume；`"[a, b] > c"` = between 区间，官方示例 `brushing-scatter-plots` 用的就是这种（如 `"[@cell:pointerdown, window:pointerup] > window:pointermove"`）。字符串写法**也能带 filter**，写在方括号里：`"window:keyup[event.key === 'Escape']"`。
+- **`filter` 写错位置会被静默丢弃**：`filter` 是 `events` **对象内部**的键。若写成 `on` 处理器的兄弟键 —— `{"events": "keyup", "filter": "…", "update": "…"}` —— Vega 解析 `on` 时只读 `events` / `update` / `encode` / `force`，那个 `filter` 既不报错也不 WARN，直接消失，结果是「任何按键都触发」。
 - **`{"signal": "xxx"}` 作为 events**：signal 变化也能触发其他 signal 的更新（`delta` → `xdom`），形成 signal 依赖链。
 - **`force: true`**（见 `zoom`）：每次滚轮事件都强制更新，即使算出的值与旧值相同。
 - **`update` 表达式**里可用的常用函数：`x()` `y()`（指针像素坐标）、`xy()`（二者数组）、`invert('scale名', px)`（像素→数据）、`scale('scale名', v)`（数据→像素）、`span()` `slice()` `clamp()` `inrange()` `min()` `max()` `pow()`。
@@ -41,18 +42,46 @@
 
 框选记录在**像素坐标系**，点的高亮判断用 `scale()` 把数据值投影到像素后再 `inrange`——所以缩放/平移后 brush 矩形固定在屏幕上，而哪些点"在框内"会随视口实时重算，二者永不失配。
 
+### 退化区间必须归一化
+
+`mousedown` 处理器把四角都锚在按下点，所以**单击不拖动**得到的是 `[x, y, x, y]`。这个值不是"没框选"，而是一个零面积的框：`inrange(v, [x, x])` 只在严格相等时为真，于是 342 个点全部掉进 `#d3d3d3` 分支、整张图一次性变灰，而 `brushRect` 的宽高都是 0、完全看不见 —— 用户拿不到任何线索说明发生了什么。按下时手抖 1~2px 也一样：区间至少有一边仍是零跨度。
+
+所以第三个处理器在 `window:mouseup` 时做归一化：
+
+```json
+{
+  "events": { "source": "window", "type": "mouseup" },
+  "update": "brush && abs(brush[2] - brush[0]) > 2 && abs(brush[3] - brush[1]) > 2 ? brush : null"
+}
+```
+
+归一化选择"改源头"而不是"在 `fill` 的 `test` 里特判"，是因为源头只有一处、下游全部自动跟上：`brush` 一变成 `null`，`fill` 的 `!brush` 分支自动恢复彩色、`brushRect` 的 `opacity` 自动归 0，两者永不打架，Signals 面板里读到的也是干净的 `null` 而不是一个活着却没有意义的区间。反过来若只在 `test` 里加一个 `brush[0] === brush[2] && brush[1] === brush[3]` 的短路，就只能救"像素级精准的单击"，手抖 1px 的单击照样全灰。
+
+两个细节值得留意：
+
+- 判定用 `&&`（**两轴**都要超过 2px）而不是 `||`。用 `||` 的话，横向漂了 3px、纵向 0px 的 `[300, 200, 303, 200]` 会被保留下来 —— 而它是一个高度为 0 的矩形，仍旧看不见、仍旧一个点都选不到，等于没修。要保证"留下来的框一定有可见面积"，就必须两轴都过阈值。代价是这 2px 死区会顺手清掉某一边不足 2px 的极细框，但那种框本来也选不到点，显示完整彩色图是两害中较轻的一个。
+- 这个处理器和 `panDown` 的 `window:mouseup`、以及两条 `between` 流各自独立注册，互不干扰；Shift 平移松手时 `brush` 若已有真实框选（跨度 > 2px），会原样保留。
+
+副作用是**单击也能清除框选**（不必非得双击），这与 `dblclick` 处理器并不冲突。
+
 ## 试一试（改练）
 
 1. 把 `wheel!` 的 `!` 去掉再滚轮，观察页面是否跟着滚动，理解 `consume`。
 2. 把 brush 起点事件的 filter 改成 `"event.altKey"`，体验用 Alt 键分流；再把 `between` 里起点事件的 filter 漏掉，观察 Shift 平移时 brush 被误触发——理解为什么两处 filter 必须成对。
-3. 给 `brush` 增加一个 `on`：`{"events": "keyup", "filter": "event.key === 'Escape'", "update": "null"}`，实现按 Esc 清除框选。
+3. 给 `brush` 增加一个 `on`，实现按 Esc 清除框选：
+
+   ```json
+   { "events": { "source": "window", "type": "keyup", "filter": "event.key === 'Escape'" }, "update": "null" }
+   ```
+
+   两处都不能省，各对应一个坑：**① `filter` 必须写在 `events` 对象里面** —— 写成 `on` 处理器的兄弟键会被静默丢弃，变成"按任意键都清除"；**② `source` 必须是 `window`** —— Vega 把事件监听挂在渲染出来的 `<canvas>` / `<svg>` 元素上（`assets/vega.js` 里的 `canvas.addEventListener` / `this._svg.addEventListener`），而它从不给这两个元素加 `tabindex`，它们拿不到键盘焦点，所以默认 `view` 源的 `keyup` 在真实浏览器里**永远不会触发**（用 CDP 发真实按键实测：`view` 源的 Esc 无反应，`window` 源才清除）。等价的字符串写法：`"window:keyup[event.key === 'Escape']"`。改完可以按 `a` 键验证第 ① 条、把 `source` 去掉验证第 ② 条。
 4. 把 `pow(1.0015, …)` 的底数改成 `1.01`，感受缩放速度差异。
 5. 参考官方 `brushing-scatter-plots` 的 `rangeX/rangeY` 写法，把 brush 转成数据域区间（`invert`）再做高亮，比较与像素方案在缩放后的行为差异。
 6. 将 `brushRect` 的 `fillOpacity` 改为 `0.3`，观察 `interactive: false` 与否对事件的影响（试着删掉它再拖拽）。
 
 ## 参考
 
-- 官方示例（仓库内）：`docs/examples/zoomable-scatter-plot.vg.json`（anchor/zoom 与 between 区间）、`docs/examples/brushing-scatter-plots.vg.json`（字符串区间写法与 invert）
+- 官方示例：[zoomable-scatter-plot](https://vega.github.io/vega/examples/zoomable-scatter-plot/)（anchor/zoom 与 between 区间）、[brushing-scatter-plots](https://vega.github.io/vega/examples/brushing-scatter-plots/)（字符串区间写法与 invert）
 - 官方文档：[Event Streams](https://vega.github.io/vega/docs/event-streams/) ·
   [Signals](https://vega.github.io/vega/docs/signals/) ·
   [表达式函数（x/y/xy/invert/scale/span…）](https://vega.github.io/vega/docs/expressions/) ·

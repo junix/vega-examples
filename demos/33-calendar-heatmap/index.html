@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>33 日历热力图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '33-calendar-heatmap',
+  group: 'F. 稀有与复杂图形',
+  title: '33 · 日历热力图：一格一天的年度网格（GitHub 贡献图式）',
+  concepts: [
+    'formula: 手算 行=星期 / 列=第几周',
+    'aggregate + window: row_number 排面板',
+    'lookup: 把面板序号 join 回每一天',
+    'flatten: 造 7 行星期标签',
+    'group mark facet: 按年分面板',
+    'mark: path（月份阶梯分隔线）',
+    'scale: linear + scheme signal',
+    'legend: gradient + 自定义标签单位',
+    'signal 驱动 width / height'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      一格一天：<b>横轴是一年中的第几周，纵轴是星期</b>，每年一个面板。
+      右侧面板可切换<b>编码字段</b>（气温 / 降水 / 风速）与<b>配色方案</b>，
+      拖 <code>cell</code> 整图缩放（<code>width</code>/<code>height</code> 是由它算出来的 signal），
+      切 <code>weekStart</code> 看"一周从周日还是周一开始"如何整体改变行号与列号。
+      深色阶梯线是<b>月份分界</b>——它由每月 1 号那一格的 (列, 行) 现算出一条三段折线。
+      鼠标悬停任意格子看当天的日期、天气与数值。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

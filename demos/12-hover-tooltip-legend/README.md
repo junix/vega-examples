@@ -14,8 +14,8 @@
 ## 运行
 
 ```sh
-../../serve.sh        # 在 vega 仓库根启动静态服务器
-# 浏览器打开 http://localhost:8000/vega-examples/demos/12-hover-tooltip-legend/
+../../serve.sh        # 在本项目根目录启动静态服务器
+# 浏览器打开 http://localhost:8000/demos/12-hover-tooltip-legend/
 ```
 
 ## spec 逐段讲解
@@ -50,14 +50,15 @@
 2. 给形状图例也加上同样的 `encode`（换一对名字如 `legendSymbol2`/`legendLabel2`，
    并把事件流补进 `clickedOrigin`），让两个图例都能点击筛选。
 3. 把 tooltip 改成字段直绑：`"tooltip": {"field": "Name"}`，对比 signal 表达式的自由度。
-4. 参考官方示例 `docs/examples/interactive-legend.vg.json`，新增一个
+4. 参考上游官方示例 [Interactive Legend](https://vega.github.io/vega/examples/interactive-legend/)，新增一个
    `"name": "selected"` 的空数据集，用 data 的 `on`-trigger（`insert`/`toggle`/`remove` 指令）
    实现 shift 多选；编码侧用 `indata('selected', 'value', datum.Origin)` 判断选中状态。
 5. 在 `hover` 编码集里再加一个 `"fillOpacity": 0.5`，观察它和 `update` 里 opacity 规则的叠加顺序。
 
 ## 参考
 
-- 官方示例精读：`docs/examples/interactive-legend.vg.json`（本 demo 的图例交互由此简化而来）
+- 上游官方示例精读：[Interactive Legend](https://vega.github.io/vega/examples/interactive-legend/)
+  （本 demo 的图例交互由此简化而来；本仓库是独立目录，没有 vendored 该文件）
 - 官方文档：[Signals](https://vega.github.io/vega/docs/signals/) ·
   [Event Streams](https://vega.github.io/vega/docs/event-streams/) ·
   [Legends](https://vega.github.io/vega/docs/legends/) ·

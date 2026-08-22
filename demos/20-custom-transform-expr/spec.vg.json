@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "MSFT 收盘价折线（基础图）。注意：滑动平均变换 MovingAverage 与表达式函数 pctChange 是 main.js 里注册的自定义扩展，相关片段由 main.js 在 parse 前注入；本文件只含内置语法，保证可独立解析/渲染（无头校验器直接用原装 vega 解析本文件）。",
+  "description": "MSFT 收盘价折线（基础图）。stocks.csv 是月频数据：MSFT 共 123 行，2000-01 … 2010-03，每行都是当月 1 日，所以下游滑动平均的窗口单位是「月」。注意：滑动平均变换 MovingAverage 与表达式函数 pctChange 是 main.js 里注册的自定义扩展，相关片段由 main.js 在 parse 前注入；本文件只含内置语法，保证可独立解析/渲染（无头校验器直接用原装 vega 解析本文件）。",
   "width": 640,
   "height": 320,
   "padding": 8,

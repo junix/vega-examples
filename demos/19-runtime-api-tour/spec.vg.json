@@ -53,7 +53,7 @@
 
   "axes": [
     { "orient": "bottom", "scale": "x", "title": "Horsepower（马力）", "grid": true, "gridOpacity": 0.2 },
-    { "orient": "left", "scale": "y", "title": "Miles per Gallon（油耗）", "grid": true, "gridOpacity": 0.2 }
+    { "orient": "left", "scale": "y", "title": "Miles per Gallon（每加仑英里数，越大越省油）", "grid": true, "gridOpacity": 0.2 }
   ],
 
   "legends": [

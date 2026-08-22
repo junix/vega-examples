@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>38 瀑布图与马赛克图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '38-waterfall-marimekko',
+  group: 'F. 稀有与复杂图形',
+  title: '38 · 瀑布图与马赛克图：window 累计和、两级 stack',
+  concepts: [
+    'transform: window (sum/lead/row_number)',
+    'transform: stack (offset=normalize)',
+    '两级 stack 嵌套',
+    'transform: lookup',
+    'transform: collect',
+    'mark: rule 连接虚线',
+    'group mark 局部 width/height signal',
+    'format("+,.0f") / format(".0%")'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      左图是<strong>瀑布图</strong>：把鼠标停到柱子上看该项的增减与累计值；拖右侧
+      <code>barPad</code> 看柱缝（也就是连接虚线的长度）变化，取消勾选
+      <code>showLinks</code> 就能体会连接虚线对"这是一条累计链"的表达有多关键。<br>
+      右图是<strong>马赛克 / Marimekko 图</strong>：列宽 ∝ 该类型影片数，列内分段高度 ∝ 该类型里的
+      MPAA 分级构成。拖 <code>minCellH</code> / <code>minCellW</code> 看百分比标签的密度控制，
+      拖 <code>colGap</code> 看列缝。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

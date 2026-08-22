@@ -21,8 +21,10 @@ window.DEMO_META = {
     <div class="demo-notes">
       <strong>按住一个节点拖动</strong>：mousedown 把节点钉在光标处（写入 <code>fx/fy</code>），
       拖动中仿真持续 restart，mouseup 释放（<code>fx/fy</code> 置 null）。
-      右侧 Signals 面板里的 <code>nodeCharge</code> / <code>linkDistance</code> / <code>nodeRadius</code>
-      滑杆可以实时调节四种力，观察布局如何重新平衡；拖动时留意 <code>fix</code> / <code>dragged</code> / <code>restart</code>
+      右侧 Signals 面板里的三个滑杆各自对应一种力：<code>nodeCharge</code> → nbody（电荷排斥）、
+      <code>linkDistance</code> → link（目标边长）、<code>nodeRadius</code> → collide（碰撞半径，同时决定节点画多大）。
+      第四种力 center 没有滑杆——它固定由 <code>width/height</code> 推导的 <code>cx/cy</code> 决定。
+      拖滑杆观察布局如何重新平衡；拖动节点时留意 <code>fix</code> / <code>dragged</code> / <code>restart</code>
       三个信号的变化。悬停节点可看到角色名（tooltip 通道）。
     </div>
     <div id="view"></div>

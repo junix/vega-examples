@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>26 六边形分箱与矩阵热力图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '26-hexbin-matrix',
+  group: 'F. 稀有与复杂图形',
+  title: '26 · 六边形分箱 vs 矩阵热力图：手算蜂巢格心与内置 bin 的两种密度图',
+  concepts: [
+    'transform: formula（手算蜂巢格心）',
+    'transform: bin × 2',
+    'transform: aggregate(count)',
+    'transform: extent → signal',
+    'mark: symbol + 自定义 shape path',
+    'mark: rect（bin 边界当 x/x2）',
+    'expr: scale() / invert() / domain()',
+    'group mark + clip 分层',
+    'scale domain: fields 跨数据集并集',
+    'legend: gradient'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      拖 <code>resolution</code>：左面板的蜂巢格宽与右面板的 <code>bin.maxbins</code>
+      由<strong>同一个 signal</strong> 驱动，两边一起变粗变细。
+      <code>minCount</code> 在聚合之后过滤稀疏格子（两个面板与共享色标同时收窄），
+      勾 <code>showCounts</code> 在矩阵格子里写出计数（格子太小的自动不写）。
+      悬停任意格子看 tooltip：左面板的格心是用 <code>invert()</code> 从像素反算回马力/油耗的。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

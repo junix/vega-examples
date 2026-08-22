@@ -1,0 +1,604 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Vega 本体没有 boxplot 复合 mark：左面板用 aggregate(q1/median/q3) + formula(IQR 围栏) + lookup 反连原始观测手工拼出箱线图与 Tukey 须，右面板用 aggregate(mean/stderr/stdev) 画均值±误差棒",
+  "width": 900,
+  "height": 400,
+  "padding": 10,
+
+  "title": {
+    "text": "企鹅体重：分布形状（箱线图）与均值精度（误差棒）",
+    "subtitle": "Palmer Penguins · 按物种 × 性别分组 · 两个面板共用分类比例尺与配色",
+    "anchor": "start",
+    "fontSize": 15,
+    "subtitleFontSize": 11.5,
+    "subtitlePadding": 4,
+    "offset": 6
+  },
+
+  "signals": [
+    {
+      "description": "Tukey 围栏的 IQR 倍数。1.5 是惯例；调大到 3 会把离群点全部吞回须内",
+      "name": "iqrK",
+      "value": 1.5,
+      "bind": { "input": "range", "min": 0.5, "max": 3, "step": 0.1 }
+    },
+    {
+      "description": "盒子宽度占分类带宽的比例，用来演示手工几何完全由 bandwidth 派生",
+      "name": "boxRatio",
+      "value": 0.62,
+      "bind": { "input": "range", "min": 0.2, "max": 0.95, "step": 0.01 }
+    },
+    {
+      "description": "误差棒的语义：标准误 / 95% 置信区间 / 标准差。三者宽度差一个数量级，这是本 demo 最想让读者看到的对比",
+      "name": "errMode",
+      "value": "se",
+      "bind": {
+        "input": "select",
+        "options": ["se", "ci95", "sd"],
+        "labels": ["标准误 ±1 SE", "95% 置信区间 ±1.96 SE", "标准差 ±1 SD"]
+      }
+    },
+    {
+      "description": "离群点开关。注意这里只改透明度而不是 filter 掉，数据集始终非空",
+      "name": "showOutliers",
+      "value": true,
+      "bind": { "input": "checkbox" }
+    },
+
+    {
+      "description": "以下是布局派生信号：两个面板等宽，中间留出右面板 y 轴的位置",
+      "name": "panelGap",
+      "value": 92
+    },
+    { "name": "panelTop", "value": 58 },
+    { "name": "panelW", "update": "(width - panelGap) / 2" },
+    { "name": "panelH", "update": "height - panelTop" },
+
+    {
+      "description": "误差棒的倍数：SE 与 SD 都是 1 倍，95% CI 用正态分位数 quantileNormal(0.975) ≈ 1.96",
+      "name": "errK",
+      "update": "errMode === 'ci95' ? quantileNormal(0.975) : 1"
+    },
+    {
+      "name": "errName",
+      "update": "errMode === 'se' ? '标准误（±1 SE）' : errMode === 'ci95' ? '95% 置信区间（±' + format(quantileNormal(0.975), '.2f') + ' SE）' : '标准差（±1 SD）'"
+    }
+  ],
+
+  "data": [
+    {
+      "description": "原始 344 行企鹅测量数据（JSON，无需 format）",
+      "name": "penguins",
+      "url": "../../assets/data/penguins.json"
+    },
+    {
+      "description": "清洗：体重缺失（2 行）与性别未知（9 行）必须先剔除，否则比例尺 domain 与分组都会被污染；再拼出 grp 分类键",
+      "name": "obs",
+      "source": "penguins",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum['Body Mass (g)'] != null && (datum.Sex === 'MALE' || datum.Sex === 'FEMALE')"
+        },
+        { "type": "formula", "expr": "datum['Body Mass (g)']", "as": "mass" },
+        {
+          "type": "formula",
+          "expr": "datum.Species + (datum.Sex === 'MALE' ? ' ♂' : ' ♀')",
+          "as": "grp"
+        }
+      ]
+    },
+    {
+      "description": "第 1 步：五数概括 + 一阶/二阶矩。Vega 的 aggregate 直接提供 q1/median/q3，以及 mean/stdev/stderr，箱线图与误差棒共用这一张统计表",
+      "name": "stats",
+      "source": "obs",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["grp", "Species", "Sex"],
+          "fields": ["mass", "mass", "mass", "mass", "mass", "mass", null],
+          "ops": ["q1", "median", "q3", "mean", "stdev", "stderr", "count"],
+          "as": ["q1", "median", "q3", "mean", "sd", "se", "n"]
+        },
+        { "type": "formula", "expr": "datum.q3 - datum.q1", "as": "iqr" },
+        { "type": "formula", "expr": "datum.q1 - iqrK * datum.iqr", "as": "fenceLo" },
+        { "type": "formula", "expr": "datum.q3 + iqrK * datum.iqr", "as": "fenceHi" }
+      ]
+    },
+    {
+      "description": "第 2 步：把每组的围栏 lookup 回到每一条原始观测上——这是实现 Tukey 须的关键，须端必须是真实观测值，不能直接用 q1-1.5·IQR",
+      "name": "obs-fenced",
+      "source": "obs",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "stats",
+          "key": "grp",
+          "fields": ["grp"],
+          "values": ["fenceLo", "fenceHi"]
+        }
+      ]
+    },
+    {
+      "description": "第 3 步 a：围栏之外的观测就是离群点，逐点画出来",
+      "name": "outliers",
+      "source": "obs-fenced",
+      "transform": [
+        { "type": "filter", "expr": "datum.mass < datum.fenceLo || datum.mass > datum.fenceHi" }
+      ]
+    },
+    {
+      "description": "第 3 步 b：围栏之内的观测取 min/max，得到 Tukey 须的两个端点（1.5×IQR 内最远的真实观测）",
+      "name": "whiskers",
+      "source": "obs-fenced",
+      "transform": [
+        { "type": "filter", "expr": "datum.mass >= datum.fenceLo && datum.mass <= datum.fenceHi" },
+        {
+          "type": "aggregate",
+          "groupby": ["grp"],
+          "fields": ["mass", "mass"],
+          "ops": ["min", "max"],
+          "as": ["whiskerLo", "whiskerHi"]
+        }
+      ]
+    },
+    {
+      "description": "第 4 步：把须端并回统计表，得到画一个盒须图所需的全部数字（每组一行）",
+      "name": "boxes",
+      "source": "stats",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "whiskers",
+          "key": "grp",
+          "fields": ["grp"],
+          "values": ["whiskerLo", "whiskerHi"]
+        }
+      ]
+    },
+    {
+      "description": "右面板：误差棒区间随 errMode / errK 信号重算，因此 yErr 的 domain 也会跟着变宽变窄",
+      "name": "errorbars",
+      "source": "stats",
+      "transform": [
+        { "type": "formula", "expr": "errMode === 'sd' ? datum.sd : datum.se", "as": "err" },
+        { "type": "formula", "expr": "datum.mean - errK * datum.err", "as": "lo" },
+        { "type": "formula", "expr": "datum.mean + errK * datum.err", "as": "hi" }
+      ]
+    },
+    {
+      "description": "不带 groupby 的 aggregate = 全体总计，用来画右面板的总体均值参考线",
+      "name": "overall",
+      "source": "obs",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": ["mass", null],
+          "ops": ["mean", "count"],
+          "as": ["mean", "n"]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "xcat",
+      "type": "band",
+      "domain": { "data": "boxes", "field": "grp", "sort": true },
+      "range": [0, { "signal": "panelW" }],
+      "padding": 0.28
+    },
+    {
+      "name": "species",
+      "type": "ordinal",
+      "domain": { "data": "boxes", "field": "Species", "sort": true },
+      "range": { "scheme": "tableau10" }
+    },
+    {
+      "name": "yBox",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          { "data": "boxes", "field": "whiskerLo" },
+          { "data": "boxes", "field": "whiskerHi" },
+          { "data": "outliers", "field": "mass" }
+        ]
+      },
+      "range": [{ "signal": "panelH" }, 0],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "yErr",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          { "data": "errorbars", "field": "lo" },
+          { "data": "errorbars", "field": "hi" },
+          { "data": "overall", "field": "mean" }
+        ]
+      },
+      "range": [{ "signal": "panelH" }, 0],
+      "nice": true,
+      "zero": false
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "species",
+      "title": "物种 Species",
+      "orient": "none",
+      "direction": "horizontal",
+      "legendX": 0,
+      "legendY": 28,
+      "symbolType": "square",
+      "symbolSize": 90,
+      "titleFontSize": 11,
+      "labelFontSize": 11
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "左面板标题（跟着 iqrK 信号变）",
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 12 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 12.5 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#2f343a" }
+        },
+        "update": {
+          "text": {
+            "signal": "'① 箱线图：Q1 / 中位数 / Q3 + Tukey 须（' + format(iqrK, '.1f') + '×IQR）+ 离群点'"
+          }
+        }
+      }
+    },
+    {
+      "description": "右面板标题（跟着 errMode 信号变）",
+      "type": "text",
+      "encode": {
+        "enter": {
+          "y": { "value": 12 },
+          "align": { "value": "left" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 12.5 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#2f343a" }
+        },
+        "update": {
+          "x": { "signal": "panelW + panelGap" },
+          "text": { "signal": "'② 误差棒：均值 ± ' + errName" }
+        }
+      }
+    },
+    {
+      "description": "样本量脚注，直接从数据流里读行数，避免把 333 写死",
+      "type": "text",
+      "from": { "data": "overall" },
+      "encode": {
+        "enter": {
+          "y": { "value": 44 },
+          "align": { "value": "right" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 10.5 },
+          "fill": { "value": "#6b7280" }
+        },
+        "update": {
+          "x": { "signal": "width" },
+          "text": {
+            "signal": "'n = ' + datum.n + ' 只（已剔除体重缺失与性别未知）· 总体均值 ' + format(datum.mean, ',.0f') + ' g'"
+          }
+        }
+      }
+    },
+
+    {
+      "description": "面板一：箱线图。group mark 建立独立坐标系，内部的 axes 依据 group 的 width/height 定位；y 轴网格必须写 gridScale，否则会去用外层的 width 信号",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "axes": [
+        {
+          "orient": "left",
+          "scale": "yBox",
+          "title": "体重 Body Mass (g)",
+          "format": ",d",
+          "tickCount": 8,
+          "grid": true,
+          "gridScale": "xcat",
+          "gridOpacity": 0.25,
+          "labelFontSize": 10.5,
+          "titlePadding": 6
+        },
+        {
+          "orient": "bottom",
+          "scale": "xcat",
+          "title": "物种 × 性别（♀ 雌 / ♂ 雄）",
+          "labelAngle": -30,
+          "labelAlign": "right",
+          "labelBaseline": "top",
+          "labelFontSize": 10.5,
+          "labelPadding": 3,
+          "titlePadding": 4
+        }
+      ],
+      "marks": [
+        {
+          "description": "须：一根竖线从下须端贯到上须端，随后被盒子盖住中段——这是最省事的画法",
+          "type": "rule",
+          "from": { "data": "boxes" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": 0.5 },
+              "y": { "scale": "yBox", "field": "whiskerLo" },
+              "y2": { "scale": "yBox", "field": "whiskerHi" },
+              "stroke": { "value": "#5a6069" },
+              "strokeWidth": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "下须端帽：band 偏移由 boxRatio 派生，端帽宽度取盒宽的 64%",
+          "type": "rule",
+          "from": { "data": "boxes" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": { "signal": "0.5 - boxRatio * 0.32" } },
+              "x2": { "scale": "xcat", "field": "grp", "band": { "signal": "0.5 + boxRatio * 0.32" } },
+              "y": { "scale": "yBox", "field": "whiskerLo" },
+              "stroke": { "value": "#5a6069" },
+              "strokeWidth": { "value": 1.5 }
+            }
+          }
+        },
+        {
+          "description": "上须端帽",
+          "type": "rule",
+          "from": { "data": "boxes" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": { "signal": "0.5 - boxRatio * 0.32" } },
+              "x2": { "scale": "xcat", "field": "grp", "band": { "signal": "0.5 + boxRatio * 0.32" } },
+              "y": { "scale": "yBox", "field": "whiskerHi" },
+              "stroke": { "value": "#5a6069" },
+              "strokeWidth": { "value": 1.5 }
+            }
+          }
+        },
+        {
+          "description": "盒：y = Q3（上边），y2 = Q1（下边），高度就是 IQR",
+          "type": "rect",
+          "from": { "data": "boxes" },
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": { "signal": "(1 - boxRatio) / 2" } },
+              "width": { "scale": "xcat", "band": { "signal": "boxRatio" } },
+              "y": { "scale": "yBox", "field": "q3" },
+              "y2": { "scale": "yBox", "field": "q1" },
+              "fill": { "scale": "species", "field": "Species" },
+              "fillOpacity": { "value": 0.82 },
+              "stroke": { "value": "#33383d" },
+              "strokeWidth": { "value": 1 },
+              "tooltip": {
+                "signal": "{'组别': datum.grp, 'n': datum.n, '下须端': format(datum.whiskerLo, ',d') + ' g', 'Q1': format(datum.q1, ',.4~f') + ' g', '中位数': format(datum.median, ',.4~f') + ' g', 'Q3': format(datum.q3, ',.4~f') + ' g', '上须端': format(datum.whiskerHi, ',d') + ' g', 'IQR': format(datum.iqr, ',.4~f') + ' g'}"
+              }
+            },
+            "hover": {
+              "fillOpacity": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "中位线：画在盒子之上，白色描边保证在深色填充上也看得清",
+          "type": "rule",
+          "from": { "data": "boxes" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": { "signal": "(1 - boxRatio) / 2" } },
+              "x2": { "scale": "xcat", "field": "grp", "band": { "signal": "(1 + boxRatio) / 2" } },
+              "y": { "scale": "yBox", "field": "median" },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 2 }
+            }
+          }
+        },
+        {
+          "description": "离群点：来自反连接后的原始观测，落在围栏之外的每一只企鹅都单独成点",
+          "type": "symbol",
+          "from": { "data": "outliers" },
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": 0.5 },
+              "y": { "scale": "yBox", "field": "mass" },
+              "shape": { "value": "circle" },
+              "size": { "value": 46 },
+              "fill": { "value": "#ffffff" },
+              "stroke": { "scale": "species", "field": "Species" },
+              "strokeWidth": { "value": 1.4 },
+              "opacity": { "signal": "showOutliers ? 1 : 0" },
+              "tooltip": {
+                "signal": "{'离群点': datum.grp, '体重': format(datum.mass, ',d') + ' g', '所在岛': datum.Island, '围栏下界': format(datum.fenceLo, ',.4~f') + ' g', '围栏上界': format(datum.fenceHi, ',.4~f') + ' g'}"
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "面板二：均值 ± 误差棒。同一份 stats 换一套编码即可，无需重新聚合",
+      "type": "group",
+      "encode": {
+        "update": {
+          "x": { "signal": "panelW + panelGap" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "axes": [
+        {
+          "orient": "left",
+          "scale": "yErr",
+          "title": "平均体重 (g)",
+          "format": ",d",
+          "tickCount": 6,
+          "grid": true,
+          "gridScale": "xcat",
+          "gridOpacity": 0.25,
+          "labelFontSize": 10.5,
+          "titlePadding": 6
+        },
+        {
+          "orient": "bottom",
+          "scale": "xcat",
+          "title": "物种 × 性别（♀ 雌 / ♂ 雄）",
+          "labelAngle": -30,
+          "labelAlign": "right",
+          "labelBaseline": "top",
+          "labelFontSize": 10.5,
+          "labelPadding": 3,
+          "titlePadding": 4
+        }
+      ],
+      "marks": [
+        {
+          "description": "总体均值参考线（不带 groupby 的 aggregate）",
+          "type": "rule",
+          "from": { "data": "overall" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "value": 0 },
+              "x2": { "signal": "panelW" },
+              "y": { "scale": "yErr", "field": "mean" },
+              "stroke": { "value": "#9aa1a9" },
+              "strokeWidth": { "value": 1 },
+              "strokeDash": { "value": [4, 3] }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "overall" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "panelW - 2" },
+              "y": { "scale": "yErr", "field": "mean", "offset": -5 },
+              "align": { "value": "right" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#6b7280" },
+              "text": { "signal": "'总体均值 ' + format(datum.mean, ',.0f') + ' g'" }
+            }
+          }
+        },
+        {
+          "description": "误差棒竖线：lo→hi",
+          "type": "rule",
+          "from": { "data": "errorbars" },
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": 0.5 },
+              "y": { "scale": "yErr", "field": "lo" },
+              "y2": { "scale": "yErr", "field": "hi" },
+              "stroke": { "scale": "species", "field": "Species" },
+              "strokeWidth": { "value": 2.5 },
+              "tooltip": {
+                "signal": "{'组别': datum.grp, 'n': datum.n, '均值': format(datum.mean, ',.1f') + ' g', '标准差 SD': format(datum.sd, ',.1f') + ' g', '标准误 SE': format(datum.se, ',.1f') + ' g', '当前区间': format(datum.lo, ',.1f') + ' – ' + format(datum.hi, ',.1f') + ' g'}"
+              }
+            }
+          }
+        },
+        {
+          "description": "误差棒下端帽",
+          "type": "rule",
+          "from": { "data": "errorbars" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": { "signal": "0.5 - boxRatio * 0.22" } },
+              "x2": { "scale": "xcat", "field": "grp", "band": { "signal": "0.5 + boxRatio * 0.22" } },
+              "y": { "scale": "yErr", "field": "lo" },
+              "stroke": { "scale": "species", "field": "Species" },
+              "strokeWidth": { "value": 2 }
+            }
+          }
+        },
+        {
+          "description": "误差棒上端帽",
+          "type": "rule",
+          "from": { "data": "errorbars" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": { "signal": "0.5 - boxRatio * 0.22" } },
+              "x2": { "scale": "xcat", "field": "grp", "band": { "signal": "0.5 + boxRatio * 0.22" } },
+              "y": { "scale": "yErr", "field": "hi" },
+              "stroke": { "scale": "species", "field": "Species" },
+              "strokeWidth": { "value": 2 }
+            }
+          }
+        },
+        {
+          "description": "均值点",
+          "type": "symbol",
+          "from": { "data": "errorbars" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": 0.5 },
+              "y": { "scale": "yErr", "field": "mean" },
+              "shape": { "value": "circle" },
+              "size": { "value": 110 },
+              "fill": { "scale": "species", "field": "Species" },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 1.5 }
+            }
+          }
+        },
+        {
+          "description": "均值数值标签，放在上端帽之上",
+          "type": "text",
+          "from": { "data": "errorbars" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "scale": "xcat", "field": "grp", "band": 0.5 },
+              "y": { "scale": "yErr", "field": "hi", "offset": -6 },
+              "align": { "value": "center" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#3f454c" },
+              "text": { "signal": "format(datum.mean, ',.0f')" }
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "config": {
+    "axis": { "labelColor": "#4b5158", "titleColor": "#33383d", "titleFontSize": 11 },
+    "legend": { "labelColor": "#4b5158", "titleColor": "#33383d" }
+  }
+}

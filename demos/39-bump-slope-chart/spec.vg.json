@@ -1,0 +1,574 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "同一份行业就业面板数据的两种「排序/变化」画法：左 bump chart（window rank 算名次，纵轴是名次且第 1 名在上），右 slope chart（只取首末两年，每类一条直线看升降）",
+  "width": 960,
+  "height": 430,
+  "padding": 8,
+
+  "title": {
+    "text": "美国分行业就业：名次变化（bump）与首末对比（slope）",
+    "subtitle": "数据 us-employment.csv，按月观测取年均；单位＝百万人",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitlePadding": 4,
+    "anchor": "start",
+    "offset": 6
+  },
+
+  "signals": [
+    {
+      "description": "bump 折线的插值方式：monotone 让名次曲线圆润不过冲，linear 是直折线，step-after 强调「名次在年末跳变」",
+      "name": "interp",
+      "value": "monotone",
+      "bind": {
+        "input": "select",
+        "options": ["monotone", "linear", "step-after", "basis"]
+      }
+    },
+    {
+      "description": "斜率图的起点年份（滑块范围就是数据本身的 2006–2015）",
+      "name": "yearFrom",
+      "value": 2006,
+      "bind": { "input": "range", "min": 2006, "max": 2015, "step": 1 }
+    },
+    {
+      "description": "斜率图的终点年份",
+      "name": "yearTo",
+      "value": 2015,
+      "bind": { "input": "range", "min": 2006, "max": 2015, "step": 1 }
+    },
+    {
+      "description": "关掉后斜率图两端只留行业名，开启则左端带起点值、右端带终点值与变化百分比",
+      "name": "showValues",
+      "value": true,
+      "bind": { "input": "checkbox" }
+    },
+    {
+      "description": "把两个滑块归一成 from <= to，防止用户把起点拖到终点右边",
+      "name": "slopeFrom",
+      "update": "min(yearFrom, yearTo)"
+    },
+    { "name": "slopeTo", "update": "max(yearFrom, yearTo)" },
+
+    {
+      "description": "以下是纯布局信号：两个面板的原点与尺寸，全部由 width/height 推出来，改画布只需改顶层 width/height",
+      "name": "panelTop",
+      "value": 36
+    },
+    { "name": "panelH", "update": "height - panelTop - 40" },
+    { "name": "bumpX", "value": 56 },
+    { "name": "bumpW", "update": "round(width * 0.45)" },
+    {
+      "description": "bump 面板左右各留出的行业名标签宽度（x 比例尺的 range 就缩在里面）",
+      "name": "labelPad",
+      "value": 46
+    },
+    { "name": "slopeX", "update": "bumpX + bumpW + 114" },
+    { "name": "slopeW", "update": "width - slopeX - 104" },
+
+    {
+      "description": "鼠标悬停到任一面板的节点上，两个面板里的同一行业同时高亮，其余淡出",
+      "name": "focus",
+      "value": null,
+      "on": [
+        { "events": "@bumpNode:mouseover, @slopeNode:mouseover", "update": "datum.label" },
+        { "events": "@bumpNode:mouseout, @slopeNode:mouseout", "update": "null" }
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "description": "us-employment.csv 是宽表：一行一个月，每个行业一列。CSV 必须显式声明 format.type，用到的列显式 parse 成 number，month parse 成 date",
+      "name": "raw",
+      "url": "../../assets/data/us-employment.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "month": "date",
+          "education_and_health_services": "number",
+          "professional_and_business_services": "number",
+          "retail_trade": "number",
+          "manufacturing": "number",
+          "leisure_and_hospitality": "number",
+          "financial_activities": "number",
+          "construction": "number",
+          "wholesale_trade": "number"
+        }
+      }
+    },
+    {
+      "description": "行业英文列名 → 中文短名 + 标签微调量。短名控制在 4 字以内才塞得进面板两侧的标签带；dyLeft/dyRight 是斜率图两端标签的手工避让偏移（只有默认区间下真正挤在一起的 3 对需要非 0 值），Vega 自带的 label 变换能自动避让，但它要真实 canvas 位图，本项目的无头校验器跑不了",
+      "name": "industryNames",
+      "values": [
+        { "key": "education_and_health_services",       "label": "教育医疗", "dyLeft": -5, "dyRight":  0 },
+        { "key": "professional_and_business_services",  "label": "专业商务", "dyLeft":  5, "dyRight":  0 },
+        { "key": "retail_trade",                        "label": "零售贸易", "dyLeft":  0, "dyRight": -5 },
+        { "key": "manufacturing",                       "label": "制造业",   "dyLeft":  0, "dyRight":  0 },
+        { "key": "leisure_and_hospitality",             "label": "休闲餐旅", "dyLeft":  0, "dyRight":  5 },
+        { "key": "financial_activities",                "label": "金融地产", "dyLeft": -3, "dyRight":  0 },
+        { "key": "construction",                        "label": "建筑业",   "dyLeft":  3, "dyRight": -4 },
+        { "key": "wholesale_trade",                     "label": "批发贸易", "dyLeft":  0, "dyRight":  4 }
+      ]
+    },
+    {
+      "description": "宽表 → 长表 → 年均。fold 把 8 个行业列摊成 (industry, jobs)；utcyear 取年份（用 utc 版避免时区把 1 月 1 日算到上一年）；aggregate 求 12 个月的均值；lookup 贴中文名；mjobs 换算成百万人，后面所有数值标签都用它",
+      "name": "long",
+      "source": "raw",
+      "transform": [
+        {
+          "type": "fold",
+          "fields": [
+            "education_and_health_services",
+            "professional_and_business_services",
+            "retail_trade",
+            "manufacturing",
+            "leisure_and_hospitality",
+            "financial_activities",
+            "construction",
+            "wholesale_trade"
+          ],
+          "as": ["industry", "jobs"]
+        },
+        { "type": "formula", "as": "year", "expr": "utcyear(datum.month)" },
+        {
+          "type": "aggregate",
+          "groupby": ["industry", "year"],
+          "ops": ["mean"],
+          "fields": ["jobs"],
+          "as": ["jobs"]
+        },
+        {
+          "type": "lookup",
+          "from": "industryNames",
+          "key": "key",
+          "fields": ["industry"],
+          "values": ["label", "dyLeft", "dyRight"],
+          "as": ["label", "dyLeft", "dyRight"]
+        },
+        { "type": "formula", "as": "mjobs", "expr": "datum.jobs / 1000" }
+      ]
+    },
+    {
+      "description": "bump chart 的核心：window 变换按 year 分组，在组内按就业人数降序排名，rank 就是当年的名次",
+      "name": "ranked",
+      "source": "long",
+      "transform": [
+        {
+          "type": "window",
+          "sort": { "field": "jobs", "order": "descending" },
+          "groupby": ["year"],
+          "ops": ["rank"],
+          "as": ["rank"]
+        }
+      ]
+    },
+    {
+      "description": "每个行业最早那一年的行，用来在 bump 左端标行业名。argmin 返回整条元组，再用 formula 摊平成普通字段",
+      "name": "bumpFirst",
+      "source": "ranked",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["label"],
+          "ops": ["argmin"],
+          "fields": ["year"],
+          "as": ["cell"]
+        },
+        { "type": "formula", "as": "year", "expr": "datum.cell.year" },
+        { "type": "formula", "as": "rank", "expr": "datum.cell.rank" }
+      ]
+    },
+    {
+      "description": "每个行业最后那一年的行，用来在 bump 右端标行业名",
+      "name": "bumpLast",
+      "source": "ranked",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["label"],
+          "ops": ["argmax"],
+          "fields": ["year"],
+          "as": ["cell"]
+        },
+        { "type": "formula", "as": "year", "expr": "datum.cell.year" },
+        { "type": "formula", "as": "rank", "expr": "datum.cell.rank" }
+      ]
+    },
+    {
+      "description": "斜率图只保留起止两年；window 的 frame [null,null]＝整个分区，配合按年升序的 sort，first_value 就是起点值，于是每一行都能算出相对起点的变化",
+      "name": "slope",
+      "source": "ranked",
+      "transform": [
+        { "type": "filter", "expr": "datum.year === slopeFrom || datum.year === slopeTo" },
+        {
+          "type": "window",
+          "groupby": ["label"],
+          "sort": { "field": "year", "order": "ascending" },
+          "frame": [null, null],
+          "ops": ["first_value"],
+          "fields": ["mjobs"],
+          "as": ["startJobs"]
+        },
+        { "type": "formula", "as": "delta", "expr": "datum.mjobs - datum.startJobs" },
+        { "type": "formula", "as": "pct", "expr": "datum.startJobs ? datum.delta / datum.startJobs : 0" }
+      ]
+    },
+    {
+      "name": "slopeLeft",
+      "source": "slope",
+      "transform": [{ "type": "filter", "expr": "datum.year === slopeFrom" }]
+    },
+    {
+      "name": "slopeRight",
+      "source": "slope",
+      "transform": [{ "type": "filter", "expr": "datum.year === slopeTo" }]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "point",
+      "domain": { "data": "ranked", "field": "year", "sort": true },
+      "range": { "signal": "[labelPad, bumpW - labelPad]" },
+      "padding": 0
+    },
+    {
+      "name": "yRank",
+      "type": "point",
+      "domain": { "data": "ranked", "field": "rank", "sort": true },
+      "range": { "signal": "[0, panelH]" },
+      "padding": 0.5
+    },
+    {
+      "name": "xSlope",
+      "type": "point",
+      "domain": { "signal": "[slopeFrom, slopeTo]" },
+      "range": { "signal": "[0, slopeW]" },
+      "padding": 0
+    },
+    {
+      "name": "ySlope",
+      "type": "linear",
+      "domain": { "data": "slope", "field": "mjobs" },
+      "range": { "signal": "[panelH, 0]" },
+      "nice": true,
+      "zero": false,
+      "padding": 14
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": [
+        "教育医疗",
+        "专业商务",
+        "零售贸易",
+        "制造业",
+        "休闲餐旅",
+        "金融地产",
+        "建筑业",
+        "批发贸易"
+      ],
+      "range": { "scheme": "tableau10" }
+    }
+  ],
+
+  "legends": [
+    {
+      "stroke": "color",
+      "title": "行业（图例顺序＝2006 年名次）",
+      "titleLimit": 240,
+      "orient": "top",
+      "direction": "horizontal",
+      "symbolType": "stroke",
+      "symbolStrokeWidth": 3,
+      "labelFontSize": 11,
+      "titleFontSize": 11,
+      "columnPadding": 12
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "左面板：bump chart。group mark 只负责开一块画布，坐标轴与折线都画在它的局部坐标系里",
+      "type": "group",
+      "name": "bumpPanel",
+      "title": {
+        "text": "① 名次变化：window rank 把「人数」换算成「第几名」",
+        "subtitle": "纵轴是名次，第 1 名在最上；线交叉的地方就是当年名次互换",
+        "subtitleFontSize": 10,
+        "subtitlePadding": 3,
+        "anchor": "start",
+        "frame": "group",
+        "fontSize": 12,
+        "offset": 14
+      },
+      "encode": {
+        "update": {
+          "x": { "signal": "bumpX" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "bumpW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "x",
+          "title": "年份（月度数据取年均）",
+          "labelFontSize": 10,
+          "titleFontSize": 11,
+          "domain": false,
+          "ticks": false,
+          "offset": 6
+        },
+        {
+          "orient": "left",
+          "scale": "yRank",
+          "title": "名次",
+          "titleFontSize": 11,
+          "labelFontSize": 10,
+          "domain": false,
+          "ticks": false,
+          "offset": 4,
+          "encode": {
+            "labels": {
+              "update": { "text": { "signal": "'第 ' + datum.value + ' 名'" } }
+            }
+          }
+        }
+      ],
+      "marks": [
+        {
+          "description": "按行业分面，每个分面画一条折线 + 一串节点。分面内先 collect 排序，保证折线按年份连点而不是按原始行序乱连",
+          "type": "group",
+          "from": { "facet": { "name": "series", "data": "ranked", "groupby": "label" } },
+          "data": [
+            {
+              "name": "seriesByYear",
+              "source": "series",
+              "transform": [{ "type": "collect", "sort": { "field": "year" } }]
+            }
+          ],
+          "marks": [
+            {
+              "type": "line",
+              "from": { "data": "seriesByYear" },
+              "interactive": false,
+              "encode": {
+                "enter": {
+                  "stroke": { "scale": "color", "field": "label" },
+                  "strokeWidth": { "value": 2.5 },
+                  "strokeCap": { "value": "round" }
+                },
+                "update": {
+                  "x": { "scale": "x", "field": "year" },
+                  "y": { "scale": "yRank", "field": "rank" },
+                  "interpolate": { "signal": "interp" },
+                  "strokeOpacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.12" }
+                }
+              }
+            },
+            {
+              "type": "symbol",
+              "name": "bumpNode",
+              "from": { "data": "seriesByYear" },
+              "encode": {
+                "enter": {
+                  "fill": { "scale": "color", "field": "label" },
+                  "stroke": { "value": "#ffffff" },
+                  "strokeWidth": { "value": 1.2 },
+                  "tooltip": {
+                    "signal": "datum.label + ' · ' + datum.year + '：第 ' + datum.rank + ' 名，' + format(datum.mjobs, '.2f') + ' 百万人'"
+                  }
+                },
+                "update": {
+                  "x": { "scale": "x", "field": "year" },
+                  "y": { "scale": "yRank", "field": "rank" },
+                  "size": { "value": 70 },
+                  "fillOpacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.12" },
+                  "strokeOpacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.12" }
+                },
+                "hover": { "size": { "value": 140 } }
+              }
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "from": { "data": "bumpFirst" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "text": { "field": "label" },
+              "align": { "value": "right" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 10 },
+              "fill": { "scale": "color", "field": "label" }
+            },
+            "update": {
+              "x": { "scale": "x", "field": "year", "offset": -9 },
+              "y": { "scale": "yRank", "field": "rank" },
+              "opacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.15" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "bumpLast" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "text": { "field": "label" },
+              "align": { "value": "left" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 10 },
+              "fill": { "scale": "color", "field": "label" }
+            },
+            "update": {
+              "x": { "scale": "x", "field": "year", "offset": 9 },
+              "y": { "scale": "yRank", "field": "rank" },
+              "opacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.15" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "右面板：slope chart。x 只有两个刻度，纵轴是真实人数，所以线的倾角＝这段时间的增减",
+      "type": "group",
+      "name": "slopePanel",
+      "title": {
+        "text": "② 首末对比：两点一线，看斜率就知升降",
+        "subtitle": "纵轴＝就业人数（百万人），刻度省略，数值直接标在两端",
+        "subtitleFontSize": 10,
+        "subtitlePadding": 3,
+        "anchor": "start",
+        "frame": "group",
+        "fontSize": 12,
+        "offset": 14
+      },
+      "encode": {
+        "update": {
+          "x": { "signal": "slopeX" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "slopeW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "xSlope",
+          "title": "对比区间（两个滑块可调）",
+          "titleFontSize": 11,
+          "labelFontSize": 11,
+          "labelFontWeight": "bold",
+          "domain": false,
+          "ticks": false,
+          "offset": 6
+        }
+      ],
+      "marks": [
+        {
+          "type": "group",
+          "from": { "facet": { "name": "pair", "data": "slope", "groupby": "label" } },
+          "data": [
+            {
+              "name": "pairByYear",
+              "source": "pair",
+              "transform": [{ "type": "collect", "sort": { "field": "year" } }]
+            }
+          ],
+          "marks": [
+            {
+              "type": "line",
+              "from": { "data": "pairByYear" },
+              "interactive": false,
+              "encode": {
+                "enter": {
+                  "stroke": { "scale": "color", "field": "label" },
+                  "strokeWidth": { "value": 2.5 },
+                  "interpolate": { "value": "linear" }
+                },
+                "update": {
+                  "x": { "scale": "xSlope", "field": "year" },
+                  "y": { "scale": "ySlope", "field": "mjobs" },
+                  "strokeOpacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.12" }
+                }
+              }
+            },
+            {
+              "type": "symbol",
+              "name": "slopeNode",
+              "from": { "data": "pairByYear" },
+              "encode": {
+                "enter": {
+                  "fill": { "scale": "color", "field": "label" },
+                  "stroke": { "value": "#ffffff" },
+                  "strokeWidth": { "value": 1.2 },
+                  "tooltip": {
+                    "signal": "datum.label + ' · ' + datum.year + '：' + format(datum.mjobs, '.2f') + ' 百万人'"
+                  }
+                },
+                "update": {
+                  "x": { "scale": "xSlope", "field": "year" },
+                  "y": { "scale": "ySlope", "field": "mjobs" },
+                  "size": { "value": 80 },
+                  "fillOpacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.12" },
+                  "strokeOpacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.12" }
+                },
+                "hover": { "size": { "value": 150 } }
+              }
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "from": { "data": "slopeLeft" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": { "value": "right" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 10 },
+              "fill": { "scale": "color", "field": "label" }
+            },
+            "update": {
+              "text": {
+                "signal": "showValues ? datum.label + '  ' + format(datum.mjobs, '.1f') : datum.label"
+              },
+              "x": { "scale": "xSlope", "field": "year", "offset": -10 },
+              "y": { "scale": "ySlope", "field": "mjobs" },
+              "dy": { "field": "dyLeft" },
+              "opacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.15" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "slopeRight" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": { "value": "left" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 10 },
+              "fill": { "scale": "color", "field": "label" }
+            },
+            "update": {
+              "text": {
+                "signal": "showValues ? format(datum.mjobs, '.1f') + '（' + (datum.pct >= 0 ? '+' : '−') + format(abs(datum.pct), '.0%') + '）' : datum.label"
+              },
+              "x": { "scale": "xSlope", "field": "year", "offset": 10 },
+              "y": { "scale": "ySlope", "field": "mjobs" },
+              "dy": { "field": "dyRight" },
+              "opacity": { "signal": "focus == null || focus === datum.label ? 1 : 0.15" }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -6,13 +6,14 @@
   "padding": 8,
 
   "title": {
-    "text": "企鹅：喙长 vs 体重（拖拽框选 · Shift+拖拽平移 · 滚轮缩放 · 双击清除框选）",
+    "text": "企鹅：喙长 vs 体重（拖拽框选 · Shift+拖拽平移 · 滚轮缩放 · 单击/双击清除框选）",
     "fontSize": 14
   },
 
   "signals": [
     {
       "name": "brush",
+      "comment": "框选区间 [x0, y0, x1, y1]（像素）。第三个处理器是必须的归一化：mousedown 会把四角都锚在按下点，若不在松手时把这种零面积区间置回 null，单击（或按下时手抖 1~2px）就会得到一个看不见的零面积矩形，同时把全部 342 个点判成「框外」、整张图变灰",
       "value": null,
       "on": [
         {
@@ -30,6 +31,10 @@
             ]
           },
           "update": "[brush[0], brush[1], x(), y()]"
+        },
+        {
+          "events": { "source": "window", "type": "mouseup" },
+          "update": "brush && abs(brush[2] - brush[0]) > 2 && abs(brush[3] - brush[1]) > 2 ? brush : null"
         },
         {
           "events": "dblclick",
@@ -100,7 +105,8 @@
 
     {
       "name": "xdom",
-      "update": "slice(xext)",
+      "comment": "初始 domain = 数据 extent 再各留 2% 余量；裸 extent 会让极值点圆心正好压在 clip 矩形边线上、各被切掉一半",
+      "update": "[xext[0] - span(xext) * 0.02, xext[1] + span(xext) * 0.02]",
       "on": [
         {
           "events": { "signal": "delta" },
@@ -114,7 +120,7 @@
     },
     {
       "name": "ydom",
-      "update": "slice(yext)",
+      "update": "[yext[0] - span(yext) * 0.02, yext[1] + span(yext) * 0.02]",
       "on": [
         {
           "events": { "signal": "delta" },

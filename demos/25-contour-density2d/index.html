@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>25 等值线与二维核密度 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '25-contour-density2d',
+  group: 'F. 稀有与复杂图形',
+  title: '25 · 等值线与二维核密度：isocontour + kde2d',
+  concepts: ['transform: isocontour', 'transform: kde2d', 'transform: geopath', 'grid 栅格对象', 'thresholds vs levels', 'resolve: shared', 'smooth', 'mark: path（恒等投影）', '文字光晕两层 text', '手工摆位的双面板 group']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      左图对 <code>volcano.json</code> 的 87×61 高程网格直接求等高线（<code>isocontour</code> 显式
+      <code>thresholds</code>）；右图先用 <code>kde2d</code> 把散点估成二维密度栅格，再对栅格求等值线
+      （<code>levels</code> 自动挑阈值）。拖右侧 <code>bandwidth</code> 看平滑度变化，调
+      <code>cellSize</code> 看栅格粒度对等值线的影响，关掉 <code>showPoints</code> 可单看密度。
+      鼠标悬停散点会放大。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

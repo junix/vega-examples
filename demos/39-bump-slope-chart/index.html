@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>39 Bump 图与斜率图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '39-bump-slope-chart',
+  group: 'F. 稀有与复杂图形',
+  title: '39 · Bump 图与斜率图：把「数值」变成「名次」与「升降」',
+  concepts: ['transform: fold', 'transform: window(rank)', 'transform: window(first_value) + frame', 'transform: lookup', 'transform: collect', 'scale: point + 反向 range', 'mark: group（双面板）', 'mark: line / symbol / text', 'signal: 联动高亮']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      左边是 <b>bump chart</b>：纵轴不是人数而是<b>名次</b>，由 <code>window</code> 变换的
+      <code>rank</code> 按年分组算出来；右边是 <b>slope chart</b>：只取起止两年，
+      每个行业一条直线，<b>斜率就是这段时间的增减</b>。
+      把鼠标移到任一面板的节点上，两个面板里的同一行业会同时高亮；
+      拖右侧的两个年份滑块可以换斜率图的比较区间，<code>showValues</code> 控制端点标签要不要带数值。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

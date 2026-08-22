@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>31 流图与堆叠基线 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '31-streamgraph',
+  group: 'F. 稀有与复杂图形',
+  title: '31 · 流图：stack 的三种基线与 inside-out 排序',
+  concepts: [
+    'transform: stack (offset zero/center/normalize)',
+    'transform: window (rank)',
+    'transform: lookup',
+    'transform: collect',
+    'mark: area + interpolate',
+    'from.facet',
+    'scale: utc',
+    'axis format 由 signal 切换',
+    '交互图例 (legendSymbol/legendLabel)'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      右侧把 <code>stackOffset</code> 从 <code>center</code> 切到 <code>zero</code> / <code>normalize</code>，
+      看主图基线怎么变、纵轴格式怎么跟着从人数变成百分比；再换 <code>stackSort</code> 体会
+      inside-out 排序对流图轮廓的影响。鼠标移到带子或右侧图例上可高亮单个行业。
+      下方三联图是同一份数据的三种基线并排对照。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

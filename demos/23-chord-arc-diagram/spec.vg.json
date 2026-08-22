@@ -1,0 +1,572 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "同一份《悲惨世界》共现网络的两种画法：左弦图（圆周弧段 + 圆内二次贝塞尔弦），右弧线邻接图（节点排一条线 + 上方半椭圆弧）",
+  "width": 980,
+  "height": 560,
+  "padding": { "left": 8, "top": 46, "right": 8, "bottom": 8 },
+  "autosize": "none",
+
+  "title": {
+    "text": "《悲惨世界》人物共现网络：弦图 vs 弧线邻接图",
+    "subtitle": {
+      "signal": "'加权度数前 ' + topN + ' 位角色 · 子图 ' + length(data('chord-nodes')) + ' 点 / ' + length(data('links-sub')) + ' 边 · 弧间隙 ' + format(padAngle, '.3f') + ' rad · 弦束拉直 ' + format(chordBundle, '.2f')"
+    },
+    "anchor": "start",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#666666"
+  },
+
+  "signals": [
+    {
+      "description": "只保留加权度数最高的前 N 个角色，避免 77 点 254 边糊成一团",
+      "name": "topN",
+      "value": 18,
+      "bind": { "input": "range", "min": 8, "max": 30, "step": 1 }
+    },
+    {
+      "description": "相邻弧段之间留出的角度间隙（弧度）。做法是把 pie 算出的角度两端各收缩 padAngle/2",
+      "name": "padAngle",
+      "value": 0.024,
+      "bind": { "input": "range", "min": 0, "max": 0.08, "step": 0.002 }
+    },
+    {
+      "description": "二次贝塞尔控制点在「圆心 ↔ 弦中点」之间的插值系数：0 = 控制点取圆心（最弯，束状），1 = 控制点取弦中点（退化成直线）",
+      "name": "chordBundle",
+      "value": 0.05,
+      "bind": { "input": "range", "min": 0, "max": 1, "step": 0.05 }
+    },
+    {
+      "description": "弧线邻接图里半椭圆的纵横比：ry = rx * arcRatio。1 就是正半圆",
+      "name": "arcRatio",
+      "value": 0.9,
+      "bind": { "input": "range", "min": 0.2, "max": 1.2, "step": 0.05 }
+    },
+    {
+      "description": "圆周（以及右侧那条直线）上的节点次序：group 先按社群聚在一起，strength 纯按强度从大到小",
+      "name": "nodeOrder",
+      "value": "group",
+      "bind": { "input": "select", "options": ["group", "strength"] }
+    },
+    {
+      "description": "未被高亮时弦/弧的不透明度",
+      "name": "linkOpacity",
+      "value": 0.45,
+      "bind": { "input": "range", "min": 0.1, "max": 1, "step": 0.05 }
+    },
+
+    { "name": "panelGap", "value": 40 },
+    { "name": "topBand", "value": 60 },
+    { "name": "panelW", "update": "(width - panelGap) / 2" },
+
+    { "name": "chordCx", "update": "panelW / 2" },
+    { "name": "chordCy", "update": "topBand + (height - topBand) / 2" },
+    { "name": "chordR", "update": "min(panelW, height - topBand) / 2 - 80" },
+    { "name": "chordThickness", "value": 13 },
+    { "name": "chordRi", "update": "chordR - chordThickness" },
+
+    { "name": "arcX0", "update": "panelW + panelGap" },
+    { "name": "arcBaseY", "value": 444 },
+
+    {
+      "description": "鼠标悬停到任一面板的节点上，两个面板同时只留下与它相连的边",
+      "name": "focus",
+      "value": null,
+      "on": [
+        { "events": "@chordArc:mouseover, @arcDot:mouseover", "update": "datum.index" },
+        { "events": "@chordArc:mouseout, @arcDot:mouseout", "update": "null" }
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "description": "同一个 JSON 文件读两次，用 format.property 分别取出 nodes 与 links 两张表",
+      "name": "nodes-all",
+      "url": "../../assets/data/miserables.json",
+      "format": { "type": "json", "property": "nodes" }
+    },
+    {
+      "name": "links-all",
+      "url": "../../assets/data/miserables.json",
+      "format": { "type": "json", "property": "links" },
+      "transform": [
+        { "type": "formula", "as": "weight", "expr": "datum.value" }
+      ]
+    },
+    {
+      "description": "fold 把每条边摊成两行端点（key 记住它原本是 source 还是 target），于是「按节点聚合」变成普通 aggregate",
+      "name": "all-ends",
+      "source": "links-all",
+      "transform": [
+        { "type": "fold", "fields": ["source", "target"], "as": ["role", "nodeIdx"] }
+      ]
+    },
+    {
+      "name": "degree-all",
+      "source": "all-ends",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["nodeIdx"],
+          "fields": ["weight", null],
+          "ops": ["sum", "count"],
+          "as": ["strength", "degree"]
+        }
+      ]
+    },
+    {
+      "description": "把加权度数贴回节点表，再用 window/row_number 排名（row_number 不并列，能精确切出 topN 行）",
+      "name": "nodes-scored",
+      "source": "nodes-all",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "degree-all",
+          "key": "nodeIdx",
+          "fields": ["index"],
+          "values": ["strength", "degree"],
+          "as": ["strength", "degree"],
+          "default": 0
+        },
+        {
+          "type": "window",
+          "sort": { "field": "strength", "order": "descending" },
+          "ops": ["row_number"],
+          "fields": [null],
+          "as": ["rank"]
+        }
+      ]
+    },
+    {
+      "name": "nodes-top",
+      "source": "nodes-scored",
+      "transform": [
+        { "type": "filter", "expr": "datum.rank <= topN" }
+      ]
+    },
+    {
+      "description": "两次 lookup（default:null）当成「内连接」用：源点或终点不在 topN 里就查不到名字，随即被 filter 掉",
+      "name": "links-sub",
+      "source": "links-all",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "nodes-top",
+          "key": "index",
+          "fields": ["source", "target"],
+          "values": ["name", "group"],
+          "as": ["srcName", "srcGroup", "tgtName", "tgtGroup"],
+          "default": null
+        },
+        { "type": "filter", "expr": "datum.srcName != null && datum.tgtName != null" },
+        { "type": "formula", "as": "endA", "expr": "datum.source" },
+        { "type": "formula", "as": "endB", "expr": "datum.target" },
+        { "type": "formula", "as": "linkId", "expr": "datum.source + '-' + datum.target" }
+      ]
+    },
+    {
+      "description": "子图内再 fold 一次：既用来算子图强度，也是弦端点表的上游",
+      "name": "sub-ends",
+      "source": "links-sub",
+      "transform": [
+        { "type": "fold", "fields": ["endA", "endB"], "as": ["role", "nodeIdx"] }
+      ]
+    },
+    {
+      "name": "sub-degree",
+      "source": "sub-ends",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["nodeIdx"],
+          "fields": ["weight"],
+          "ops": ["sum"],
+          "as": ["subStrength"]
+        }
+      ]
+    },
+    {
+      "description": "弧段布局：collect 定圆周次序（先社群、再强度）→ pie 按 subStrength 分配角度 → 两端各收缩 padAngle/2 得到间隙",
+      "name": "chord-nodes",
+      "source": "nodes-top",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "sub-degree",
+          "key": "nodeIdx",
+          "fields": ["index"],
+          "values": ["subStrength"],
+          "as": ["subStrength"],
+          "default": 0
+        },
+        { "type": "filter", "expr": "datum.subStrength > 0" },
+        {
+          "type": "formula",
+          "as": "orderKey",
+          "expr": "nodeOrder === 'group' ? datum.group : 0"
+        },
+        {
+          "type": "collect",
+          "sort": { "field": ["orderKey", "subStrength"], "order": ["ascending", "descending"] }
+        },
+        {
+          "type": "pie",
+          "field": "subStrength",
+          "sort": false,
+          "startAngle": 0,
+          "endAngle": 6.283185307179586,
+          "as": ["pieFrom", "pieTo"]
+        },
+        { "type": "formula", "as": "a0", "expr": "datum.pieFrom + padAngle / 2" },
+        { "type": "formula", "as": "a1", "expr": "datum.pieTo - padAngle / 2" },
+        { "type": "formula", "as": "aMid", "expr": "(datum.a0 + datum.a1) / 2" }
+      ]
+    },
+    {
+      "description": "每个端点在它所属弧段内部再细分：window 在 nodeIdx 分区内按权重降序做累计和，弦锚点落在自己那一小段的正中",
+      "name": "chord-ends",
+      "source": "sub-ends",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "chord-nodes",
+          "key": "index",
+          "fields": ["nodeIdx"],
+          "values": ["a0", "a1", "subStrength"],
+          "as": ["na0", "na1", "nStrength"]
+        },
+        {
+          "type": "window",
+          "groupby": ["nodeIdx"],
+          "sort": { "field": "weight", "order": "descending" },
+          "ops": ["sum"],
+          "fields": ["weight"],
+          "as": ["cum"]
+        },
+        {
+          "type": "formula",
+          "as": "frac",
+          "expr": "(datum.cum - datum.weight / 2) / datum.nStrength"
+        },
+        {
+          "type": "formula",
+          "as": "ang",
+          "expr": "datum.na0 + datum.frac * (datum.na1 - datum.na0)"
+        }
+      ]
+    },
+    {
+      "description": "pivot 把 fold 摊开的两行端点重新收回一行：role 的取值 endA/endB 变成两个字段，值取各自的锚点角度",
+      "name": "chord-links",
+      "source": "chord-ends",
+      "transform": [
+        {
+          "type": "pivot",
+          "groupby": ["linkId", "weight", "source", "target", "srcName", "tgtName", "srcGroup"],
+          "field": "role",
+          "value": "ang",
+          "op": "sum"
+        },
+        { "type": "formula", "as": "x1", "expr": "chordCx + chordRi * sin(datum.endA)" },
+        { "type": "formula", "as": "y1", "expr": "chordCy - chordRi * cos(datum.endA)" },
+        { "type": "formula", "as": "x2", "expr": "chordCx + chordRi * sin(datum.endB)" },
+        { "type": "formula", "as": "y2", "expr": "chordCy - chordRi * cos(datum.endB)" }
+      ]
+    },
+    {
+      "name": "panel-labels",
+      "values": [
+        { "side": "chord", "label": "弦图 chord：弧长 ∝ 共现强度，弦 = 一条共现边" },
+        { "side": "arc", "label": "弧线邻接图 arc diagram：节点等距一行，半椭圆弧 = 一条边" }
+      ]
+    },
+    {
+      "name": "baseline",
+      "values": [ { "k": 1 } ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "groupColor",
+      "type": "ordinal",
+      "domain": { "data": "chord-nodes", "field": "group", "sort": true },
+      "range": { "scheme": "category10" }
+    },
+    {
+      "name": "nodeX",
+      "type": "point",
+      "domain": { "data": "chord-nodes", "field": "name" },
+      "range": [ { "signal": "12" }, { "signal": "panelW - 12" } ],
+      "padding": 0.5
+    },
+    {
+      "name": "nodeSize",
+      "type": "linear",
+      "domain": { "data": "chord-nodes", "field": "subStrength" },
+      "range": [ 20, 340 ],
+      "zero": true
+    },
+    {
+      "name": "linkWidth",
+      "type": "sqrt",
+      "domain": { "data": "links-sub", "field": "weight" },
+      "range": [ 0.7, 6 ],
+      "zero": true
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "groupColor",
+      "type": "symbol",
+      "title": "社群 group",
+      "orient": "none",
+      "direction": "horizontal",
+      "legendX": { "signal": "0" },
+      "legendY": { "signal": "0" },
+      "symbolType": "circle",
+      "symbolSize": 90,
+      "titleFontSize": 11,
+      "labelFontSize": 10
+    },
+    {
+      "size": "nodeSize",
+      "type": "symbol",
+      "title": "子图内加权度数",
+      "orient": "none",
+      "direction": "horizontal",
+      "legendX": { "signal": "arcX0" },
+      "legendY": { "signal": "0" },
+      "values": [ 20, 60, 100 ],
+      "symbolType": "circle",
+      "symbolFillColor": "#bbbbbb",
+      "symbolStrokeColor": "#888888",
+      "format": "d",
+      "titleFontSize": 11,
+      "labelFontSize": 10
+    },
+    {
+      "stroke": "linkWidth",
+      "type": "symbol",
+      "title": "边权重 value",
+      "orient": "none",
+      "direction": "horizontal",
+      "legendX": { "signal": "arcX0 + 190" },
+      "legendY": { "signal": "0" },
+      "values": [ 1, 10, 20, 31 ],
+      "symbolType": "stroke",
+      "symbolSize": 200,
+      "symbolStrokeColor": "#888888",
+      "format": "d",
+      "titleFontSize": 11,
+      "labelFontSize": 10
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "text",
+      "from": { "data": "panel-labels" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "text": { "field": "label" },
+          "align": { "value": "center" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 11 },
+          "fill": { "value": "#555555" }
+        },
+        "update": {
+          "x": { "signal": "(datum.side === 'chord' ? 0 : arcX0) + panelW / 2" },
+          "y": { "signal": "topBand - 16" }
+        }
+      }
+    },
+
+    {
+      "description": "左面板：弦图。group mark 只是个坐标容器，内部所有几何都相对面板左上角",
+      "type": "group",
+      "name": "chordPanel",
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "value": 0 },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "height" }
+        }
+      },
+      "marks": [
+        {
+          "description": "弦：M 起点 Q 控制点 终点。控制点在圆心与弦中点之间按 chordBundle 插值",
+          "type": "path",
+          "name": "chordRibbon",
+          "from": { "data": "chord-links" },
+          "encode": {
+            "enter": {
+              "stroke": { "scale": "groupColor", "field": "srcGroup" },
+              "fill": { "value": null },
+              "strokeCap": { "value": "round" },
+              "tooltip": {
+                "signal": "datum.srcName + ' ↔ ' + datum.tgtName + ' · 共现 ' + format(datum.weight, 'd') + ' 次'"
+              }
+            },
+            "update": {
+              "path": {
+                "signal": "'M' + format(datum.x1, '.1f') + ',' + format(datum.y1, '.1f') + 'Q' + format(chordCx + chordBundle * ((datum.x1 + datum.x2) / 2 - chordCx), '.1f') + ',' + format(chordCy + chordBundle * ((datum.y1 + datum.y2) / 2 - chordCy), '.1f') + ' ' + format(datum.x2, '.1f') + ',' + format(datum.y2, '.1f')"
+              },
+              "strokeWidth": { "scale": "linkWidth", "field": "weight" },
+              "strokeOpacity": {
+                "signal": "focus == null ? linkOpacity : (datum.source === focus || datum.target === focus ? 0.95 : 0.05)"
+              },
+              "zindex": { "signal": "focus != null && (datum.source === focus || datum.target === focus) ? 1 : 0" }
+            }
+          }
+        },
+        {
+          "description": "弧段：pie 分配的角度 + padAngle 收缩。Vega 的 arc 以 12 点方向为 0、顺时针为正",
+          "type": "arc",
+          "name": "chordArc",
+          "from": { "data": "chord-nodes" },
+          "encode": {
+            "enter": {
+              "x": { "signal": "chordCx" },
+              "y": { "signal": "chordCy" },
+              "fill": { "scale": "groupColor", "field": "group" },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.5 },
+              "tooltip": {
+                "signal": "datum.name + ' · 社群 ' + datum.group + ' · 子图强度 ' + format(datum.subStrength, 'd') + ' · 全图强度 ' + format(datum.strength, 'd')"
+              }
+            },
+            "update": {
+              "startAngle": { "field": "a0" },
+              "endAngle": { "field": "a1" },
+              "innerRadius": { "signal": "chordRi" },
+              "outerRadius": { "signal": "chordR" },
+              "fillOpacity": { "signal": "focus == null || datum.index === focus ? 1 : 0.35" }
+            }
+          }
+        },
+        {
+          "description": "径向标签：右半圈（aMid <= PI）左对齐、旋转 aMid-90°；左半圈右对齐、旋转 aMid+90°",
+          "type": "text",
+          "from": { "data": "chord-nodes" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "text": { "field": "name" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#333333" }
+            },
+            "update": {
+              "x": { "signal": "chordCx + (chordR + 6) * sin(datum.aMid)" },
+              "y": { "signal": "chordCy - (chordR + 6) * cos(datum.aMid)" },
+              "angle": { "signal": "datum.aMid * 180 / PI + (datum.aMid <= PI ? -90 : 90)" },
+              "align": { "signal": "datum.aMid <= PI ? 'left' : 'right'" },
+              "fontWeight": { "signal": "datum.index === focus ? 'bold' : 'normal'" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "右面板：弧线邻接图。节点用 point 比例尺等距摊在 arcBaseY 上，边是上凸的半椭圆",
+      "type": "group",
+      "name": "arcPanel",
+      "encode": {
+        "update": {
+          "x": { "signal": "arcX0" },
+          "y": { "value": 0 },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "height" }
+        }
+      },
+      "marks": [
+        {
+          "type": "rule",
+          "from": { "data": "baseline" },
+          "interactive": false,
+          "encode": {
+            "update": {
+              "x": { "signal": "6" },
+              "x2": { "signal": "panelW - 6" },
+              "y": { "signal": "arcBaseY" },
+              "stroke": { "value": "#dddddd" },
+              "strokeWidth": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "边：A rx,ry 0 0,1 —— 从左端点到右端点、sweep=1 在屏幕坐标里是顺时针，正好从 9 点走到 12 点再到 3 点，弧就凸在基线上方",
+          "type": "path",
+          "from": { "data": "links-sub" },
+          "encode": {
+            "enter": {
+              "stroke": { "scale": "groupColor", "field": "srcGroup" },
+              "fill": { "value": null },
+              "tooltip": {
+                "signal": "datum.srcName + ' ↔ ' + datum.tgtName + ' · 共现 ' + format(datum.weight, 'd') + ' 次'"
+              }
+            },
+            "update": {
+              "path": {
+                "signal": "'M' + format(min(scale('nodeX', datum.srcName), scale('nodeX', datum.tgtName)), '.1f') + ',' + format(arcBaseY, '.1f') + 'A' + format(abs(scale('nodeX', datum.srcName) - scale('nodeX', datum.tgtName)) / 2, '.1f') + ',' + format(abs(scale('nodeX', datum.srcName) - scale('nodeX', datum.tgtName)) / 2 * arcRatio, '.1f') + ' 0 0 1 ' + format(max(scale('nodeX', datum.srcName), scale('nodeX', datum.tgtName)), '.1f') + ',' + format(arcBaseY, '.1f')"
+              },
+              "strokeWidth": { "scale": "linkWidth", "field": "weight" },
+              "strokeOpacity": {
+                "signal": "focus == null ? linkOpacity : (datum.source === focus || datum.target === focus ? 0.95 : 0.05)"
+              },
+              "zindex": { "signal": "focus != null && (datum.source === focus || datum.target === focus) ? 1 : 0" }
+            }
+          }
+        },
+        {
+          "type": "symbol",
+          "name": "arcDot",
+          "from": { "data": "chord-nodes" },
+          "encode": {
+            "enter": {
+              "shape": { "value": "circle" },
+              "fill": { "scale": "groupColor", "field": "group" },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 1 },
+              "tooltip": {
+                "signal": "datum.name + ' · 社群 ' + datum.group + ' · 子图强度 ' + format(datum.subStrength, 'd')"
+              }
+            },
+            "update": {
+              "x": { "scale": "nodeX", "field": "name" },
+              "y": { "signal": "arcBaseY" },
+              "size": { "scale": "nodeSize", "field": "subStrength" },
+              "fillOpacity": { "signal": "focus == null || datum.index === focus ? 1 : 0.35" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "chord-nodes" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "text": { "field": "name" },
+              "align": { "value": "left" },
+              "baseline": { "value": "middle" },
+              "angle": { "value": 90 },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#333333" }
+            },
+            "update": {
+              "x": { "scale": "nodeX", "field": "name" },
+              "y": { "signal": "arcBaseY + 14" },
+              "fontWeight": { "signal": "datum.index === focus ? 'bold' : 'normal'" }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -71,7 +71,7 @@ flights-raw ──────────────────────�
 ### 为什么需要两层 rect（灰色全集 + 高亮子集）
 
 - 单层直方图直接画 `*-fg` 也能联动，但刷选后柱子整体变矮，**失去了「全集长什么样」的参照**，看不出子集在各 bin 上的占比差异（例如「早班机集中在短航线」这种结构）。
-- 灰色 `*-bg` 提供静态参照系：它是全集分布，且取自 `flights-raw` 而**不是** `flights`。原因在于 `crossfilter` 会把「被所有维度同时排除」的记录从自己的下游数据流里剔除——bg 若接在 crossfilter 之后就不再是全集。
+- 灰色 `*-bg` 提供静态参照系：它是全集分布，且取自 `flights-raw` 而**不是** `flights`。原因不是「`crossfilter` 会把被所有维度排除的记录剔除」——它一条都不删：把三个区间同时收窄到有 930/2000 条记录被三个维度同时排除时，`view.data('flights')` 依然是全部 2000 行（而三张图的蓝柱总数正确地降到 62/158/91）。真正的原因是 `crossfilter` 输出 pulse 的 `add`/`rem`/`mod` 里装的是**位图下标（整数）而不是 tuple**，只有下游的 `resolvefilter` 认得这种下标、能把它翻译回记录。所以把 `aggregate` 直接挂到 `flights` 上，`groupby` 的 `delay0`/`delay1` 全是 `undefined`，只会得到一个退化分组（bins=1，`count` 是下标计数的副产物、数值无意义），rect 的 `x` 算成 `undefined`、`x2` 算成 `NaN`，一根柱子也画不出来。
 - y 比例尺的 domain 也取自静态的 `*-bg`，这样刷选时坐标轴不动，蓝色柱子在灰色背景内消长，变化一目了然。若 domain 取自 `*-fg`，每次刷选都会重新定标，柱状图会「弹跳」。
 
 ## 试一试
@@ -79,8 +79,8 @@ flights-raw ──────────────────────�
 1. 在延误图上刷 `[0, 60]`：看起飞时刻图的蓝色分布偏向哪些小时；双击延误图重置。
 2. 把 `delay-fg` 的 `ignore: 1` 改成 `0`（不忽略自己），再刷延误图——本图的柱子会跟着自己的刷选一起塌掉，体会 ignore 的作用。
 3. 改 bin 的 `step`（如 distance 的 100 改成 200），观察直方图粒度变化。
-4. 把某个 `*Extent` 改小（如 `delayExtent` 改成 `[-60, 180]`）再看延误图最右侧——超范围的记录被 bin 到 Infinity，柱子位置异常。这就是 extent 必须覆盖数据范围的原因。
-5. 进阶：仿照现有三个 group 增加第四张图（如按 origin 字段），需要动哪几处？（signals 加一对 extent/anchor/range、crossfilter 的 fields/query 加一项、layout 的 domain 加一项、ignore 掩码全部重排。）
+4. 把某个 `*Extent` 改小（如 `delayExtent` 改成 `[-60, 180]`）——超范围的 5 条记录（199/204/205/217/365 分钟）会被 bin 到 `delay0 = Infinity`，而 `scale('delayScale', Infinity)` 返回 `NaN`，rect 的 x/x2 都成 `NaN` 后被渲染器压成「x=0、宽度 0」的矩形，于是这 5 条记录**贴在最左端静默消失**——不是出现在最右侧（最右侧画的仍是正常的 170–180 bin），整份 SVG 里也找不到任何 `NaN`/`Infinity` 坐标。改小下界同理：`delayExtent` 改成 `[0, 370]` 时 992 条负延误记录落到 `-Infinity`，同样退化成 x=0 的零宽柱子而整批消失。这就是 extent 必须覆盖数据范围的原因：溢出不报错，只悄悄丢数据。
+5. 进阶：仿照现有三个 group 增加第四张图（如按起飞日期 `date(datum.date)`），需要动哪几处？（`signals` 加一对 extent/anchor/range、`flights-raw` 加一个 `bin`、`crossfilter` 的 `fields`/`query` 各加一项、`layout` 的 domain 加一项、`height` 的 `(chartHeight + chartGap) * 3` 改成 `* 4`；`ignore` 掩码**只需给新图写 `ignore: 8`**——新维度追加在 `fields` 末尾时，已有的 delay=1 / hour=2 / distance=4 完全不变，只有把新维度插到 `fields` 中间才需要重排。）
 
 ## 参考
 

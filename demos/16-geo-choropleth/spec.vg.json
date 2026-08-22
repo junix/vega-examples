@@ -3,13 +3,33 @@
   "description": "美国县级失业率分级统计地图（choropleth）：TopoJSON 数据 + lookup 连接 + albersUsa 投影 + quantize 填色",
   "width": 960,
   "height": 600,
-  "padding": 8,
+  "padding": { "top": 46, "left": 8, "right": 8, "bottom": 8 },
   "autosize": "none",
 
   "title": {
     "text": "2009 年美国各县失业率（%）",
-    "fontSize": 15
+    "subtitle": { "signal": "'配色 domain 截断在 ' + format(rateCap, '.0%') + '：有 ' + cappedCount + ' 个县超出上限（最高 ' + format(maxRate, '.1%') + '），被一律夹进最深一档，彼此已无法区分'" },
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#666666"
   },
+
+  "signals": [
+    {
+      "comment": "配色 domain 的上限。分级统计地图几乎总要截断长尾，否则少数极端县把整张图压成一片浅色；但截断掉多少必须让读者看得见 —— 所以这里做成滑杆，并把被截断的县数写进副标题",
+      "name": "rateCap",
+      "value": 0.15,
+      "bind": { "input": "range", "min": 0.05, "max": 0.35, "step": 0.01 }
+    },
+    {
+      "name": "cappedCount",
+      "update": "data('over-cap').length ? data('over-cap')[0].n : 0"
+    },
+    {
+      "name": "maxRate",
+      "update": "data('rate-extent').length ? data('rate-extent')[0].maxRate : 0"
+    }
+  ],
 
   "data": [
     {
@@ -18,6 +38,23 @@
       "format": { "type": "tsv", "parse": "auto" }
     },
     {
+      "comment": "落在截断线以上的县：数量随滑杆实时变化，直接写进副标题",
+      "name": "over-cap",
+      "source": "unemployment",
+      "transform": [
+        { "type": "filter", "expr": "datum.rate > rateCap" },
+        { "type": "aggregate", "fields": ["rate"], "ops": ["count"], "as": ["n"] }
+      ]
+    },
+    {
+      "name": "rate-extent",
+      "source": "unemployment",
+      "transform": [
+        { "type": "aggregate", "fields": ["rate"], "ops": ["max"], "as": ["maxRate"] }
+      ]
+    },
+    {
+      "comment": "filter 必须同时管住「数据侧有值」和「几何侧有形状」两件事：us-10m.json 的 counties 里有 410 条 type:null 的占位要素（外加 5 条 arcs 为空的退化 MultiPolygon），其中 389 条查得到失业率 —— 只写 datum.rate != null 会把它们全部留下，渲染成没有 d 属性的空 path；反过来被 rate 条件丢掉的 34 条里有 13 条是真有几何的水域面（FIPS xx000，五大湖与近海）和美属维尔京群岛",
       "name": "counties",
       "url": "../../assets/data/us-10m.json",
       "format": { "type": "topojson", "feature": "counties" },
@@ -31,7 +68,7 @@
         },
         {
           "type": "filter",
-          "expr": "datum.rate != null"
+          "expr": "datum.rate != null && datum.geometry != null && length(datum.geometry.coordinates) > 0"
         }
       ]
     },
@@ -53,7 +90,7 @@
     {
       "name": "color",
       "type": "quantize",
-      "domain": [0, 0.15],
+      "domain": [0, { "signal": "rateCap" }],
       "range": { "scheme": "bluepurple", "count": 7 }
     }
   ],
@@ -73,7 +110,7 @@
       "from": { "data": "counties" },
       "encode": {
         "enter": {
-          "tooltip": { "signal": "'FIPS ' + datum.id + '：' + format(datum.rate, '0.1%')" }
+          "tooltip": { "signal": "'FIPS ' + pad(datum.id, 5, '0', 'left') + '：' + format(datum.rate, '0.1%')" }
         },
         "update": {
           "fill": { "scale": "color", "field": "rate" }

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>40 甘特图与历史时间线 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '40-gantt-timeline',
+  group: 'F. 稀有与复杂图形',
+  title: '40 · 甘特图与历史时间线：区间条、依赖箭头与错行标签',
+  concepts: [
+    'mark: rect（区间条）', 'mark: path（依赖折线）', 'mark: symbol（菱形里程碑/箭头）',
+    'transform: lookup（depends 自连接）', 'transform: sequence', 'transform: formula',
+    'scale: time + band', 'axis.format: %m-%d / d', 'signal 驱动的今天线与错行数'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      拖右侧的 <code>todayDay</code> 让红色「今天」竖线在甘特图上移动；拖 <code>elbow</code>
+      看依赖折线的出腿长度如何改变正交布线的形状；拖 <code>rowCount</code>
+      把右边时间线的错行数从 1 调到 5 —— 调到 1 就能亲眼看到君主名字互相压住，
+      这正是需要错行的原因。悬停任意条/菱形看 tooltip。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

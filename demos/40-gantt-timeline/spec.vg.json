@@ -1,0 +1,608 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "并排两个时间面板：左侧甘特图（band 排任务 + time scale 排日期 + depends 自连接 lookup 画依赖折线箭头 + 可拖的今天线 + 菱形里程碑），右侧历史时间线（在位区间条按 index % rowCount 交替错行，年份轴用 format:'d'）",
+  "width": 960,
+  "height": 470,
+  "padding": { "left": 8, "top": 52, "right": 8, "bottom": 10 },
+  "autosize": "none",
+
+  "title": {
+    "text": "甘特图 × 历史时间线：区间条、依赖箭头与错行标签",
+    "subtitle": "左：内联项目计划（time scale × band scale，depends 自连接 lookup 画依赖）　右：monarchs.json 在位区间（index % rowCount 交替错行）",
+    "anchor": "start",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitlePadding": 4
+  },
+
+  "signals": [
+    {
+      "description": "布局：左面板原点与尺寸。左边留 118px 给任务名标签，面板宽 442px",
+      "name": "ganttX", "value": 118
+    },
+    { "name": "ganttW", "value": 442 },
+    {
+      "description": "布局：右面板原点与宽度",
+      "name": "tlX", "value": 618
+    },
+    { "name": "tlW", "value": 336 },
+    { "name": "panelTop", "value": 24 },
+    { "name": "panelH", "value": 316 },
+
+    {
+      "description": "「今天」竖线：以 2026-03-01 为第 0 天的偏移量。拖它对比「进度条右端」与「今天线」——右端在线左边 = 落后，在线右边 = 超前",
+      "name": "todayDay",
+      "value": 46,
+      "bind": { "input": "range", "min": 0, "max": 92, "step": 1 }
+    },
+    {
+      "description": "天数偏移换算成毫秒时间戳。time scale 既吃 Date 对象也吃数字时间戳，所以可以直接 scale('gx', today)",
+      "name": "today",
+      "update": "time(datetime(2026, 2, 1)) + todayDay * 24 * 60 * 60 * 1000"
+    },
+    { "name": "todayText", "update": "'今天 ' + timeFormat(today, '%m-%d')" },
+
+    {
+      "description": "依赖折线的水平出腿上限（px）。实际出腿 = min(elbow, 前后任务像素间隙 / 2)，所以任务背靠背时会自动退化成一条垂直线",
+      "name": "elbow",
+      "value": 12,
+      "bind": { "input": "range", "min": 0, "max": 40, "step": 1 }
+    },
+
+    {
+      "description": "时间线错行数。调到 1 就能看见君主名字互相压住——这就是错行存在的理由",
+      "name": "rowCount",
+      "value": 3,
+      "bind": { "input": "range", "min": 1, "max": 5, "step": 1 }
+    },
+    { "name": "tlPitch", "update": "panelH / rowCount" },
+    { "name": "tlBarH", "value": 30 }
+  ],
+
+  "data": [
+    {
+      "description": "手写的小项目计划。start === end 的两行是里程碑（下面用 formula 判定）；depends 存前置任务的 task 名——这就是一张自引用外键表。任务按 start 升序排，band scale 的 domain 直接取数据顺序，于是依赖箭头总是自上而下",
+      "name": "gantt-tasks",
+      "values": [
+        { "task": "Kickoff",       "phase": "Discovery", "start": "2026-03-02", "end": "2026-03-04", "progress": 1.00, "depends": null },
+        { "task": "Interviews",    "phase": "Discovery", "start": "2026-03-06", "end": "2026-03-16", "progress": 1.00, "depends": "Kickoff" },
+        { "task": "Market scan",   "phase": "Discovery", "start": "2026-03-06", "end": "2026-03-20", "progress": 1.00, "depends": "Kickoff" },
+        { "task": "Spec draft",    "phase": "Design",    "start": "2026-03-23", "end": "2026-04-03", "progress": 1.00, "depends": "Market scan" },
+        { "task": "Wireframes",    "phase": "Design",    "start": "2026-04-06", "end": "2026-05-01", "progress": 0.40, "depends": "Spec draft" },
+        { "task": "Data pipeline", "phase": "Build",     "start": "2026-04-06", "end": "2026-04-28", "progress": 0.65, "depends": "Spec draft" },
+        { "task": "Chart engine",  "phase": "Build",     "start": "2026-04-13", "end": "2026-05-15", "progress": 0.05, "depends": "Spec draft" },
+        { "task": "Sign-off",      "phase": "Design",    "start": "2026-05-04", "end": "2026-05-04", "progress": 0.00, "depends": "Wireframes" },
+        { "task": "Docs + demos",  "phase": "Build",     "start": "2026-05-06", "end": "2026-05-20", "progress": 0.00, "depends": "Sign-off" },
+        { "task": "Beta test",     "phase": "Ship",      "start": "2026-05-18", "end": "2026-05-27", "progress": 0.00, "depends": "Chart engine" },
+        { "task": "GA launch",     "phase": "Ship",      "start": "2026-05-29", "end": "2026-05-29", "progress": 0.00, "depends": "Beta test" }
+      ],
+      "format": {
+        "parse": { "start": "date:'%Y-%m-%d'", "end": "date:'%Y-%m-%d'", "progress": "number" }
+      },
+      "transform": [
+        { "type": "formula", "as": "isMilestone", "expr": "time(datum.end) - time(datum.start) <= 0" }
+      ]
+    },
+    {
+      "description": "有工期的任务：画计划条 + 进度条",
+      "name": "gantt-bars",
+      "source": "gantt-tasks",
+      "transform": [ { "type": "filter", "expr": "!datum.isMilestone" } ]
+    },
+    {
+      "description": "零工期的里程碑：矩形会退化成零宽度，所以改用菱形 symbol",
+      "name": "gantt-milestones",
+      "source": "gantt-tasks",
+      "transform": [ { "type": "filter", "expr": "datum.isMilestone" } ]
+    },
+    {
+      "description": "依赖边。lookup 的 from 就是本表自己（自连接）：把 depends 指向的前置任务的 end / isMilestone 接过来，再用顶层 scale() 与 bandwidth() 把四个端点算成像素坐标。path mark 只负责把算好的点拼成折线",
+      "name": "gantt-deps",
+      "source": "gantt-tasks",
+      "transform": [
+        { "type": "filter", "expr": "datum.depends != null" },
+        {
+          "type": "lookup",
+          "from": "gantt-tasks",
+          "key": "task",
+          "fields": ["depends"],
+          "values": ["end", "isMilestone"],
+          "as": ["fromEnd", "fromMilestone"]
+        },
+        { "type": "formula", "as": "x1", "expr": "scale('gx', datum.fromEnd) + (datum.fromMilestone ? 6 : 2)" },
+        { "type": "formula", "as": "y1", "expr": "scale('gy', datum.depends) + bandwidth('gy') / 2" },
+        { "type": "formula", "as": "x2", "expr": "max(scale('gx', datum.start) - (datum.isMilestone ? 7 : 3), datum.x1)" },
+        { "type": "formula", "as": "y2", "expr": "scale('gy', datum.task) + bandwidth('gy') / 2" },
+        { "type": "formula", "as": "xm", "expr": "datum.x1 + min(elbow, (datum.x2 - datum.x1) / 2)" }
+      ]
+    },
+
+    {
+      "description": "英国君主在位年份。注意 start/end 是年份数字（1565），不是日期；Cromwell 那行带 commonwealth:true；George IV 那行 start === end === 1820。row = index % rowCount 就是错行的全部秘密",
+      "name": "monarchs",
+      "url": "../../assets/data/monarchs.json",
+      "transform": [
+        { "type": "formula", "as": "row", "expr": "datum.index % rowCount" },
+        { "type": "formula", "as": "kind", "expr": "datum.commonwealth ? 'Commonwealth' : 'Monarchy'" },
+        { "type": "formula", "as": "years", "expr": "datum.end - datum.start" }
+      ]
+    },
+    {
+      "description": "时间线的手工几何全在这一层算完：像素起止 x0/x1（并给零宽度的 George IV 兜底 3px）、条中心 cx、行中心 yc、名字放不放得进条里 inside、以及贴边时的标签对齐 nameX/nameAlign。scale('ty', …) 只能在这里调用——写进 monarchs 自己会和 ty 的 domain 形成循环依赖",
+      "name": "monarchs-laid",
+      "source": "monarchs",
+      "transform": [
+        { "type": "formula", "as": "x0", "expr": "scale('ty', datum.start)" },
+        { "type": "formula", "as": "x1", "expr": "max(scale('ty', datum.end), datum.x0 + 3)" },
+        { "type": "formula", "as": "wpx", "expr": "datum.x1 - datum.x0" },
+        { "type": "formula", "as": "cx", "expr": "(datum.x0 + datum.x1) / 2" },
+        { "type": "formula", "as": "yc", "expr": "tlPitch * (datum.row + 0.5)" },
+        { "type": "formula", "as": "inside", "expr": "datum.wpx > length(datum.name) * 5.8 + 8" },
+        { "type": "formula", "as": "half", "expr": "length(datum.name) * 3 + 4" },
+        { "type": "formula", "as": "labelX", "expr": "datum.cx + datum.half > tlW ? tlW : (datum.cx - datum.half < 0 ? 0 : datum.cx)" },
+        { "type": "formula", "as": "labelAlign", "expr": "datum.cx + datum.half > tlW ? 'right' : (datum.cx - datum.half < 0 ? 'left' : 'center')" },
+        { "type": "formula", "as": "yearText", "expr": "datum.wpx > 38 ? format(datum.start, 'd') + '–' + format(datum.end, 'd') : ''" }
+      ]
+    },
+    {
+      "description": "错行轨道：sequence 变换按 rowCount 现生成 0 … rowCount-1 行，用来画每行的浅色基线",
+      "name": "tl-rows",
+      "transform": [
+        { "type": "sequence", "start": 0, "stop": { "signal": "rowCount" }, "step": 1, "as": "row" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "gx",
+      "type": "time",
+      "domain": { "data": "gantt-tasks", "fields": ["start", "end"] },
+      "nice": "month",
+      "range": [ { "signal": "0" }, { "signal": "ganttW" } ]
+    },
+    {
+      "name": "gy",
+      "type": "band",
+      "domain": { "data": "gantt-tasks", "field": "task" },
+      "range": [ { "signal": "0" }, { "signal": "panelH" } ],
+      "paddingInner": 0.38,
+      "paddingOuter": 0.24
+    },
+    {
+      "name": "phase",
+      "type": "ordinal",
+      "domain": ["Discovery", "Design", "Build", "Ship"],
+      "range": { "scheme": "tableau10" }
+    },
+    {
+      "name": "ty",
+      "type": "linear",
+      "domain": { "data": "monarchs", "fields": ["start", "end"] },
+      "zero": false,
+      "padding": 12,
+      "range": [ { "signal": "0" }, { "signal": "tlW" } ]
+    },
+    {
+      "name": "polity",
+      "type": "ordinal",
+      "domain": ["Monarchy", "Commonwealth"],
+      "range": { "scheme": "tableau10" }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "phase",
+      "orient": "none",
+      "legendX": { "signal": "ganttX" },
+      "legendY": 386,
+      "direction": "horizontal",
+      "symbolType": "square",
+      "title": "阶段 phase",
+      "titleFontSize": 11,
+      "labelFontSize": 11
+    },
+    {
+      "fill": "polity",
+      "orient": "none",
+      "legendX": { "signal": "tlX" },
+      "legendY": 386,
+      "direction": "horizontal",
+      "symbolType": "square",
+      "title": "政体 polity",
+      "titleFontSize": 11,
+      "labelFontSize": 11
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "面板小标题：直接用 text mark 画在根坐标系里，比多层 group + title 简单",
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": { "signal": "ganttX" },
+          "y": { "value": 12 },
+          "text": { "value": "① 项目计划甘特图（2026 Q2：9 项任务 + 2 个里程碑）" },
+          "align": { "value": "left" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#24292f" }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": { "signal": "tlX" },
+          "y": { "value": 12 },
+          "text": { "value": "② 英国君主在位时间线（1565–1820）" },
+          "align": { "value": "left" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#24292f" }
+        }
+      }
+    },
+    {
+      "description": "两个面板之间的分隔线",
+      "type": "rule",
+      "encode": {
+        "enter": {
+          "x": { "value": 589 },
+          "y": { "value": 4 },
+          "y2": { "value": 410 },
+          "stroke": { "value": "#d8dee4" },
+          "strokeWidth": { "value": 1 }
+        }
+      }
+    },
+    {
+      "description": "两行脚注：把「怎么读这张图」和两个格式化坑写在图上",
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": { "signal": "ganttX" },
+          "y": { "value": 442 },
+          "align": { "value": "left" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#57606a" },
+          "text": { "value": "甘特图：浅色条 = 计划工期，深色条 = 已完成（宽 = 工期 × progress）；虚线箭头 = 依赖；菱形 = 里程碑；红色竖线 = 今天（拖 todayDay）。" }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": { "signal": "ganttX" },
+          "y": { "value": 458 },
+          "align": { "value": "left" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#57606a" },
+          "text": { "value": "时间线：交替错行避免文字重叠；Commonwealth（虚线边框）= 共和时期；年份轴必须写 \"format\": \"d\"，否则 1565 会显示成 \"1,565\"。" }
+        }
+      }
+    },
+
+    {
+      "description": "==================== 左面板：甘特图 ====================",
+      "type": "group",
+      "name": "ganttPanel",
+      "encode": {
+        "enter": {
+          "x": { "signal": "ganttX" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "ganttW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "gx",
+          "format": "%m-%d",
+          "tickCount": { "interval": "week", "step": 2 },
+          "grid": true,
+          "gridOpacity": 0.35,
+          "gridDash": [2, 3],
+          "labelFontSize": 10,
+          "title": "日期（2026 年，刻度 = 每两周）",
+          "titleFontSize": 11
+        },
+        {
+          "orient": "left",
+          "scale": "gy",
+          "domain": false,
+          "ticks": false,
+          "labelPadding": 6,
+          "labelFontSize": 10,
+          "labelLimit": 120
+        }
+      ],
+      "marks": [
+        {
+          "description": "第一层：计划工期条（浅色）",
+          "type": "rect",
+          "from": { "data": "gantt-bars" },
+          "encode": {
+            "enter": {
+              "fill": { "scale": "phase", "field": "phase" },
+              "fillOpacity": { "value": 0.26 },
+              "stroke": { "scale": "phase", "field": "phase" },
+              "strokeWidth": { "value": 1 },
+              "cornerRadius": { "value": 2 },
+              "tooltip": {
+                "signal": "datum.task + '｜' + datum.phase + '｜' + timeFormat(datum.start, '%m-%d') + ' → ' + timeFormat(datum.end, '%m-%d') + '｜进度 ' + format(datum.progress, '.0%')"
+              }
+            },
+            "update": {
+              "x": { "scale": "gx", "field": "start" },
+              "x2": { "scale": "gx", "field": "end" },
+              "y": { "scale": "gy", "field": "task" },
+              "height": { "signal": "bandwidth('gy')" }
+            },
+            "hover": { "fillOpacity": { "value": 0.5 } }
+          }
+        },
+        {
+          "description": "第二层：进度条（深色），宽度 = 计划宽度 × progress，上下各内缩 3px",
+          "type": "rect",
+          "from": { "data": "gantt-bars" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "fill": { "scale": "phase", "field": "phase" },
+              "fillOpacity": { "value": 0.92 },
+              "cornerRadius": { "value": 2 }
+            },
+            "update": {
+              "x": { "scale": "gx", "field": "start" },
+              "x2": {
+                "signal": "scale('gx', datum.start) + (scale('gx', datum.end) - scale('gx', datum.start)) * datum.progress"
+              },
+              "y": { "signal": "scale('gy', datum.task) + 3" },
+              "height": { "signal": "max(bandwidth('gy') - 6, 2)" }
+            }
+          }
+        },
+        {
+          "description": "依赖折线：M x1,y1 → 水平出腿到 xm → 垂直到 y2 → 水平进 x2。四个端点都在 gantt-deps 里算好了，这里只做字符串拼接",
+          "type": "path",
+          "from": { "data": "gantt-deps" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "stroke": { "value": "#8b949e" },
+              "strokeWidth": { "value": 1 },
+              "strokeDash": { "value": [3, 2] },
+              "fill": { "value": null }
+            },
+            "update": {
+              "path": {
+                "signal": "'M' + datum.x1 + ',' + datum.y1 + 'L' + datum.xm + ',' + datum.y1 + 'L' + datum.xm + ',' + datum.y2 + 'L' + datum.x2 + ',' + datum.y2"
+              }
+            }
+          }
+        },
+        {
+          "description": "箭头头部：triangle-right 落在折线终点，指向后继任务的左端",
+          "type": "symbol",
+          "from": { "data": "gantt-deps" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "shape": { "value": "triangle-right" },
+              "size": { "value": 34 },
+              "fill": { "value": "#6e7781" }
+            },
+            "update": {
+              "x": { "field": "x2" },
+              "y": { "field": "y2" }
+            }
+          }
+        },
+        {
+          "description": "里程碑：零工期，用菱形代替矩形条",
+          "type": "symbol",
+          "from": { "data": "gantt-milestones" },
+          "encode": {
+            "enter": {
+              "shape": { "value": "diamond" },
+              "size": { "value": 150 },
+              "fill": { "scale": "phase", "field": "phase" },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 1.5 },
+              "tooltip": {
+                "signal": "'里程碑 ' + datum.task + '｜' + timeFormat(datum.start, '%Y-%m-%d')"
+              }
+            },
+            "update": {
+              "x": { "scale": "gx", "field": "start" },
+              "y": { "signal": "scale('gy', datum.task) + bandwidth('gy') / 2" }
+            }
+          }
+        },
+        {
+          "description": "里程碑日期标在菱形上方（不是右侧），避免最后一个里程碑的文字越出面板",
+          "type": "text",
+          "from": { "data": "gantt-milestones" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": { "value": "center" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#57606a" },
+              "text": { "signal": "timeFormat(datum.start, '%m-%d')" }
+            },
+            "update": {
+              "x": { "signal": "min(scale('gx', datum.start), ganttW - 20)" },
+              "y": { "signal": "scale('gy', datum.task) - 1" }
+            }
+          }
+        },
+        {
+          "description": "进度百分比标在条右侧。用 format(x,'.0%') 而不是直出 datum.progress，否则 0.05 会变成 0.05000000000000001 之类",
+          "type": "text",
+          "from": { "data": "gantt-bars" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": { "value": "left" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#57606a" }
+            },
+            "update": {
+              "x": { "signal": "scale('gx', datum.end) + 4" },
+              "y": { "signal": "scale('gy', datum.task) + bandwidth('gy') / 2" },
+              "text": { "signal": "datum.progress > 0 ? format(datum.progress, '.0%') : ''" }
+            }
+          }
+        },
+        {
+          "description": "今天线：x 由 today signal 决定，拖 todayDay 时竖线连标签一起动",
+          "type": "rule",
+          "encode": {
+            "update": {
+              "x": { "scale": "gx", "signal": "today" },
+              "y": { "value": -6 },
+              "y2": { "signal": "panelH + 4" },
+              "stroke": { "value": "#d1242f" },
+              "strokeWidth": { "value": 1.5 },
+              "strokeDash": { "value": [4, 3] }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "encode": {
+            "update": {
+              "x": { "signal": "clamp(scale('gx', today), 24, ganttW - 24)" },
+              "y": { "value": -8 },
+              "text": { "signal": "todayText" },
+              "align": { "value": "center" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 10 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#d1242f" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "==================== 右面板：历史时间线 ====================",
+      "type": "group",
+      "name": "timelinePanel",
+      "encode": {
+        "enter": {
+          "x": { "signal": "tlX" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "tlW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "ty",
+          "format": "d",
+          "tickCount": 7,
+          "grid": true,
+          "gridOpacity": 0.35,
+          "gridDash": [2, 3],
+          "labelFontSize": 10,
+          "title": "年份（axis.format 写 \"d\"；不写就是 \"1,565\"）",
+          "titleFontSize": 11
+        }
+      ],
+      "marks": [
+        {
+          "description": "每条错行轨道的浅色基线（数据来自 sequence 变换，随 rowCount 增减）",
+          "type": "rule",
+          "from": { "data": "tl-rows" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "value": 0 },
+              "stroke": { "value": "#eaeef2" },
+              "strokeWidth": { "value": 1 }
+            },
+            "update": {
+              "x2": { "signal": "tlW" },
+              "y": { "signal": "tlPitch * (datum.row + 0.5)" }
+            }
+          }
+        },
+        {
+          "description": "在位区间条。宽度用预算好的 x0/x1：George IV 那行 start === end === 1820，不兜底就是零宽度、根本看不见",
+          "type": "rect",
+          "from": { "data": "monarchs-laid" },
+          "encode": {
+            "enter": {
+              "fill": { "scale": "polity", "field": "kind" },
+              "fillOpacity": { "value": 0.85 },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 1.5 },
+              "cornerRadius": { "value": 2 },
+              "tooltip": {
+                "signal": "datum.name + '：' + format(datum.start, 'd') + '–' + format(datum.end, 'd') + '（在位 ' + datum.years + ' 年）' + (datum.commonwealth ? ' · 共和时期' : '')"
+              }
+            },
+            "update": {
+              "x": { "field": "x0" },
+              "x2": { "field": "x1" },
+              "y": { "signal": "datum.yc - tlBarH / 2" },
+              "height": { "signal": "tlBarH" },
+              "strokeDash": { "signal": "datum.commonwealth ? [4, 2] : [1, 0]" }
+            },
+            "hover": { "fillOpacity": { "value": 1 } }
+          }
+        },
+        {
+          "description": "名字：条够宽（inside）就写在条里（白字居中），不够宽就抬到条上方（深字）；贴着面板左右边时改成左/右对齐，保证文字永远不越出面板",
+          "type": "text",
+          "from": { "data": "monarchs-laid" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "fontSize": { "value": 10 },
+              "text": { "field": "name" }
+            },
+            "update": {
+              "x": { "field": "labelX" },
+              "align": { "field": "labelAlign" },
+              "y": { "signal": "datum.inside ? datum.yc : datum.yc - tlBarH / 2 - 3" },
+              "baseline": { "signal": "datum.inside ? 'middle' : 'bottom'" },
+              "fill": { "signal": "datum.inside ? '#ffffff' : '#24292f'" }
+            }
+          }
+        },
+        {
+          "description": "在位起止年标在条下方，只给宽到放得下的条标（阈值 38px），窄条的年份看 tooltip",
+          "type": "text",
+          "from": { "data": "monarchs-laid" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#57606a" }
+            },
+            "update": {
+              "x": { "field": "labelX" },
+              "align": { "field": "labelAlign" },
+              "y": { "signal": "datum.yc + tlBarH / 2 + 3" },
+              "text": { "field": "yearText" }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

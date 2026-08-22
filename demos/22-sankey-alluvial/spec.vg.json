@@ -1,0 +1,385 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "桑基/冲积图：三层能源流量。用 aggregate 求节点总量、window 求层内序号、stack 分别在节点侧与边侧堆叠，再用 path mark 手工拼三次贝塞尔曲线画连接带",
+  "width": 860,
+  "height": 470,
+  "padding": { "left": 92, "top": 8, "right": 104, "bottom": 8 },
+
+  "title": {
+    "text": "能源流向桑基图：一次能源 → 转换环节 → 终端用途（虚构数据）",
+    "subtitle": {
+      "signal": "'单位 PJ（拍焦） · 每层流量合计 ' + format(maxLayerTotal, ',d') + ' PJ · 带子高度 = 流量，悬停高亮并查看明细'"
+    },
+    "anchor": "start",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#6b6b6b",
+    "offset": 6
+  },
+
+  "signals": [
+    {
+      "description": "节点矩形的宽度（像素）。它同时决定层间距 layerStep",
+      "name": "nodeWidth",
+      "value": 16,
+      "bind": { "input": "range", "min": 6, "max": 32, "step": 1 }
+    },
+    {
+      "description": "同一层内相邻节点之间留出的像素间隙。间隙越大，可用于画流量的像素越少",
+      "name": "nodeGap",
+      "value": 14,
+      "bind": { "input": "range", "min": 2, "max": 40, "step": 1 }
+    },
+    {
+      "description": "连接带的填充不透明度：调低看整体骨架，调高看单条流向",
+      "name": "ribbonOpacity",
+      "value": 0.55,
+      "bind": { "input": "range", "min": 0.1, "max": 1, "step": 0.05 }
+    },
+    {
+      "description": "贝塞尔控制点的水平位置（占跨度比例）。0 = 直线，0.5 = 教科书桑基的 S 形",
+      "name": "curvature",
+      "value": 0.5,
+      "bind": { "input": "range", "min": 0, "max": 1, "step": 0.05 }
+    },
+    {
+      "description": "顶部让给列标题的高度，避免列标题压到节点",
+      "name": "headerH",
+      "value": 24
+    },
+    {
+      "description": "最大的单层流量合计。它是 flow 比例尺的 domain 上界",
+      "name": "maxLayerTotal",
+      "update": "length(data('layer_max')) ? data('layer_max')[0].maxTotal : 0"
+    },
+    {
+      "description": "节点数最多的那一层有几个节点，用来预留全部间隙",
+      "name": "maxLayerCount",
+      "update": "length(data('layer_max')) ? data('layer_max')[0].maxCount : 1"
+    },
+    {
+      "name": "layerCount",
+      "update": "length(data('layer_max')) ? data('layer_max')[0].layerCount : 1"
+    },
+    {
+      "description": "相邻两层节点左边缘的水平距离",
+      "name": "layerStep",
+      "update": "(width - nodeWidth) / max(layerCount - 1, 1)"
+    },
+    {
+      "description": "扣掉列标题与全部节点间隙后，真正能拿来表示流量的垂直像素数",
+      "name": "plotH",
+      "update": "max(height - headerH - (maxLayerCount - 1) * nodeGap, 10)"
+    }
+  ],
+
+  "data": [
+    {
+      "description": "边表：每条边一行。source/target 用节点名，value 是流量（PJ）。上下游守恒：每个中间节点的入流之和 = 出流之和",
+      "name": "flows",
+      "values": [
+        { "source": "煤炭",   "target": "电力",     "value": 620 },
+        { "source": "煤炭",   "target": "直接燃烧", "value": 180 },
+        { "source": "石油",   "target": "精炼燃料", "value": 520 },
+        { "source": "石油",   "target": "直接燃烧", "value": 60 },
+        { "source": "天然气", "target": "电力",     "value": 300 },
+        { "source": "天然气", "target": "直接燃烧", "value": 260 },
+        { "source": "核能",   "target": "电力",     "value": 160 },
+        { "source": "可再生", "target": "电力",     "value": 280 },
+        { "source": "可再生", "target": "直接燃烧", "value": 70 },
+
+        { "source": "电力",     "target": "转换损耗", "value": 780 },
+        { "source": "电力",     "target": "工业",     "value": 250 },
+        { "source": "电力",     "target": "建筑",     "value": 260 },
+        { "source": "电力",     "target": "交通",     "value": 70 },
+        { "source": "精炼燃料", "target": "转换损耗", "value": 50 },
+        { "source": "精炼燃料", "target": "工业",     "value": 90 },
+        { "source": "精炼燃料", "target": "交通",     "value": 380 },
+        { "source": "直接燃烧", "target": "转换损耗", "value": 60 },
+        { "source": "直接燃烧", "target": "工业",     "value": 280 },
+        { "source": "直接燃烧", "target": "建筑",     "value": 230 }
+      ]
+    },
+    {
+      "description": "节点表：只声明「在第几层」和「层内自上而下的排序」，高度完全由流量算出来",
+      "name": "node_names",
+      "values": [
+        { "name": "煤炭",     "layer": 0, "order": 0 },
+        { "name": "石油",     "layer": 0, "order": 1 },
+        { "name": "天然气",   "layer": 0, "order": 2 },
+        { "name": "核能",     "layer": 0, "order": 3 },
+        { "name": "可再生",   "layer": 0, "order": 4 },
+
+        { "name": "电力",     "layer": 1, "order": 0 },
+        { "name": "精炼燃料", "layer": 1, "order": 1 },
+        { "name": "直接燃烧", "layer": 1, "order": 2 },
+
+        { "name": "转换损耗", "layer": 2, "order": 0 },
+        { "name": "工业",     "layer": 2, "order": 1 },
+        { "name": "建筑",     "layer": 2, "order": 2 },
+        { "name": "交通",     "layer": 2, "order": 3 }
+      ]
+    },
+    {
+      "description": "每个节点的出流合计",
+      "name": "out_totals",
+      "source": "flows",
+      "transform": [
+        { "type": "aggregate", "groupby": ["source"], "fields": ["value"], "ops": ["sum"], "as": ["outTotal"] }
+      ]
+    },
+    {
+      "description": "每个节点的入流合计",
+      "name": "in_totals",
+      "source": "flows",
+      "transform": [
+        { "type": "aggregate", "groupby": ["target"], "fields": ["value"], "ops": ["sum"], "as": ["inTotal"] }
+      ]
+    },
+    {
+      "description": "节点 + 总量 + 层内序号 + 层内堆叠区间（还是数据单位，不是像素）",
+      "name": "nodes",
+      "source": "node_names",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "out_totals", "key": "source",
+          "fields": ["name"], "values": ["outTotal"], "as": ["outTotal"],
+          "default": 0
+        },
+        {
+          "type": "lookup",
+          "from": "in_totals", "key": "target",
+          "fields": ["name"], "values": ["inTotal"], "as": ["inTotal"],
+          "default": 0
+        },
+        { "type": "formula", "as": "total", "expr": "max(datum.inTotal, datum.outTotal)" },
+        {
+          "type": "window",
+          "groupby": ["layer"],
+          "sort": { "field": "order" },
+          "ops": ["rank"], "as": ["slot"]
+        },
+        {
+          "type": "stack",
+          "groupby": ["layer"],
+          "field": "total",
+          "sort": { "field": "order" },
+          "as": ["v0", "v1"]
+        }
+      ]
+    },
+    {
+      "description": "每层的流量合计与节点个数，用于（1）flow 比例尺 domain（2）把每层垂直居中",
+      "name": "layer_stats",
+      "source": "nodes",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["layer"],
+          "fields": ["total", null],
+          "ops": ["sum", "count"],
+          "as": ["layerTotal", "nodeCount"]
+        }
+      ]
+    },
+    {
+      "description": "全局极值：最大层流量、最大层节点数、层数。单行数据集，供 signal 读取",
+      "name": "layer_max",
+      "source": "layer_stats",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": ["layerTotal", "nodeCount", null],
+          "ops": ["max", "max", "count"],
+          "as": ["maxTotal", "maxCount", "layerCount"]
+        }
+      ]
+    },
+    {
+      "description": "节点的像素几何：nx/ny0/ny1。层内堆叠值经 flow 比例尺换成像素，再叠上 (slot-1) 个间隙与整层居中偏移",
+      "name": "node_geom",
+      "source": "nodes",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "layer_stats", "key": "layer",
+          "fields": ["layer"], "values": ["layerTotal", "nodeCount"], "as": ["layerTotal", "nodeCount"],
+          "default": 0
+        },
+        { "type": "formula", "as": "nx", "expr": "datum.layer * layerStep" },
+        { "type": "formula", "as": "layerH", "expr": "scale('flow', datum.layerTotal) + (datum.nodeCount - 1) * nodeGap" },
+        { "type": "formula", "as": "yTop", "expr": "headerH + (height - headerH - datum.layerH) / 2" },
+        { "type": "formula", "as": "ny0", "expr": "datum.yTop + scale('flow', datum.v0) + (datum.slot - 1) * nodeGap" },
+        { "type": "formula", "as": "ny1", "expr": "datum.yTop + scale('flow', datum.v1) + (datum.slot - 1) * nodeGap" }
+      ]
+    },
+    {
+      "description": "连接带：先把两端节点的几何 lookup 进来，再在源侧按 target 顺序、目标侧按 source 顺序各堆叠一次，最后换算成四条边界的 y 像素",
+      "name": "links",
+      "source": "flows",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "node_geom", "key": "name",
+          "fields": ["source"],
+          "values": ["nx", "ny0", "layer", "order", "total"],
+          "as": ["srcX", "srcY0", "srcLayer", "srcOrder", "srcTotal"]
+        },
+        {
+          "type": "lookup",
+          "from": "node_geom", "key": "name",
+          "fields": ["target"],
+          "values": ["nx", "ny0", "layer", "order", "total"],
+          "as": ["tgtX", "tgtY0", "tgtLayer", "tgtOrder", "tgtTotal"]
+        },
+        {
+          "type": "stack",
+          "groupby": ["source"],
+          "field": "value",
+          "sort": { "field": ["tgtLayer", "tgtOrder"] },
+          "as": ["so0", "so1"]
+        },
+        {
+          "type": "stack",
+          "groupby": ["target"],
+          "field": "value",
+          "sort": { "field": ["srcLayer", "srcOrder"] },
+          "as": ["ti0", "ti1"]
+        },
+        { "type": "formula", "as": "x0", "expr": "datum.srcX + nodeWidth" },
+        { "type": "formula", "as": "x1", "expr": "datum.tgtX" },
+        { "type": "formula", "as": "sy0", "expr": "datum.srcY0 + scale('flow', datum.so0)" },
+        { "type": "formula", "as": "sy1", "expr": "datum.srcY0 + scale('flow', datum.so1)" },
+        { "type": "formula", "as": "ty0", "expr": "datum.tgtY0 + scale('flow', datum.ti0)" },
+        { "type": "formula", "as": "ty1", "expr": "datum.tgtY0 + scale('flow', datum.ti1)" }
+      ]
+    },
+    {
+      "description": "列标题",
+      "name": "columns",
+      "values": [
+        { "layer": 0, "label": "一次能源" },
+        { "layer": 1, "label": "转换环节" },
+        { "layer": 2, "label": "终端用途" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "flow",
+      "type": "linear",
+      "domain": { "data": "layer_stats", "field": "layerTotal" },
+      "zero": true,
+      "nice": false,
+      "range": [0, { "signal": "plotH" }]
+    },
+    {
+      "name": "nodeColor",
+      "type": "ordinal",
+      "domain": { "data": "node_names", "field": "name" },
+      "range": { "scheme": "tableau20" }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "连接带：path mark 的 path 通道吃一段 SVG path 字符串。这里手工拼 M-C-L-C-Z：上边界一条三次贝塞尔，右端竖线，下边界反向一条贝塞尔，闭合成带子",
+      "type": "path",
+      "name": "ribbons",
+      "from": { "data": "links" },
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 0 },
+          "fill": { "scale": "nodeColor", "field": "source" },
+          "tooltip": {
+            "signal": "{'流向': datum.source + ' → ' + datum.target, '流量': format(datum.value, ',d') + ' PJ', '占上游节点': format(datum.value / datum.srcTotal, '.1%'), '占下游节点': format(datum.value / datum.tgtTotal, '.1%')}"
+          }
+        },
+        "update": {
+          "path": {
+            "signal": "'M' + format(datum.x0, '.1f') + ',' + format(datum.sy0, '.1f') + 'C' + format(datum.x0 + (datum.x1 - datum.x0) * curvature, '.1f') + ',' + format(datum.sy0, '.1f') + ' ' + format(datum.x1 - (datum.x1 - datum.x0) * curvature, '.1f') + ',' + format(datum.ty0, '.1f') + ' ' + format(datum.x1, '.1f') + ',' + format(datum.ty0, '.1f') + 'L' + format(datum.x1, '.1f') + ',' + format(datum.ty1, '.1f') + 'C' + format(datum.x1 - (datum.x1 - datum.x0) * curvature, '.1f') + ',' + format(datum.ty1, '.1f') + ' ' + format(datum.x0 + (datum.x1 - datum.x0) * curvature, '.1f') + ',' + format(datum.sy1, '.1f') + ' ' + format(datum.x0, '.1f') + ',' + format(datum.sy1, '.1f') + 'Z'"
+          },
+          "fillOpacity": { "signal": "ribbonOpacity" },
+          "stroke": { "value": null },
+          "zindex": { "value": 0 }
+        },
+        "hover": {
+          "fillOpacity": { "value": 0.95 },
+          "stroke": { "value": "#333333" },
+          "strokeWidth": { "value": 1 },
+          "zindex": { "value": 1 }
+        }
+      }
+    },
+    {
+      "description": "节点矩形：高度 = 流经该节点的流量之和",
+      "type": "rect",
+      "name": "node_bars",
+      "from": { "data": "node_geom" },
+      "encode": {
+        "enter": {
+          "fill": { "scale": "nodeColor", "field": "name" },
+          "tooltip": {
+            "signal": "{'节点': datum.name, '入流': format(datum.inTotal, ',d') + ' PJ', '出流': format(datum.outTotal, ',d') + ' PJ', '占本层': format(datum.total / datum.layerTotal, '.1%')}"
+          }
+        },
+        "update": {
+          "x": { "field": "nx" },
+          "width": { "signal": "nodeWidth" },
+          "y": { "field": "ny0" },
+          "y2": { "field": "ny1" },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 1 }
+        },
+        "hover": {
+          "stroke": { "value": "#222222" },
+          "strokeWidth": { "value": 2 }
+        }
+      }
+    },
+    {
+      "description": "节点标签：第 0 层写在节点左侧，其余层写在右侧，避免和画布外沿冲突",
+      "type": "text",
+      "name": "node_labels",
+      "from": { "data": "node_geom" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "fontSize": { "value": 11 },
+          "fill": { "value": "#2b2b2b" },
+          "baseline": { "value": "middle" }
+        },
+        "update": {
+          "x": { "signal": "datum.layer === 0 ? datum.nx - 6 : datum.nx + nodeWidth + 6" },
+          "y": { "signal": "(datum.ny0 + datum.ny1) / 2" },
+          "align": { "signal": "datum.layer === 0 ? 'right' : 'left'" },
+          "text": { "signal": "datum.name + ' · ' + format(datum.total, ',d')" }
+        }
+      }
+    },
+    {
+      "description": "列标题：横坐标是「第几层」，没有连续轴，所以用 text mark 手工放三个表头",
+      "type": "text",
+      "name": "column_titles",
+      "from": { "data": "columns" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#555555" },
+          "align": { "value": "center" },
+          "baseline": { "value": "bottom" }
+        },
+        "update": {
+          "x": { "signal": "datum.layer * layerStep + nodeWidth / 2" },
+          "y": { "signal": "headerH - 8" },
+          "text": { "field": "label" }
+        }
+      }
+    }
+  ]
+}

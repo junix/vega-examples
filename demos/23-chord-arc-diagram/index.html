@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>23 弦图与弧线邻接图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '23-chord-arc-diagram',
+  group: 'F. 稀有与复杂图形',
+  title: '23 · 弦图与弧线邻接图：同一张网络的两种手工几何',
+  concepts: [
+    'transform: fold / pivot',
+    'transform: window (row_number / 分区累计和)',
+    'transform: lookup (default:null 当内连接)',
+    'transform: pie + 手工 padAngle',
+    'mark: arc',
+    'mark: path（二次贝塞尔 Q / 椭圆弧 A）',
+    'group mark 并排双面板',
+    'legend: orient none + legendX/legendY'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      同一份《悲惨世界》共现网络：左边是<strong>弦图</strong>（角色占圆周上一段弧，弧长 ∝ 共现强度；
+      圆内每条弦是一条边），右边是<strong>弧线邻接图</strong>（角色等距排成一行，边画成上凸的半椭圆）。
+      把鼠标悬停到任一面板的节点上，<strong>两个面板会同时</strong>只留下与它相连的边。
+      右侧滑杆可以拖 <code>topN</code>（取多少个角色）、<code>padAngle</code>（弧段间隙）、
+      <code>chordBundle</code>（弦的控制点从圆心滑到弦中点，0 最弯、1 变直线）、
+      <code>arcRatio</code>（半椭圆的纵横比）。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

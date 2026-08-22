@@ -10,8 +10,8 @@
 ## 运行
 
 ```sh
-../../serve.sh        # 在 vega 仓库根启动静态服务器
-# 浏览器打开 http://localhost:8000/vega-examples/demos/14-force-directed-graph/
+../../serve.sh        # 在本项目根目录启动静态服务器
+# 浏览器打开 http://localhost:8000/demos/14-force-directed-graph/
 ```
 
 ## spec 逐段讲解
@@ -19,7 +19,7 @@
 | 段落 | 作用 | 本例要点 |
 | --- | --- | --- |
 | `signals.cx / cy` | 画布中心点 | 供 center 力引用，改 `width/height` 自动跟随 |
-| `signals.nodeRadius / nodeCharge / linkDistance` | 三个绑定滑杆的布局参数 | `bind` 生成输入控件；改动会脉冲 force 变换重新布局 |
+| `signals.nodeRadius / nodeCharge / linkDistance` | 三个绑定滑杆的布局参数 | `bind` 生成输入控件；改动会脉冲 force 变换重新布局。**一个滑杆管一种力**：`nodeRadius` → collide 半径（并决定 symbol 画多大）、`nodeCharge` → nbody 强度、`linkDistance` → link 目标边长。第四种力 center 没有滑杆，它固定由 `cx/cy` 决定 |
 | `signals.dragged` | 当前被按住的节点 | `symbol:mousedown` 时 `item()` 取到光标下的场景 item；抬起后**故意不清空**，释放触发器还要靠它定位节点 |
 | `signals.fix` | 拖拽中的光标坐标 | 三个事件处理器构成状态机：`mousedown → xy()` 立即钉住；`[mousedown, mouseup] > mousemove` 是 between 事件流，只捕获按下到抬起之间的移动；`mouseup → false` 结束拖拽 |
 | `signals.restart` | 仿真重加热开关 | 绑到 force 变换的 `restart` 参数；`fix` 每次变化都置 `true`，仿真 alpha 重置后继续跳动 |
@@ -39,6 +39,13 @@
   「节点」其实是 77 个 symbol 场景 item——d3-force 直接把 `x/y/vx/vy` 写到 item 上，
   所以 encode 里不需要（也不应该）再写 `x/y` 绑定。同理，`link` 力会把 link 数据的
   `source/target` 下标替换成场景 item 引用，`linkpath` 才能读到 `datum.source.x`。
+- **`size` 是直径的平方，不是半径**：Vega 内建 `circle` 形状的画法是 `r = sqrt(size) / 2`
+  （见 `assets/vega.js` 里 `builtins.circle`），也就是把 `size` 当作**外接正方形的面积**。
+  想让节点的视觉半径正好等于 collide 力的碰撞半径 `nodeRadius`，`size` 必须写成直径的平方
+  `pow(2 * nodeRadius, 2)`；若误写成 `2 * nodeRadius * nodeRadius`，画出来的半径只有
+  `sqrt(2)/2 ≈ 0.707` 倍，碰撞半径比看到的圆大 41%，节点之间会留下永远合不上的空隙。
+  实测（`nodeRadius = 6`，仿真收敛后）：`size = 144` → SVG 里 `<path d="M6,0A6,6…">`，
+  最近的两个节点中心距恰好 `12.00 = 2 × 6`，两圆相切而不重叠。
 - **`fx` / `fy` 是 d3-force 的固定坐标**：设置了 `fx/fy` 的节点不参与力学运动，被钉在该位置；
   置 `null` 即恢复自由。这是拖拽固定的标准做法。
 - **trigger 与 modify**：mark 的 `on` 块在信号/事件脉冲时执行 `modify(数据集名, 目标item, 字段值)`。
@@ -55,7 +62,7 @@
 ## 试一试（改练）
 
 1. 把 `nodeCharge` 滑到正值（如 `10`）：排斥变吸引，整图缩成一团；滑到 `-100` 看节点炸开。
-2. 删掉 `collide` 那一行力，观察节点互相重叠；再把 `nodeRadius` 拉大看 collide 的作用。
+2. 删掉 `collide` 那一行力，观察节点互相重叠；再把 `nodeRadius` 拉大看 collide 的作用（`nodeRadius` 同时放大圆和碰撞半径，两者始终相切）。把 `size` 改回 `2 * nodeRadius * nodeRadius`，会看到圆缩小但节点间距不变——这就是上面说的 41% 空隙。
 3. 把 `linkpath` 的 `"shape": "line"` 改成 `"arc"` 或 `"curve"`，看边的形态变化
    （可选值：`line / arc / curve / diagonal / orthogonal`）。
 4. 把 `restart` 信号的 `update` 改成 `"false"`，再拖节点——节点被钉住但周围节点不再让开，

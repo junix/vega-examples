@@ -8,15 +8,15 @@
 ## 运行
 
 ```sh
-../../serve.sh        # 在 vega 仓库根启动静态服务器
-# 浏览器打开 http://localhost:8000/vega-examples/demos/03-scatter-regression/
+../../serve.sh        # 在本项目根目录启动静态服务器
+# 浏览器打开 http://localhost:8000/demos/03-scatter-regression/
 ```
 
 ## spec 逐段讲解
 
 | 段落 | 作用 | 本例要点 |
 | --- | --- | --- |
-| `data[0]` cars | 加载 JSON 并清洗 | cars.json 有 6 条记录 `Horsepower` 为 null；`filter` 变换用表达式 `datum.Horsepower != null && ...` 滤除。JSON 数组无需声明 `format`（对比 demo 02 的 CSV） |
+| `data[0]` cars | 加载 JSON 并清洗 | cars.json 共 406 条，其中 6 条 `Horsepower` 为 null、8 条 `Miles_per_Gallon` 为 null（两者互不重叠）；`filter` 变换用表达式 `datum.Horsepower != null && datum.Miles_per_Gallon != null` 一共滤掉 14 条，剩 392 条。JSON 数组无需声明 `format`（对比 demo 02 的 CSV） |
 | `data[1]` trendLinear | 派生：分组线性回归 | `regression` 变换按 `Origin` 分三组拟合 `v = a + b·u`；不写 `extent`，缺省行为是每条拟合线只覆盖本组数据的 x 范围 |
 | `data[2]` trendQuad | 派生：分组二次拟合 | `method: "poly", order: 2` 拟合抛物线；同样不写 extent——高次曲线外推很容易飞出图表（见“试一试”3） |
 | `scales.x / y` | 数值 → 位置 | 散点图两轴都是 `linear`；`"zero": false` 让 domain 紧贴数据范围（散点图惯例，与柱状图必须含零不同） |
@@ -51,7 +51,7 @@
 4. 在 `trendLinear` 的 regression 里加 `"params": true`（此时 `as` 不起作用，可删），
    刷新后打开浏览器控制台执行 `view.data('trendLinear')`，查看每组的 `coef` 与 `rSquared`。
    （`renderDemo` 返回的 Promise 里有 view；也可在 main.js 里 `.then(view => window.view = view)`。）
-5. 删掉 `filter` 变换：null 马力记录会产生 NaN 坐标并在控制台报警告，回归结果也会被污染。
+5. 删掉 `filter` 变换：null 马力或 null 油耗记录（共 14 条）会产生 NaN 坐标并在控制台报警告，回归结果也会被污染。
 
 ## 参考
 

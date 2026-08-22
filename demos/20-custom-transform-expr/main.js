@@ -67,8 +67,13 @@
         var w = self._win, sum = 0, i;
         w.push(+field(t));
         if (w.length > n) w.shift();
+        /* 窗口还没填满就写 sum / w.length，等于把「前 k 期均线」冒充成「n 期均线」——
+         * 最左端第 1 个点会等于原始价本身，红线起点与灰线完全重合，读者无从分辨。
+         * 所以未填满时写 null（与 pandas rolling(n).mean() 的 NaN 同义），
+         * 由红线的 defined 通道把这一段断开、干脆不画。 */
+        if (w.length < n) { t[as] = null; return; }
         for (i = 0; i < w.length; i++) sum += w[i];
-        t[as] = sum / w.length;
+        t[as] = sum / n;
       }
     }
   });
@@ -107,17 +112,27 @@
         window: { signal: 'maWindow' }
       });
 
-      /* 3c. 注入依赖扩展的图形：滑动平均线 + 图例文字 + pctChange 注释 */
+      /* 3c. 注入依赖扩展的图形：滑动平均线 + 图例文字 + pctChange 注释
+       *
+       * 注意 enter / update 的分工：enter 每个图元只跑一次，
+       * 所以凡是会随 maWindow 变化的属性（ma 字段、defined、图例文字）
+       * 都必须写在 update 里 —— 写进 enter 的话，reflow 只会重跑 update，
+       * 数据算对了但画面纹丝不动，滑块看上去毫无反应。 */
       spec.marks.push(
         {
           type: 'line',
           from: { data: 'msft' },
           encode: {
             enter: {
-              x: { scale: 'x', field: 'date' },
-              y: { scale: 'y', field: 'ma' },   // ma 是 MovingAverage 写出的字段
               stroke: { value: '#e45756' },
               strokeWidth: { value: 2 }
+            },
+            update: {
+              x: { scale: 'x', field: 'date' },
+              y: { scale: 'y', field: 'ma' },   // ma 是 MovingAverage 写出的字段
+              /* 窗口未填满的前 n-1 个点 ma 为 null；defined:false 把线断开，
+               * 红线从「第一个真正的 n 期均值」才开始画。 */
+              defined: { signal: 'isValid(datum.ma)' }
             }
           }
         },
@@ -128,8 +143,11 @@
               x: { signal: 'width - 8' }, y: { value: 6 },
               align: { value: 'right' }, baseline: { value: 'top' },
               fontSize: { value: 12 },
-              text: { signal: "'灰线 原始收盘价　红线 ' + maWindow + ' 日滑动平均'" },
               fill: { value: '#57606a' }
+            },
+            update: {
+              /* stocks.csv 是月频数据（每月 1 条），所以窗口单位是「月」而不是「日」 */
+              text: { signal: "'灰线 原始收盘价　红线 ' + maWindow + ' 个月滑动平均'" }
             }
           }
         },
@@ -142,9 +160,11 @@
               fontSize: { value: 13 }, fill: { value: '#24292f' }
             },
             update: {
+              /* latest / previous 是相邻两个月，pctChange 算的是月环比 */
               text: {
-                signal: "'MSFT 最新收盘 $' + format(latest.price, '.2f')"
-                      + " + '（较前一交易日 ' + format(pctChange(latest.price, previous.price), '+.1f') + '%）'"
+                signal: "'MSFT 最新收盘（' + timeFormat(latest.date, '%Y-%m') + '）$'"
+                      + " + format(latest.price, '.2f')"
+                      + " + '（较上月 ' + format(pctChange(latest.price, previous.price), '+.1f') + '%）'"
               }
             }
           }
@@ -164,6 +184,8 @@
 
       return view.runAsync().then(function () {
         cell.textContent = JSON.stringify(view.signal('maWindow'));
+        /* 手工构造的 View 自己接入页面顶部的共享导出工具栏 */
+        registerDemoView(view, 'msft');
       });
     })
     .catch(function (err) { showDemoError(err); });

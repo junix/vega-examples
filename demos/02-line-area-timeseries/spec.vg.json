@@ -19,13 +19,28 @@
     {
       "name": "total",
       "source": "stocks",
+      "comment": "aggregate 只对每个日期实际存在的行求和：GOOG 2004-08 才上市，不过滤的话合计会在那个月凭空跳升 63%（158.66 → 258.40），把成分变化画成行情。所以同时算 count，再 filter 只留五只齐备的 68 个日期。",
       "transform": [
         {
           "type": "aggregate",
           "groupby": ["date"],
-          "ops": ["sum"],
-          "fields": ["price"],
-          "as": ["total_price"]
+          "ops": ["sum", "count"],
+          "fields": ["price", null],
+          "as": ["total_price", "n"]
+        },
+        { "type": "filter", "expr": "datum.n === 5" }
+      ]
+    },
+    {
+      "name": "gate",
+      "source": "total",
+      "comment": "面积起点（五只齐备的第一个日期），用来放一条注记 —— 从数据里算出来，删掉上面的 filter 时注记会自动跟着走。",
+      "transform": [
+        {
+          "type": "aggregate",
+          "ops": ["min"],
+          "fields": ["date"],
+          "as": ["start"]
         }
       ]
     },
@@ -43,7 +58,7 @@
         {
           "type": "formula",
           "as": "dy",
-          "expr": "datum.symbol === 'IBM' ? -8 : datum.symbol === 'AMZN' ? 8 : 0"
+          "expr": "datum.symbol === 'AMZN' ? -8 : datum.symbol === 'IBM' ? 8 : 0"
         }
       ]
     }
@@ -137,6 +152,35 @@
           "fill": { "scale": "color", "field": "symbol" },
           "baseline": { "value": "middle" },
           "fontWeight": { "value": "bold" }
+        }
+      }
+    },
+    {
+      "type": "rule",
+      "from": { "data": "gate" },
+      "comment": "面积左端的竖向注记线：标出合计口径从 4 只变成 5 只的那个月。",
+      "encode": {
+        "enter": {
+          "x": { "scale": "x", "field": "start" },
+          "y": { "value": 0 },
+          "y2": { "signal": "height" },
+          "stroke": { "value": "#888888" },
+          "strokeDash": { "value": [3, 3] }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": { "data": "gate" },
+      "comment": "注记文字：让“面积为什么从中间才开始”写在图上，而不是只写在 README 里。",
+      "encode": {
+        "enter": {
+          "x": { "scale": "x", "field": "start", "offset": 4 },
+          "y": { "value": 4 },
+          "text": { "value": "← GOOG 2004-08 才上市，此前不足五只，合计不画" },
+          "fill": { "value": "#666666" },
+          "fontSize": { "value": 10 },
+          "baseline": { "value": "top" }
         }
       }
     }

@@ -28,8 +28,10 @@ a:hover { text-decoration: underline; }
 }
 .demo-header .links { margin-top: 8px; font-size: 13px; display: flex; gap: 14px; }
 
+/* F 组的图动辄 900~1300px 宽，版心要放得下；窄屏时图表区自己横向滚动，
+   而不是溢出去被右侧 signal 面板盖住 */
 .demo-main {
-  max-width: 1080px;
+  max-width: 1560px;
   margin: 20px auto;
   padding: 0 24px;
   display: flex;
@@ -44,6 +46,7 @@ a:hover { text-decoration: underline; }
   padding: 16px;
   flex: 1 1 auto;
   min-width: 0;
+  overflow-x: auto;
 }
 
 .demo-notes {
@@ -108,7 +111,7 @@ a:hover { text-decoration: underline; }
 }
 
 /* gallery 首页 */
-.gallery-main { max-width: 1080px; margin: 24px auto; padding: 0 24px; }
+.gallery-main { max-width: 1560px; margin: 24px auto; padding: 0 24px; }
 .gallery-group h2 { font-size: 17px; border-bottom: 1px solid #d8dee4; padding-bottom: 6px; margin-top: 28px; }
 .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 .gallery-card {
@@ -123,3 +126,37 @@ a:hover { text-decoration: underline; }
 .gallery-card .t { font-weight: 600; margin-bottom: 6px; }
 .gallery-card .tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .gallery-card .tag { font-size: 11px; background: #eaeef2; color: #57606a; border-radius: 8px; padding: 1px 8px; }
+
+/* 导出工具栏：每个 demo 页面顶部一条，由 assets/demo.js 自动插入 */
+.demo-export {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #f6f8fa;
+  font-size: 13px;
+}
+.demo-export-label { color: #57606a; }
+.demo-export button {
+  font-size: 13px;
+  padding: 3px 14px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+.demo-export button:hover { background: #eaeef2; }
+.demo-export select { font-size: 12px; padding: 2px 4px; border: 1px solid #d0d7de; border-radius: 5px; background: #fff; }
+.demo-export-opt { display: inline-flex; align-items: center; gap: 4px; color: #57606a; }
+.demo-export-status {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #1a7f37;
+  margin-left: auto;
+}
+.demo-export-status.is-error { color: #cf222e; }

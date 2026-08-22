@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>22 桑基图 / 冲积图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '22-sankey-alluvial',
+  group: 'F. 稀有与复杂图形',
+  title: '22 · 桑基图 / 冲积图：多级流量分配',
+  concepts: ['transform: aggregate', 'transform: lookup', 'transform: window(rank)', 'transform: stack ×3', 'mark: path', '手工三次贝塞尔 path 字符串', 'signal 驱动几何']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      悬停任意一条连接带看流量明细（含占上下游节点的百分比）。右侧四个滑块分别控制
+      <code>nodeWidth</code>（节点宽）、<code>nodeGap</code>（层内间隙）、
+      <code>ribbonOpacity</code>（带子不透明度）和 <code>curvature</code>（贝塞尔控制点位置，
+      拖到 0 会退化成直线梯形带）。节点高度、带子宽度、层间距全部由 spec 里的变换算出，
+      没有任何手写布局代码。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

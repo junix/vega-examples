@@ -20,6 +20,10 @@
       "name": "aspectRatio", "value": 1.6,
       "bind": { "input": "range", "min": 1, "max": 4, "step": 0.1 }
     },
+    {
+      "description": "treemap 标签字号；标签过滤阈值也按它换算，避免两处各写一份数字而走样",
+      "name": "labelFont", "value": 10
+    },
     { "name": "tmWidth", "update": "width / 2 - 20" },
     { "name": "tmHeight", "update": "height - 30" },
     { "name": "sunRadius", "update": "min(tmHeight, width - tmWidth - 40) / 2" },
@@ -54,13 +58,13 @@
       ]
     },
     {
-      "description": "只为面积足够大的叶子生成标签，控制标签密度",
+      "description": "只为「装得下自己名字」的叶子生成标签。表达式语言里没有测字宽的函数，用 length(name) * 字号 * 0.8 当宽度上界 —— 0.8 就是 Vega 自己无 canvas 时的估算常数，真实测量必然更窄（本数据集实测最宽 0.585 * 字号 / 字符）",
       "name": "treemap-labels",
       "source": "tree-treemap",
       "transform": [
         {
           "type": "filter",
-          "expr": "!datum.children && datum.x1 - datum.x0 > 40 && datum.y1 - datum.y0 > 14"
+          "expr": "!datum.children && datum.y1 - datum.y0 > labelFont + 4 && datum.x1 - datum.x0 > length(datum.name) * labelFont * 0.8 + 4"
         }
       ]
     },
@@ -98,7 +102,6 @@
 
   "scales": [
     {
-      "description": "两个面板共享的深度配色：domain 按数据出现顺序推断为 [0,1,2,3,4]（flare 共五级）",
       "name": "depthColor",
       "type": "ordinal",
       "domain": { "data": "tree-treemap", "field": "depth" },
@@ -126,6 +129,7 @@
       }
     },
     {
+      "description": "Treemap 标签：limit 是硬保证 —— 上游过滤只是估算，limit 让文字宽度真的不超过所属矩形（超出部分截断并加省略号）",
       "type": "text",
       "from": { "data": "treemap-labels" },
       "interactive": false,
@@ -134,12 +138,13 @@
           "text": { "field": "name" },
           "align": { "value": "center" },
           "baseline": { "value": "middle" },
-          "fill": { "value": "#222222" },
-          "fontSize": { "value": 10 }
+          "fill": { "value": "#222222" }
         },
         "update": {
           "x": { "signal": "0.5 * (datum.x0 + datum.x1)" },
-          "y": { "signal": "0.5 * (datum.y0 + datum.y1)" }
+          "y": { "signal": "0.5 * (datum.y0 + datum.y1)" },
+          "fontSize": { "signal": "labelFont" },
+          "limit": { "signal": "datum.x1 - datum.x0 - 4" }
         }
       }
     },

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>24 玫瑰图与径向堆叠柱 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '24-radial-rose-stack',
+  group: 'F. 稀有与复杂图形',
+  title: '24 · 南丁格尔玫瑰图与径向堆叠柱：极坐标下的 fold + stack',
+  concepts: [
+    'transform: fold', 'transform: stack', 'transform: sequence', 'transform: window',
+    'scale: sqrt vs linear', 'scale: band（角度域 0~2π）',
+    'mark: arc（startAngle / innerRadius）', 'mark: text（极坐标 radius / theta）',
+    'group mark 双面板', 'data() 读极值到 signal'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      把右侧 <code>radiusMode</code> 从 <code>sqrt</code> 切到 <code>linear</code>，看左边玫瑰图的外圈怎样被
+      「吹大」——这就是玫瑰图必须用面积（半径 ∝ √人数）而非半径编码数值的原因。
+      再拖 <code>barPad</code> / <code>hole</code> / <code>ringStep</code> 调右图的角度留白、中心留白和刻度环密度。
+      悬停任意扇形看该月该死因的具体人数。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

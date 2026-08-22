@@ -7,7 +7,7 @@
 
   "title": {
     "text": "每个 Origin 功率重量比 Top-3 车型",
-    "subtitle": "power_ratio = Horsepower ÷ Weight_in_lbs · 组下方脚注为该 Origin 全体车型均值（旁路 aggregate）",
+    "subtitle": "power_ratio = Horsepower ÷ Weight_in_lbs · 三块面板共用 x 量纲 · 脚注为该 Origin 全体均值（旁路 aggregate）",
     "fontSize": 14,
     "subtitleFontSize": 11,
     "subtitleColor": "#666666"
@@ -113,7 +113,7 @@
         {
           "name": "x",
           "type": "linear",
-          "domain": { "data": "cells", "field": "power_ratio" },
+          "domain": { "data": "top3", "field": "power_ratio" },
           "range": [0, { "signal": "cellWidth" }],
           "nice": true,
           "zero": true
@@ -141,6 +141,9 @@
               "y": { "scale": "y", "field": "rank" },
               "height": { "scale": "y", "band": 0.62 },
               "fill": { "scale": "color", "field": "Origin" }
+            },
+            "update": {
+              "fillOpacity": { "value": 1 }
             },
             "hover": {
               "fillOpacity": { "value": 0.7 }
@@ -200,7 +203,11 @@
       "from": { "data": "origin_avg" },
       "encode": {
         "enter": {
-          "x": { "scale": "gpos", "field": "Origin", "band": 0.5 },
+          "x": {
+            "scale": "gpos",
+            "field": "Origin",
+            "offset": { "signal": "cellWidth / 2" }
+          },
           "y": { "value": 178 },
           "align": { "value": "center" },
           "baseline": { "value": "top" },

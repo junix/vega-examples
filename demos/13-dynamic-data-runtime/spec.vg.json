@@ -26,9 +26,9 @@
       "transform": [
         {
           "type": "aggregate",
-          "fields": [ "t", "v", "v" ],
-          "ops": [ "max", "min", "max" ],
-          "as": [ "maxT", "minV", "maxV" ]
+          "fields": [ "t", "t", "v", "v" ],
+          "ops": [ "min", "max", "min", "max" ],
+          "as": [ "minT", "maxT", "minV", "maxV" ]
         }
       ]
     }
@@ -39,10 +39,11 @@
       "name": "x",
       "type": "linear",
       "domain": {
-        "signal": "data('stats').length ? [data('stats')[0].maxT - window + 1, data('stats')[0].maxT] : [0, window - 1]"
+        "signal": "data('stats').length ? [max(data('stats')[0].minT, data('stats')[0].maxT - window + 1), data('stats')[0].maxT] : [0, window - 1]"
       },
       "range": "width",
-      "zero": false
+      "zero": false,
+      "padding": 6
     },
     {
       "name": "y",
@@ -57,7 +58,7 @@
   ],
 
   "axes": [
-    { "orient": "bottom", "scale": "x", "title": "采样序号 t", "format": "d", "tickCount": 10 },
+    { "orient": "bottom", "scale": "x", "title": "采样序号 t", "format": "d", "tickMinStep": 1, "tickCount": 10 },
     { "orient": "left", "scale": "y", "title": "随机游走值 v", "grid": true, "gridOpacity": 0.3 }
   ],
 

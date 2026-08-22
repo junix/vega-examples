@@ -1,0 +1,417 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "两种等值线来源的对照：左侧对规则高程网格直接 isocontour（显式 thresholds），右侧先 kde2d 求二维核密度网格再 isocontour（自动 levels），并叠加原始散点",
+  "width": 794,
+  "height": 360,
+  "padding": 10,
+  "autosize": "pad",
+
+  "title": {
+    "text": "isocontour：从「规则网格」与「二维核密度网格」两条路径提取等值线",
+    "subtitle": "isocontour 的输入不是普通数据行，而是 {values, width, height} 栅格对象；输出是每条阈值一行 GeoJSON MultiPolygon",
+    "anchor": "start",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#666",
+    "offset": 6
+  },
+
+  "signals": [
+    {
+      "description": "左图填色等值带的阈值步长（米）。thresholds 显式给出时，levels/nice/zero/resolve 全部被忽略",
+      "name": "bandStep", "value": 5,
+      "bind": { "input": "select", "options": [5, 10, 20] }
+    },
+    {
+      "description": "左图白色等高线的阈值步长（米），刻意比填色带粗一档，便于读高程",
+      "name": "lineStep", "value": 20,
+      "bind": { "input": "select", "options": [10, 20, 40] }
+    },
+    {
+      "description": "isocontour 的 smooth：true 用线性插值把折线磨平，false 保留 marching-squares 的锯齿",
+      "name": "smoothContours", "value": true,
+      "bind": { "input": "checkbox" }
+    },
+    {
+      "description": "kde2d 核带宽（像素）。越大越平滑，越小越贴合个别样本",
+      "name": "bandwidth", "value": 14,
+      "bind": { "input": "range", "min": 4, "max": 40, "step": 1 }
+    },
+    {
+      "description": "右图 isocontour 的 levels：想要的等值线条数（由 quantize 自动挑阈值）",
+      "name": "levels", "value": 6,
+      "bind": { "input": "range", "min": 2, "max": 12, "step": 1 }
+    },
+    {
+      "description": "kde2d 的 cellSize：栅格粒度，1 表示输出网格与 size 逐像素对应，4 表示每轴降采样 4 倍",
+      "name": "cellSize", "value": 4,
+      "bind": { "input": "select", "options": [1, 2, 4] }
+    },
+    {
+      "description": "是否显示右图的原始散点（关掉可单看密度等值线）",
+      "name": "showPoints", "value": true,
+      "bind": { "input": "checkbox" }
+    },
+
+    { "description": "以下是纯布局信号：两个面板的尺寸与左上角坐标，手工摆位而非 facet", "name": "volW", "value": 348 },
+    { "name": "volH", "value": 244 },
+    { "name": "penW", "value": 300 },
+    { "name": "penH", "value": 244 },
+    { "name": "volX", "value": 46 },
+    { "name": "penX", "update": "volX + volW + 100" },
+    { "name": "panelY", "value": 40 },
+    { "name": "captionY", "update": "panelY + volH + 48" }
+  ],
+
+  "data": [
+    {
+      "description": "volcano.json 整体是一个 {width:87, height:61, values:[5307 个高程]} 对象，被摄入成「一行」",
+      "name": "volcano",
+      "url": "../../assets/data/volcano.json"
+    },
+    {
+      "description": "填色等值带：显式 thresholds；每条阈值 t 产出一行，datum.contour 是 value>=t 区域的 MultiPolygon。scale 把网格下标坐标放大到面板像素（348/87 = 244/61 = 4）",
+      "name": "volcanoBands",
+      "source": "volcano",
+      "transform": [
+        {
+          "type": "isocontour",
+          "thresholds": { "signal": "sequence(100, 200, bandStep)" },
+          "smooth": { "signal": "smoothContours" },
+          "scale": { "expr": "volW / datum.width" }
+        }
+      ]
+    },
+    {
+      "description": "描边等高线：同一张网格、更粗的阈值步长，只画线不填色",
+      "name": "volcanoLines",
+      "source": "volcano",
+      "transform": [
+        {
+          "type": "isocontour",
+          "thresholds": { "signal": "sequence(100, 200, lineStep)" },
+          "smooth": { "signal": "smoothContours" },
+          "scale": { "expr": "volW / datum.width" }
+        }
+      ]
+    },
+    {
+      "description": "等高线标签锚点：contour.coordinates 是 [多边形][环][点][x|y] 四层数组。先滤掉退化环，取第一个环的中点作锚点，再滤掉贴着面板边框的锚点（最外圈等高线沿网格边界走，标签会压在边框上），最后 clamp 兜底保证标签不出框",
+      "name": "volcanoLabels",
+      "source": "volcanoLines",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "length(datum.contour.coordinates) > 0 && length(datum.contour.coordinates[0]) > 0 && length(datum.contour.coordinates[0][0]) > 8"
+        },
+        { "type": "formula", "as": "mid", "expr": "datum.contour.coordinates[0][0][floor(length(datum.contour.coordinates[0][0]) / 2)]" },
+        { "type": "filter", "expr": "datum.mid[0] > 16 && datum.mid[0] < volW - 16 && datum.mid[1] > 8 && datum.mid[1] < volH - 8" },
+        { "type": "formula", "as": "lx", "expr": "clamp(datum.mid[0], 16, volW - 16)" },
+        { "type": "formula", "as": "ly", "expr": "clamp(datum.mid[1], 8, volH - 8)" },
+        { "type": "formula", "as": "elevLabel", "expr": "format(datum.contour.value, 'd') + ' m'" }
+      ]
+    },
+
+    {
+      "description": "企鹅体测数据：字段名带空格与括号，必须用 datum['...'] 取；先滤掉缺失值，否则 kde2d 会把 NaN 打进网格",
+      "name": "penguins",
+      "url": "../../assets/data/penguins.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum['Beak Length (mm)'] != null && datum['Beak Depth (mm)'] != null && datum.Species != null"
+        }
+      ]
+    },
+    {
+      "description": "二维核密度：输出一行一个种类，datum.grid 是 {values, width, height, x1, y1, x2, y2, scale} 栅格对象——不是普通数据行。x/y 用 expr 先过比例尺，把数据单位换成面板像素",
+      "name": "penguinDensity",
+      "source": "penguins",
+      "transform": [
+        {
+          "type": "kde2d",
+          "groupby": ["Species"],
+          "size": [ { "signal": "penW" }, { "signal": "penH" } ],
+          "x": { "expr": "scale('xPen', datum['Beak Length (mm)'])" },
+          "y": { "expr": "scale('yPen', datum['Beak Depth (mm)'])" },
+          "bandwidth": { "signal": "[bandwidth, bandwidth]" },
+          "cellSize": { "signal": "cellSize" },
+          "as": "grid"
+        }
+      ]
+    },
+    {
+      "description": "对密度网格求等值线：field 指到 grid；levels 让 quantize 自动挑阈值；resolve='shared' 让三个种类共用一套阈值，等值线才可比。grid 自带 scale=cellSize 与 x1/y1，isocontour 会自动用它还原到像素坐标",
+      "name": "penguinContours",
+      "source": "penguinDensity",
+      "transform": [
+        {
+          "type": "isocontour",
+          "field": "grid",
+          "levels": { "signal": "levels" },
+          "resolve": "shared",
+          "smooth": { "signal": "smoothContours" }
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    { "name": "xVol", "type": "linear", "domain": [0, 870], "range": [0, { "signal": "volW" }] },
+    { "name": "yVol", "type": "linear", "domain": [0, 610], "range": [0, { "signal": "volH" }] },
+    { "name": "elev", "type": "linear", "domain": [94, 195], "range": { "scheme": "viridis" } },
+    {
+      "name": "xPen", "type": "linear", "nice": true, "zero": false,
+      "domain": { "data": "penguins", "field": "Beak Length (mm)" },
+      "range": [0, { "signal": "penW" }]
+    },
+    {
+      "name": "yPen", "type": "linear", "nice": true, "zero": false,
+      "domain": { "data": "penguins", "field": "Beak Depth (mm)" },
+      "range": [ { "signal": "penH" }, 0 ]
+    },
+    {
+      "name": "species", "type": "ordinal",
+      "domain": { "data": "penguins", "field": "Species" },
+      "range": { "scheme": "tableau10" }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "elev",
+      "type": "gradient",
+      "title": "高程 (m)",
+      "format": "d",
+      "values": [100, 120, 140, 160, 180],
+      "gradientLength": 130,
+      "titleFontSize": 11,
+      "labelFontSize": 10,
+      "orient": "right"
+    },
+    {
+      "fill": "species",
+      "stroke": "species",
+      "type": "symbol",
+      "symbolType": "circle",
+      "title": "企鹅种类",
+      "titleFontSize": 11,
+      "labelFontSize": 10,
+      "orient": "right"
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "左面板：规则高程网格 → 填色等值带 + 白色等高线 + 高程标签（描边光晕 + 白字两层 text）",
+      "type": "group",
+      "name": "volcanoPanel",
+      "clip": false,
+      "encode": {
+        "update": {
+          "x": { "signal": "volX" },
+          "y": { "signal": "panelY" },
+          "width": { "signal": "volW" },
+          "height": { "signal": "volH" }
+        }
+      },
+      "title": {
+        "text": "① 火山地形 · 87×61 规则网格（Maunga Whau，格距 10 m）",
+        "anchor": "start",
+        "frame": "group",
+        "fontSize": 12,
+        "color": "#333",
+        "offset": 6
+      },
+      "axes": [
+        { "orient": "bottom", "scale": "xVol", "title": "横向距离 (m)", "tickCount": 5, "format": "d", "labelFontSize": 10, "titleFontSize": 11, "titlePadding": 4 },
+        { "orient": "left", "scale": "yVol", "title": "纵向距离 (m)", "tickCount": 5, "format": "d", "labelFontSize": 10, "titleFontSize": 11, "titlePadding": 4 }
+      ],
+      "marks": [
+        {
+          "description": "底色：直接取 elev 比例尺在 domain 下界的颜色，让 100 m 以下的区域也有色",
+          "type": "rect",
+          "encode": {
+            "update": {
+              "x": { "value": 0 },
+              "y": { "value": 0 },
+              "width": { "signal": "volW" },
+              "height": { "signal": "volH" },
+              "fill": { "scale": "elev", "value": 94 }
+            }
+          }
+        },
+        {
+          "description": "填色等值带：geopath 把 GeoJSON 转成 SVG path（不给 projection 就是恒等投影，直接用像素坐标）",
+          "type": "path",
+          "clip": true,
+          "from": { "data": "volcanoBands" },
+          "encode": {
+            "update": {
+              "fill": { "scale": "elev", "field": "contour.value" },
+              "fillOpacity": { "value": 1 }
+            }
+          },
+          "transform": [ { "type": "geopath", "field": "datum.contour" } ]
+        },
+        {
+          "description": "等高线：只描边，fill 必须显式设成 null，否则 path 会用默认填充色盖住下面的色带",
+          "type": "path",
+          "clip": true,
+          "from": { "data": "volcanoLines" },
+          "encode": {
+            "update": {
+              "fill": { "value": null },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.9 },
+              "strokeOpacity": { "value": 0.6 }
+            }
+          },
+          "transform": [ { "type": "geopath", "field": "datum.contour" } ]
+        },
+        {
+          "description": "标签光晕层：深色粗描边先画一遍，保证白字在 viridis 的任意亮度上都读得出来",
+          "type": "text",
+          "clip": true,
+          "from": { "data": "volcanoLabels" },
+          "encode": {
+            "update": {
+              "x": { "field": "lx" },
+              "y": { "field": "ly" },
+              "text": { "field": "elevLabel" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 9 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#1d2630" },
+              "stroke": { "value": "#1d2630" },
+              "strokeWidth": { "value": 3 },
+              "strokeOpacity": { "value": 0.85 }
+            }
+          }
+        },
+        {
+          "description": "标签文字层",
+          "type": "text",
+          "clip": true,
+          "from": { "data": "volcanoLabels" },
+          "encode": {
+            "update": {
+              "x": { "field": "lx" },
+              "y": { "field": "ly" },
+              "text": { "field": "elevLabel" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 9 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#ffffff" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "右面板：kde2d 二维核密度 → isocontour 等值线 + 原始散点",
+      "type": "group",
+      "name": "penguinPanel",
+      "encode": {
+        "update": {
+          "x": { "signal": "penX" },
+          "y": { "signal": "panelY" },
+          "width": { "signal": "penW" },
+          "height": { "signal": "penH" }
+        }
+      },
+      "title": {
+        "text": { "signal": "'② 企鹅喙形 · kde2d 二维核密度等值线（' + length(data('penguins')) + ' 个样本 / 3 个种类）'" },
+        "anchor": "start",
+        "frame": "group",
+        "fontSize": 12,
+        "color": "#333",
+        "offset": 6
+      },
+      "axes": [
+        { "orient": "bottom", "scale": "xPen", "title": "喙长 Beak Length (mm)", "format": "d", "tickCount": 8, "grid": true, "gridOpacity": 0.35, "labelFontSize": 10, "titleFontSize": 11, "titlePadding": 4 },
+        { "orient": "left", "scale": "yPen", "title": "喙深 Beak Depth (mm)", "format": "d", "tickCount": 6, "grid": true, "gridOpacity": 0.35, "labelFontSize": 10, "titleFontSize": 11, "titlePadding": 4 }
+      ],
+      "marks": [
+        {
+          "description": "浅色底板，让低透明度的密度填充有东西可叠",
+          "type": "rect",
+          "encode": {
+            "update": {
+              "x": { "value": 0 },
+              "y": { "value": 0 },
+              "width": { "signal": "penW" },
+              "height": { "signal": "penH" },
+              "fill": { "value": "#fbfbfc" },
+              "stroke": { "value": "#dcdfe3" }
+            }
+          }
+        },
+        {
+          "description": "密度等值线：同一条 geopath 用法，颜色按种类；叠加的低透明填充把「核心区」压出来",
+          "type": "path",
+          "clip": true,
+          "from": { "data": "penguinContours" },
+          "encode": {
+            "update": {
+              "fill": { "scale": "species", "field": "Species" },
+              "fillOpacity": { "value": 0.07 },
+              "stroke": { "scale": "species", "field": "Species" },
+              "strokeWidth": { "value": 1.2 },
+              "strokeOpacity": { "value": 0.85 }
+            }
+          },
+          "transform": [ { "type": "geopath", "field": "datum.contour" } ]
+        },
+        {
+          "description": "原始散点，方便对照密度估计是否讲了实话",
+          "type": "symbol",
+          "clip": true,
+          "from": { "data": "penguins" },
+          "encode": {
+            "update": {
+              "x": { "scale": "xPen", "field": "Beak Length (mm)" },
+              "y": { "scale": "yPen", "field": "Beak Depth (mm)" },
+              "size": { "value": 22 },
+              "fill": { "scale": "species", "field": "Species" },
+              "fillOpacity": { "signal": "showPoints ? 0.7 : 0" },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.4 },
+              "strokeOpacity": { "signal": "showPoints ? 0.8 : 0" }
+            },
+            "hover": {
+              "size": { "value": 90 },
+              "fillOpacity": { "signal": "showPoints ? 1 : 0" }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "图注：把当前 signal 组合与实际生成的等值线条数写出来，方便读者把参数和结果对上",
+      "type": "text",
+      "encode": {
+        "update": {
+          "x": { "signal": "volX" },
+          "y": { "signal": "captionY" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 10.5 },
+          "lineHeight": { "value": 15 },
+          "fill": { "value": "#555" },
+          "text": {
+            "signal": "['① thresholds = sequence(100, 200, ' + bandStep + ') → ' + length(data('volcanoBands')) + ' 条填色等值带；白线为每 ' + lineStep + ' m 一条等高线；smooth = ' + smoothContours, '② kde2d(bandwidth = ' + bandwidth + ' px, cellSize = ' + cellSize + ') → isocontour(levels = ' + levels + ', resolve = shared) → ' + length(data('penguinContours')) + ' 条密度等值线（3 个种类合计）']"
+          }
+        }
+      }
+    }
+  ],
+
+  "config": {
+    "axis": { "labelColor": "#555", "titleColor": "#444", "domainColor": "#bbb", "tickColor": "#bbb" },
+    "legend": { "labelColor": "#555", "titleColor": "#444" }
+  }
+}

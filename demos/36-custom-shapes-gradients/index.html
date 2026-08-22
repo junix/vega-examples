@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>36 自定义形状与渐变 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '36-custom-shapes-gradients',
+  group: 'F. 稀有与复杂图形',
+  title: '36 · 自定义形状与渐变：symbol path、参数方程、gradient、trail、clip',
+  concepts: [
+    'symbol shape = SVG path',
+    'size 是面积（√size）',
+    'transform: sequence',
+    'transform: formula',
+    'mark: line / area',
+    'mark: trail',
+    'fill: {gradient}',
+    'gradient(scale, p0, p1)',
+    'group clip: false / {signal} / {path}'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      六个面板，一份 spec。右侧滑块都会实时改图：<code>shapeSize</code> 看 ①②
+      的「面积语义」，<code>curveKind</code> / <code>roseK</code> / <code>samples</code>
+      换 ③ 的参数方程（把 <code>samples</code> 拖到 45 就能看出 <code>line</code>
+      画的其实是折线），<code>trailMax</code> / <code>spiralTurns</code> 改 ⑤ 的轨迹粗细与圈数，
+      <code>clipOn</code> 开关 ⑥ 中间那个 group 的裁剪。① 的图形可以悬停看名字。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

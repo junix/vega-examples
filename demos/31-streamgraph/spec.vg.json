@@ -1,0 +1,639 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "流图（streamgraph）：同一份美国分行业失业数据，用 stack 变换的 offset 参数在 zero / center / normalize 三种堆叠基线之间切换，配 inside-out 排序与可切换的曲线插值",
+  "width": 640,
+  "height": 540,
+  "padding": { "left": 8, "top": 8, "right": 8, "bottom": 8 },
+
+  "title": {
+    "text": "美国分行业失业人数（2000-01 ~ 2010-02）：堆叠基线三选一",
+    "subtitle": "主图基线可切换；下方三联图并排展示 zero / center / normalize 的同一份数据",
+    "fontSize": 14,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#777777",
+    "anchor": "start",
+    "offset": 6
+  },
+
+  "signals": [
+    {
+      "description": "stack 变换的基线偏移：zero=普通堆叠面积，center=流图（对称基线），normalize=100% 堆叠",
+      "name": "stackOffset",
+      "value": "center",
+      "bind": { "input": "select", "options": ["zero", "center", "normalize"] }
+    },
+    {
+      "description": "堆叠顺序策略。inside-out 把体量最大的行业放到中间，是 Byte & Wattenberg 流图论文的核心技巧",
+      "name": "stackSort",
+      "value": "inside-out",
+      "bind": {
+        "input": "select",
+        "options": ["inside-out", "largest-bottom", "peak-time", "alphabetical", "none"]
+      }
+    },
+    {
+      "description": "area mark 的曲线插值方式：monotone 保单调不过冲，basis 最平滑但不过点，linear 是原始折线",
+      "name": "curveType",
+      "value": "monotone",
+      "bind": { "input": "select", "options": ["monotone", "basis", "linear", "cardinal", "step"] }
+    },
+    {
+      "description": "带间描边宽度：流图里细白描边能明显提升可读性",
+      "name": "bandStroke",
+      "value": 0.6,
+      "bind": { "input": "range", "min": 0, "max": 2, "step": 0.1 }
+    },
+
+    {
+      "description": "鼠标悬停（图上带子或图例条目）时高亮的行业名；null 表示没有高亮",
+      "name": "hoverSeries",
+      "value": null,
+      "on": [
+        { "events": "@bands:pointerover", "update": "datum.series" },
+        { "events": "@legendSymbol:pointerover, @legendLabel:pointerover", "update": "datum.value" },
+        {
+          "events": "@bands:pointerout, @legendSymbol:pointerout, @legendLabel:pointerout",
+          "update": "null"
+        }
+      ]
+    },
+
+    { "description": "主面板宽度（= 画布宽），单独起个名字是为了在 group 内部转发给局部 width 信号", "name": "mainW", "update": "width" },
+    { "description": "主面板高度", "name": "mainH", "value": 300 },
+    { "description": "三联图区域的顶边", "name": "stripTop", "value": 392 },
+    { "description": "三联图之间的水平间距（要留得下小面板的纵轴标签）", "name": "miniGap", "value": 30 },
+    { "name": "miniW", "update": "floor((width - 2 * miniGap) / 3)" },
+    { "name": "miniH", "value": 110 },
+
+    {
+      "description": "normalize 模式下纵轴是比例，要用百分号格式；其它模式是人数",
+      "name": "yFormat",
+      "update": "stackOffset === 'normalize' ? '.0%' : ',.0f'"
+    },
+    {
+      "name": "yTitle",
+      "update": "stackOffset === 'normalize' ? '占当月失业总人数的比例' : stackOffset === 'center' ? '失业人数（千人）· 基线居中' : '失业人数（千人，堆叠合计）'"
+    },
+    {
+      "description": "行业个数直接从数据集长度取，不要在表达式里写死 14",
+      "name": "seriesCount",
+      "update": "length(data('series_stats'))"
+    }
+  ],
+
+  "data": [
+    {
+      "description": "原始长表：14 个行业 × 122 个月 = 1708 行，无缺失值。date 是带时区的 ISO 串（-08:00/-07:00 的太平洋时间月初），parse 成 date 后统一用 utc 比例尺读，渲染结果与浏览器所在时区无关",
+      "name": "raw",
+      "url": "../../assets/data/unemployment-across-industries.json",
+      "format": {
+        "type": "json",
+        "parse": { "date": "date", "count": "number" }
+      }
+    },
+    {
+      "description": "每个行业算一次总量，再用两次 window/rank 得到两套名次；最后一次 window 的 sort 决定了本数据集的行序，也就决定了图例顺序（总量降序）",
+      "name": "series_stats",
+      "source": "raw",
+      "transform": [
+        {
+          "description": "argmax 返回的是『取到最大值的那一整行』，所以能顺手拿到峰值出现的月份",
+          "type": "aggregate",
+          "groupby": ["series"],
+          "fields": ["count", "count", "count"],
+          "ops": ["sum", "max", "argmax"],
+          "as": ["total", "peak", "peakRow"]
+        },
+        { "type": "formula", "as": "peakDate", "expr": "datum.peakRow.date" },
+        {
+          "description": "project 把 argmax 带进来的整行对象丢掉，只留下四个标量字段，后面 lookup 回填时才不会污染每一行",
+          "type": "project",
+          "fields": ["series", "total", "peak", "peakDate"]
+        },
+        {
+          "type": "window",
+          "sort": { "field": "series", "order": "ascending" },
+          "ops": ["rank"],
+          "as": ["rankAlpha"]
+        },
+        {
+          "type": "window",
+          "sort": { "field": "peakDate", "order": "ascending" },
+          "ops": ["rank"],
+          "as": ["rankPeak"]
+        },
+        {
+          "type": "window",
+          "sort": { "field": "total", "order": "descending" },
+          "ops": ["rank"],
+          "as": ["rankTotal"]
+        },
+        {
+          "description": "inside-out 的排序键：名次 1,2,3,4,5 映射成 -1,2,-3,4,-5，升序排出来就是 5,3,1,2,4 的『帐篷形』——体量最大的排中间",
+          "type": "formula",
+          "as": "insideOutKey",
+          "expr": "datum.rankTotal % 2 === 1 ? -datum.rankTotal : datum.rankTotal"
+        }
+      ]
+    },
+    {
+      "description": "把行业级别的名次回填到每一行，再按 stackSort 信号折算成一个纯数值的 orderKey——stack 只认一个比较器，把策略编码成数值是最省事的做法",
+      "name": "keyed",
+      "source": "raw",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "series_stats",
+          "key": "series",
+          "fields": ["series"],
+          "values": ["total", "peak", "peakDate", "rankTotal", "rankAlpha", "rankPeak", "insideOutKey"],
+          "as": ["sTotal", "sPeak", "sPeakDate", "sRank", "sAlpha", "sPeakRank", "insideOutKey"]
+        },
+        {
+          "type": "formula",
+          "as": "orderKey",
+          "expr": "stackSort === 'inside-out' ? datum.insideOutKey : stackSort === 'largest-bottom' ? datum.sRank : stackSort === 'peak-time' ? datum.sPeakRank : stackSort === 'alphabetical' ? datum.sAlpha : 0"
+        }
+      ]
+    },
+    {
+      "description": "主图布局：offset 由信号驱动，是本 demo 的主角。collect 按 date 排序保证每个 facet 内的点是时间递增的，area 才不会画成乱麻",
+      "name": "layout_main",
+      "source": "keyed",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": ["date"],
+          "field": "count",
+          "sort": { "field": "orderKey" },
+          "offset": { "signal": "stackOffset" },
+          "as": ["y0", "y1"]
+        },
+        { "type": "collect", "sort": { "field": "date" } }
+      ]
+    },
+    {
+      "description": "三联图之一：offset 固定为 zero，即普通堆叠面积图，基线是 y=0",
+      "name": "mini_zero",
+      "source": "keyed",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": ["date"],
+          "field": "count",
+          "sort": { "field": "orderKey" },
+          "offset": "zero",
+          "as": ["y0", "y1"]
+        },
+        { "type": "collect", "sort": { "field": "date" } }
+      ]
+    },
+    {
+      "description": "三联图之二：offset=center，每个时间点的总量被居中，得到经典流图",
+      "name": "mini_center",
+      "source": "keyed",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": ["date"],
+          "field": "count",
+          "sort": { "field": "orderKey" },
+          "offset": "center",
+          "as": ["y0", "y1"]
+        },
+        { "type": "collect", "sort": { "field": "date" } }
+      ]
+    },
+    {
+      "description": "三联图之三：offset=normalize，每列除以该列总量，纵轴变成 0~1 的份额",
+      "name": "mini_normalize",
+      "source": "keyed",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": ["date"],
+          "field": "count",
+          "sort": { "field": "orderKey" },
+          "offset": "normalize",
+          "as": ["y0", "y1"]
+        },
+        { "type": "collect", "sort": { "field": "date" } }
+      ]
+    },
+    {
+      "description": "三联图的小标题：用一份三行的内联数据 + 一个 text mark 画出来，省得写三个 text mark",
+      "name": "strip_labels",
+      "values": [
+        { "i": 0, "label": "offset = zero（普通堆叠面积）" },
+        { "i": 1, "label": "offset = center（流图）" },
+        { "i": 2, "label": "offset = normalize（100% 堆叠）" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "series_stats", "field": "series" },
+      "range": { "scheme": "tableau20" }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "orient": "bottom",
+      "direction": "horizontal",
+      "columns": 3,
+      "title": "行业（按十年累计失业人数降序）",
+      "titleFontSize": 11,
+      "titleOrient": "top",
+      "labelFontSize": 10,
+      "labelLimit": 260,
+      "symbolType": "square",
+      "symbolSize": 90,
+      "columnPadding": 16,
+      "rowPadding": 2,
+      "encode": {
+        "symbols": {
+          "name": "legendSymbol",
+          "interactive": true,
+          "update": {
+            "opacity": { "signal": "hoverSeries == null || hoverSeries === datum.value ? 1 : 0.3" }
+          }
+        },
+        "labels": {
+          "name": "legendLabel",
+          "interactive": true,
+          "update": {
+            "opacity": { "signal": "hoverSeries == null || hoverSeries === datum.value ? 1 : 0.3" },
+            "fontWeight": { "signal": "hoverSeries === datum.value ? 'bold' : 'normal'" }
+          }
+        }
+      }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "主面板：一个 group mark 自带 scales/axes，外层只负责摆位置",
+      "type": "group",
+      "name": "mainPanel",
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 0 },
+          "width": { "signal": "mainW" },
+          "height": { "signal": "mainH" }
+        }
+      },
+
+      "signals": [
+        { "name": "width", "update": "mainW" },
+        { "name": "height", "update": "mainH" }
+      ],
+
+      "scales": [
+        {
+          "name": "xMain",
+          "type": "utc",
+          "domain": { "data": "layout_main", "field": "date" },
+          "nice": { "interval": "month", "step": 1 },
+          "range": "width"
+        },
+        {
+          "name": "yMain",
+          "type": "linear",
+          "domain": { "data": "layout_main", "fields": ["y0", "y1"] },
+          "range": "height",
+          "zero": false,
+          "nice": false
+        }
+      ],
+
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "xMain",
+          "title": "月份",
+          "format": "%Y",
+          "tickCount": { "interval": "year", "step": 1 },
+          "labelFontSize": 10
+        },
+        {
+          "orient": "left",
+          "scale": "yMain",
+          "title": { "signal": "yTitle" },
+          "format": { "signal": "yFormat" },
+          "tickCount": 6,
+          "labelFontSize": 10,
+          "grid": true,
+          "gridOpacity": 0.25
+        }
+      ],
+
+      "marks": [
+        {
+          "description": "按 series 分面，每个面出一条 area——area/line 这类连线型 mark 必须一个序列一个 mark 实例，所以要先 facet",
+          "type": "group",
+          "from": {
+            "facet": { "name": "seriesFacet", "data": "layout_main", "groupby": ["series"] }
+          },
+          "marks": [
+            {
+              "type": "area",
+              "name": "bands",
+              "from": { "data": "seriesFacet" },
+              "encode": {
+                "enter": {
+                  "fill": { "scale": "color", "field": "series" },
+                  "stroke": { "value": "#ffffff" },
+                  "tooltip": {
+                    "signal": "{'行业': datum.series, '总量排名': datum.sRank + ' / ' + seriesCount, '十年累计': format(datum.sTotal, ',.0f') + ' 千人', '单月峰值': format(datum.sPeak, ',.0f') + ' 千人（' + utcFormat(datum.sPeakDate, '%Y-%m') + '）'}"
+                  }
+                },
+                "update": {
+                  "x": { "scale": "xMain", "field": "date" },
+                  "y": { "scale": "yMain", "field": "y0" },
+                  "y2": { "scale": "yMain", "field": "y1" },
+                  "interpolate": { "signal": "curveType" },
+                  "strokeWidth": { "signal": "bandStroke" },
+                  "fillOpacity": {
+                    "signal": "hoverSeries == null ? 0.92 : (datum.series === hoverSeries ? 1 : 0.15)"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "description": "当前参数组合的文字回显，方便读者知道自己拖出了什么",
+          "type": "text",
+          "encode": {
+            "enter": {
+              "x": { "signal": "mainW", "offset": -4 },
+              "y": { "value": 4 },
+              "align": { "value": "right" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 11 },
+              "fill": { "value": "#666666" }
+            },
+            "update": {
+              "text": {
+                "signal": "'offset = ' + stackOffset + '   ·   sort = ' + stackSort + '   ·   interpolate = ' + curveType"
+              }
+            }
+          }
+        },
+        {
+          "description": "悬停行业名，兼作『没悬停时的提示语』",
+          "type": "text",
+          "encode": {
+            "enter": {
+              "x": { "value": 4 },
+              "y": { "value": 4 },
+              "align": { "value": "left" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 12 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#333333" }
+            },
+            "update": {
+              "text": {
+                "signal": "hoverSeries == null ? '把鼠标移到带子或图例上可高亮单个行业' : hoverSeries"
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "signal": "stripTop", "offset": -26 },
+          "align": { "value": "left" },
+          "baseline": { "value": "bottom" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#333333" },
+          "text": { "value": "同一份数据、同一套排序，只改 stack.offset：" }
+        }
+      }
+    },
+    {
+      "description": "三联图的小标题，x 由数据里的 i 算出，和下面三个面板一一对齐",
+      "type": "text",
+      "from": { "data": "strip_labels" },
+      "encode": {
+        "enter": {
+          "align": { "value": "left" },
+          "baseline": { "value": "bottom" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#555555" },
+          "text": { "field": "label" }
+        },
+        "update": {
+          "x": { "signal": "datum.i * (miniW + miniGap)" },
+          "y": { "signal": "stripTop", "offset": -5 }
+        }
+      }
+    },
+
+    {
+      "type": "group",
+      "name": "miniZeroPanel",
+      "encode": {
+        "enter": {
+          "x": { "signal": "0 * (miniW + miniGap)" },
+          "y": { "signal": "stripTop" },
+          "width": { "signal": "miniW" },
+          "height": { "signal": "miniH" },
+          "stroke": { "value": "#e6e6e6" }
+        }
+      },
+      "signals": [
+        { "name": "width", "update": "miniW" },
+        { "name": "height", "update": "miniH" }
+      ],
+      "scales": [
+        {
+          "name": "xz", "type": "utc", "range": "width",
+          "domain": { "data": "mini_zero", "field": "date" },
+          "nice": { "interval": "month", "step": 1 }
+        },
+        {
+          "name": "yz", "type": "linear", "range": "height", "zero": false, "nice": false,
+          "domain": { "data": "mini_zero", "fields": ["y0", "y1"] }
+        }
+      ],
+      "axes": [
+        {
+          "orient": "bottom", "scale": "xz", "format": "%Y",
+          "tickCount": { "interval": "year", "step": 2 },
+          "labelFontSize": 9, "labelPadding": 2, "tickSize": 3
+        },
+        {
+          "orient": "left", "scale": "yz", "format": "~s",
+          "tickCount": 3, "labelFontSize": 9, "labelPadding": 2, "tickSize": 3
+        }
+      ],
+      "marks": [
+        {
+          "type": "group",
+          "from": { "facet": { "name": "fz", "data": "mini_zero", "groupby": ["series"] } },
+          "marks": [
+            {
+              "type": "area",
+              "interactive": false,
+              "from": { "data": "fz" },
+              "encode": {
+                "enter": { "fill": { "scale": "color", "field": "series" } },
+                "update": {
+                  "x": { "scale": "xz", "field": "date" },
+                  "y": { "scale": "yz", "field": "y0" },
+                  "y2": { "scale": "yz", "field": "y1" },
+                  "interpolate": { "signal": "curveType" },
+                  "fillOpacity": {
+                    "signal": "hoverSeries == null ? 0.92 : (datum.series === hoverSeries ? 1 : 0.15)"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "miniCenterPanel",
+      "encode": {
+        "enter": {
+          "x": { "signal": "1 * (miniW + miniGap)" },
+          "y": { "signal": "stripTop" },
+          "width": { "signal": "miniW" },
+          "height": { "signal": "miniH" },
+          "stroke": { "value": "#e6e6e6" }
+        }
+      },
+      "signals": [
+        { "name": "width", "update": "miniW" },
+        { "name": "height", "update": "miniH" }
+      ],
+      "scales": [
+        {
+          "name": "xc", "type": "utc", "range": "width",
+          "domain": { "data": "mini_center", "field": "date" },
+          "nice": { "interval": "month", "step": 1 }
+        },
+        {
+          "name": "yc", "type": "linear", "range": "height", "zero": false, "nice": false,
+          "domain": { "data": "mini_center", "fields": ["y0", "y1"] }
+        }
+      ],
+      "axes": [
+        {
+          "orient": "bottom", "scale": "xc", "format": "%Y",
+          "tickCount": { "interval": "year", "step": 2 },
+          "labelFontSize": 9, "labelPadding": 2, "tickSize": 3
+        },
+        {
+          "orient": "left", "scale": "yc", "format": "~s",
+          "tickCount": 3, "labelFontSize": 9, "labelPadding": 2, "tickSize": 3
+        }
+      ],
+      "marks": [
+        {
+          "type": "group",
+          "from": { "facet": { "name": "fc", "data": "mini_center", "groupby": ["series"] } },
+          "marks": [
+            {
+              "type": "area",
+              "interactive": false,
+              "from": { "data": "fc" },
+              "encode": {
+                "enter": { "fill": { "scale": "color", "field": "series" } },
+                "update": {
+                  "x": { "scale": "xc", "field": "date" },
+                  "y": { "scale": "yc", "field": "y0" },
+                  "y2": { "scale": "yc", "field": "y1" },
+                  "interpolate": { "signal": "curveType" },
+                  "fillOpacity": {
+                    "signal": "hoverSeries == null ? 0.92 : (datum.series === hoverSeries ? 1 : 0.15)"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "miniNormalizePanel",
+      "encode": {
+        "enter": {
+          "x": { "signal": "2 * (miniW + miniGap)" },
+          "y": { "signal": "stripTop" },
+          "width": { "signal": "miniW" },
+          "height": { "signal": "miniH" },
+          "stroke": { "value": "#e6e6e6" }
+        }
+      },
+      "signals": [
+        { "name": "width", "update": "miniW" },
+        { "name": "height", "update": "miniH" }
+      ],
+      "scales": [
+        {
+          "name": "xn", "type": "utc", "range": "width",
+          "domain": { "data": "mini_normalize", "field": "date" },
+          "nice": { "interval": "month", "step": 1 }
+        },
+        {
+          "name": "yn", "type": "linear", "range": "height", "zero": false, "nice": false,
+          "domain": { "data": "mini_normalize", "fields": ["y0", "y1"] }
+        }
+      ],
+      "axes": [
+        {
+          "orient": "bottom", "scale": "xn", "format": "%Y",
+          "tickCount": { "interval": "year", "step": 2 },
+          "labelFontSize": 9, "labelPadding": 2, "tickSize": 3
+        },
+        {
+          "orient": "left", "scale": "yn", "format": ".0%",
+          "tickCount": 3, "labelFontSize": 9, "labelPadding": 2, "tickSize": 3
+        }
+      ],
+      "marks": [
+        {
+          "type": "group",
+          "from": { "facet": { "name": "fn", "data": "mini_normalize", "groupby": ["series"] } },
+          "marks": [
+            {
+              "type": "area",
+              "interactive": false,
+              "from": { "data": "fn" },
+              "encode": {
+                "enter": { "fill": { "scale": "color", "field": "series" } },
+                "update": {
+                  "x": { "scale": "xn", "field": "date" },
+                  "y": { "scale": "yn", "field": "y0" },
+                  "y2": { "scale": "yn", "field": "y1" },
+                  "interpolate": { "signal": "curveType" },
+                  "fillOpacity": {
+                    "signal": "hoverSeries == null ? 0.92 : (datum.series === hoverSeries ? 1 : 0.15)"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

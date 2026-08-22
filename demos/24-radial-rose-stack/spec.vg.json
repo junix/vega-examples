@@ -1,0 +1,534 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "极坐标下的两种堆叠：左为南丁格尔玫瑰图（半径 ∝ √人数，扇形面积正比于死亡人数），右为径向堆叠柱状图（半径线性编码堆叠累计值）。数据为 1854-04 ~ 1856-03 克里米亚战争英军月度死亡数。",
+  "width": 940,
+  "height": 490,
+  "padding": 10,
+
+  "title": {
+    "text": "克里米亚战争英军月度死亡数：南丁格尔玫瑰图 vs 径向堆叠柱状图",
+    "subtitle": "同一份 fold + stack 长表，两种半径映射：sqrt 让面积讲故事，linear 让半径讲故事",
+    "fontSize": 15,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#666666",
+    "offset": 6
+  },
+
+  "signals": [
+    {
+      "description": "玫瑰图的半径映射方式：sqrt 时扇形面积正比于人数（正确）；linear 时半径正比于人数，外圈面积被平方级夸大",
+      "name": "radiusMode",
+      "value": "sqrt",
+      "bind": { "input": "select", "options": ["sqrt", "linear"] }
+    },
+    {
+      "description": "右图径向柱之间的角度留白（band scale 的 paddingInner）",
+      "name": "barPad",
+      "value": 0.18,
+      "bind": { "input": "range", "min": 0, "max": 0.6, "step": 0.02 }
+    },
+    {
+      "description": "右图中心留白半径（px）：让径向柱起点离开圆心，避免内圈被挤成一个点",
+      "name": "hole",
+      "value": 46,
+      "bind": { "input": "range", "min": 0, "max": 90, "step": 2 }
+    },
+    {
+      "description": "同心圆刻度环的间隔（人）",
+      "name": "ringStep",
+      "value": 1000,
+      "bind": { "input": "range", "min": 500, "max": 2000, "step": 250 }
+    },
+
+    { "description": "左右各占一半画布宽度", "name": "panelW", "update": "width / 2" },
+    { "description": "圆心在各自面板内的坐标（两个面板共用，因为 group mark 的坐标是相对自身原点的）", "name": "cx", "update": "panelW / 2" },
+    { "name": "cy", "update": "height / 2 + 6" },
+    { "description": "留 52px 给外圈月份标签与面板脚注", "name": "maxR", "update": "min(panelW / 2 - 52, height / 2 - 52)" },
+    { "name": "labelR", "update": "maxR + 10" },
+    { "description": "从数据里读出的月度死亡合计峰值（1855-01 的 3168 人），用于生成刻度环", "name": "maxTotal", "update": "data('peak')[0].maxTotal" }
+  ],
+
+  "data": [
+    {
+      "description": "南丁格尔本人整理的克里米亚战争死亡数据；日期按 UTC 解析，避免本地时区把 1854-04-01 抹成 3 月",
+      "name": "crimea",
+      "url": "../../assets/data/crimea.json",
+      "format": { "type": "json", "parse": { "date": "utc:'%Y-%m-%d'" } },
+      "transform": [
+        { "type": "window", "sort": { "field": "date" }, "ops": ["row_number"], "as": ["monthNo"] },
+        { "type": "formula", "as": "i", "expr": "datum.monthNo - 1" },
+        { "type": "formula", "as": "total", "expr": "datum.disease + datum.wounds + datum.other" }
+      ]
+    },
+    {
+      "description": "峰值：给刻度环的 sequence 用；单行数据集，signals 用 data('peak')[0] 读它",
+      "name": "peak",
+      "source": "crimea",
+      "transform": [
+        { "type": "aggregate", "fields": ["total"], "ops": ["max"], "as": ["maxTotal"] }
+      ]
+    },
+    {
+      "description": "宽表转长表：三列死因 → key/value 两列，24 行变 72 行",
+      "name": "folded",
+      "source": "crimea",
+      "transform": [
+        { "type": "fold", "fields": ["disease", "wounds", "other"], "as": ["cause", "value"] },
+        { "type": "formula", "as": "causeOrder", "expr": "datum.cause === 'disease' ? 0 : datum.cause === 'wounds' ? 1 : 2" },
+        { "type": "formula", "as": "causeLabel", "expr": "datum.cause === 'disease' ? '疾病' : datum.cause === 'wounds' ? '战伤' : '其他'" }
+      ]
+    },
+    {
+      "description": "按月堆叠，得到每段的累计区间 [v0, v1]；v0/v1 之后被半径比例尺映射成 innerRadius/outerRadius",
+      "name": "stacked",
+      "source": "folded",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": ["i"],
+          "sort": { "field": "causeOrder" },
+          "field": "value",
+          "as": ["v0", "v1"]
+        }
+      ]
+    },
+    {
+      "description": "刻度环：sequence 变换按 ringStep 生成 ringStep, 2*ringStep, ... < maxTotal 的数列，字段名默认 data",
+      "name": "rings",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": { "signal": "ringStep" },
+          "stop": { "signal": "maxTotal" },
+          "step": { "signal": "ringStep" }
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": ["disease", "wounds", "other"],
+      "range": { "scheme": "tableau10" }
+    },
+    {
+      "name": "rSqrt",
+      "type": "sqrt",
+      "domain": { "data": "stacked", "field": "v1" },
+      "range": [0, { "signal": "maxR" }],
+      "zero": true
+    },
+    {
+      "name": "rLinear",
+      "type": "linear",
+      "domain": { "data": "stacked", "field": "v1" },
+      "range": [0, { "signal": "maxR" }],
+      "zero": true
+    },
+    {
+      "name": "rBar",
+      "type": "linear",
+      "domain": { "data": "stacked", "field": "v1" },
+      "range": [{ "signal": "hole" }, { "signal": "maxR" }],
+      "zero": true
+    },
+    {
+      "name": "angleFull",
+      "type": "band",
+      "domain": { "data": "crimea", "field": "i" },
+      "range": [0, { "signal": "2 * PI" }]
+    },
+    {
+      "name": "angleBar",
+      "type": "band",
+      "domain": { "data": "crimea", "field": "i" },
+      "range": [0, { "signal": "2 * PI" }],
+      "paddingInner": { "signal": "barPad" },
+      "paddingOuter": { "signal": "barPad / 2" }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "orient": "none",
+      "legendX": { "signal": "width / 2 - 120" },
+      "legendY": { "signal": "height + 6" },
+      "direction": "horizontal",
+      "title": "死亡原因",
+      "titleOrient": "left",
+      "titlePadding": 8,
+      "titleFontSize": 11,
+      "labelFontSize": 11,
+      "symbolType": "square",
+      "symbolSize": 120,
+      "encode": {
+        "labels": {
+          "update": {
+            "text": {
+              "signal": "datum.value === 'disease' ? '疾病（可预防）' : datum.value === 'wounds' ? '战伤' : '其他原因'"
+            }
+          }
+        }
+      }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "面板分隔线",
+      "type": "rule",
+      "encode": {
+        "update": {
+          "x": { "signal": "panelW" },
+          "y": { "value": 10 },
+          "y2": { "signal": "height - 10" },
+          "stroke": { "value": "#e6e6e6" }
+        }
+      }
+    },
+
+    {
+      "description": "左面板：南丁格尔玫瑰图。group mark 内部坐标相对自身原点，所以左右两个面板能共用 cx / cy / maxR",
+      "type": "group",
+      "name": "rosePanel",
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "y": { "value": 0 },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "height" }
+        }
+      },
+      "marks": [
+        {
+          "description": "玫瑰花瓣：每月占满 1/24 圆（angleFull 没有 padding），半径由 radiusMode 选中的比例尺决定。sqrt 时 r=k√v，于是环带面积 ∝ r1²-r0² ∝ v1-v0 = 该死因人数",
+          "type": "arc",
+          "from": { "data": "stacked" },
+          "encode": {
+            "enter": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "fill": { "scale": "color", "field": "cause" },
+              "tooltip": {
+                "signal": "utcFormat(datum.date, '%Y-%m') + ' · ' + datum.causeLabel + ' ' + format(datum.value, ',d') + ' 人｜当月合计 ' + format(datum.total, ',d') + ' 人'"
+              }
+            },
+            "update": {
+              "startAngle": { "scale": "angleFull", "field": "i" },
+              "endAngle": { "scale": "angleFull", "field": "i", "band": 1 },
+              "innerRadius": { "signal": "radiusMode === 'sqrt' ? scale('rSqrt', datum.v0) : scale('rLinear', datum.v0)" },
+              "outerRadius": { "signal": "radiusMode === 'sqrt' ? scale('rSqrt', datum.v1) : scale('rLinear', datum.v1)" },
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.6 },
+              "fillOpacity": { "value": 0.92 },
+              "zindex": { "value": 0 }
+            },
+            "hover": {
+              "fillOpacity": { "value": 1 },
+              "stroke": { "value": "#333333" },
+              "strokeWidth": { "value": 1.4 },
+              "zindex": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "同心圆刻度环：arc 的 innerRadius = outerRadius 时退化成一条圆线，只描边不填充",
+          "type": "arc",
+          "from": { "data": "rings" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "startAngle": { "value": 0 },
+              "endAngle": { "signal": "2 * PI" },
+              "stroke": { "value": "#3f3f3f" },
+              "strokeWidth": { "value": 0.8 },
+              "strokeOpacity": { "value": 0.45 },
+              "strokeDash": { "value": [2, 3] }
+            },
+            "update": {
+              "innerRadius": { "signal": "radiusMode === 'sqrt' ? scale('rSqrt', datum.data) : scale('rLinear', datum.data)" },
+              "outerRadius": { "signal": "radiusMode === 'sqrt' ? scale('rSqrt', datum.data) : scale('rLinear', datum.data)" }
+            }
+          }
+        },
+        {
+          "description": "刻度环数值：放在 12 点方向（θ=0），那里正好是死亡数最少的 1854-04 与 1856-03，不会压住花瓣",
+          "type": "text",
+          "from": { "data": "rings" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "theta": { "value": 0 },
+              "text": { "signal": "format(datum.data, ',d')" },
+              "align": { "value": "center" },
+              "baseline": { "value": "bottom" },
+              "dy": { "value": -2 },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#555555" }
+            },
+            "update": {
+              "radius": { "signal": "radiusMode === 'sqrt' ? scale('rSqrt', datum.data) : scale('rLinear', datum.data)" }
+            }
+          }
+        },
+        {
+          "description": "外圈月份标签：text mark 的极坐标通道 radius/theta —— θ=0 在 12 点、顺时针为正，和 arc 的角度约定一致",
+          "type": "text",
+          "from": { "data": "crimea" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "text": {
+                "signal": "datum.i === 0 || utcmonth(datum.date) === 0 ? utcFormat(datum.date, '%Y年') + (utcmonth(datum.date) + 1) + '月' : (utcmonth(datum.date) + 1) + '月'"
+              },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#444444" }
+            },
+            "update": {
+              "radius": { "signal": "labelR" },
+              "theta": { "signal": "scale('angleFull', datum.i) + bandwidth('angleFull') / 2" },
+              "align": {
+                "signal": "abs(sin(scale('angleFull', datum.i) + bandwidth('angleFull') / 2)) < 0.08 ? 'center' : (sin(scale('angleFull', datum.i) + bandwidth('angleFull') / 2) > 0 ? 'left' : 'right')"
+              },
+              "baseline": {
+                "signal": "cos(scale('angleFull', datum.i) + bandwidth('angleFull') / 2) > 0.08 ? 'bottom' : (cos(scale('angleFull', datum.i) + bandwidth('angleFull') / 2) < -0.08 ? 'top' : 'middle')"
+              }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "value": 4 },
+              "y": { "value": 4 },
+              "align": { "value": "left" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 12 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#333333" },
+              "text": { "value": "① 玫瑰图（polar area / coxcomb）" }
+            }
+          }
+        },
+        {
+          "description": "脚注随 radiusMode 变化，把「半径线性映射会夸大外圈」这件事写在图上",
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "value": 4 },
+              "align": { "value": "left" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#666666" }
+            },
+            "update": {
+              "y": { "signal": "height - 6" },
+              "text": {
+                "signal": "radiusMode === 'sqrt' ? '半径 = √人数（sqrt）→ 扇形面积正比于人数，读图无偏' : '半径 ∝ 人数（linear）→ 面积按平方增长，外圈被夸大'"
+              }
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "description": "右面板：径向堆叠柱状图。角度编码月份、半径线性编码堆叠累计值，中心留 hole 半径的空白",
+      "type": "group",
+      "name": "radialBarPanel",
+      "encode": {
+        "update": {
+          "x": { "signal": "panelW" },
+          "y": { "value": 0 },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "height" }
+        }
+      },
+      "marks": [
+        {
+          "description": "径向柱：与左图同一份 stacked 数据，只是换成带 padding 的角度 band + 线性半径 + 内圈留白",
+          "type": "arc",
+          "from": { "data": "stacked" },
+          "encode": {
+            "enter": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "fill": { "scale": "color", "field": "cause" },
+              "tooltip": {
+                "signal": "utcFormat(datum.date, '%Y-%m') + ' · ' + datum.causeLabel + ' ' + format(datum.value, ',d') + ' 人｜累计到 ' + format(datum.v1, ',d') + ' 人'"
+              }
+            },
+            "update": {
+              "startAngle": { "scale": "angleBar", "field": "i" },
+              "endAngle": { "scale": "angleBar", "field": "i", "band": 1 },
+              "innerRadius": { "scale": "rBar", "field": "v0" },
+              "outerRadius": { "scale": "rBar", "field": "v1" },
+              "cornerRadius": { "value": 1 },
+              "fillOpacity": { "value": 0.92 },
+              "zindex": { "value": 0 }
+            },
+            "hover": {
+              "fillOpacity": { "value": 1 },
+              "stroke": { "value": "#333333" },
+              "strokeWidth": { "value": 1.2 },
+              "zindex": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "基线环（半径 = hole，对应 0 人）+ 各级刻度环",
+          "type": "arc",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "startAngle": { "value": 0 },
+              "endAngle": { "signal": "2 * PI" },
+              "stroke": { "value": "#999999" },
+              "strokeWidth": { "value": 1 }
+            },
+            "update": {
+              "innerRadius": { "signal": "hole" },
+              "outerRadius": { "signal": "hole" }
+            }
+          }
+        },
+        {
+          "type": "arc",
+          "from": { "data": "rings" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "startAngle": { "value": 0 },
+              "endAngle": { "signal": "2 * PI" },
+              "stroke": { "value": "#3f3f3f" },
+              "strokeWidth": { "value": 0.8 },
+              "strokeOpacity": { "value": 0.45 },
+              "strokeDash": { "value": [2, 3] }
+            },
+            "update": {
+              "innerRadius": { "scale": "rBar", "field": "data" },
+              "outerRadius": { "scale": "rBar", "field": "data" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "rings" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "theta": { "value": 0 },
+              "text": { "signal": "format(datum.data, ',d')" },
+              "align": { "value": "center" },
+              "baseline": { "value": "bottom" },
+              "dy": { "value": -2 },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#555555" }
+            },
+            "update": {
+              "radius": { "scale": "rBar", "field": "data" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "crimea" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "text": {
+                "signal": "datum.i === 0 || utcmonth(datum.date) === 0 ? utcFormat(datum.date, '%Y年') + (utcmonth(datum.date) + 1) + '月' : (utcmonth(datum.date) + 1) + '月'"
+              },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#444444" }
+            },
+            "update": {
+              "radius": { "signal": "labelR" },
+              "theta": { "signal": "scale('angleBar', datum.i) + bandwidth('angleBar') / 2" },
+              "align": {
+                "signal": "abs(sin(scale('angleBar', datum.i) + bandwidth('angleBar') / 2)) < 0.08 ? 'center' : (sin(scale('angleBar', datum.i) + bandwidth('angleBar') / 2) > 0 ? 'left' : 'right')"
+              },
+              "baseline": {
+                "signal": "cos(scale('angleBar', datum.i) + bandwidth('angleBar') / 2) > 0.08 ? 'bottom' : (cos(scale('angleBar', datum.i) + bandwidth('angleBar') / 2) < -0.08 ? 'top' : 'middle')"
+              }
+            }
+          }
+        },
+        {
+          "description": "中心留白处标注峰值月份，顺手演示 data('peak') 读出来的极值",
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 9 },
+              "fill": { "value": "#888888" }
+            },
+            "update": {
+              "x": { "signal": "cx" },
+              "y": { "signal": "cy" },
+              "text": { "signal": "'峰值 ' + format(maxTotal, ',d') + ' 人' " },
+              "opacity": { "signal": "hole >= 30 ? 1 : 0" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "value": 4 },
+              "y": { "value": 4 },
+              "align": { "value": "left" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 12 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#333333" },
+              "text": { "value": "② 径向堆叠柱（radial stacked bar）" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "value": 4 },
+              "align": { "value": "left" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#666666" }
+            },
+            "update": {
+              "y": { "signal": "height - 6" },
+              "text": {
+                "signal": "'角度 = 月份（band，pad ' + format(barPad, '.2f') + '）｜半径 = 累计人数（linear，留白 ' + format(hole, 'd') + 'px）'"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

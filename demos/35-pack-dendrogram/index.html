@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>35 圆填充与径向树状图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '35-pack-dendrogram',
+  group: 'F. 稀有与复杂图形',
+  title: '35 · 圆填充与径向树状图：同一棵树的两种布局',
+  concepts: [
+    'transform: stratify',
+    'transform: pack',
+    'transform: tree (tidy / cluster)',
+    'transform: treelinks',
+    'transform: linkpath (diagonal · radial)',
+    'mark: symbol（size = 外接正方形面积 (2r)²）',
+    'mark: path（极坐标路径 + x/y 平移）',
+    '极坐标手工换算 + 标签旋转翻转'
+  ]
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      左右两图来自<strong>同一份父子表</strong>（<code>flare.json</code>）、同一套 <code>depth</code> 配色。
+      右侧滑块里：<code>maxDepth</code> 决定画到第几层（左图只是少画几圈、几何不变；右图必须<strong>重算</strong>布局，
+      因为角度是按叶子个数均分的），<code>treeMethod</code> 在 <code>cluster</code>（叶子对齐外圈，即树状图）
+      与 <code>tidy</code>（Reingold-Tilford 紧凑布局）之间切换，<code>extent</code> / <code>rotate</code> 改角度跨度与整体旋转。
+      鼠标悬停任意圆点可看名称、层级与 <code>size</code>。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

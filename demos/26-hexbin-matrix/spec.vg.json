@@ -1,0 +1,443 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "同一份汽车数据的两种二维密度图：左侧用 formula 手算蜂巢格心做六边形分箱（symbol + 自定义六边形 path），右侧用 bin + aggregate 做矩阵热力图（rect），共享一条 viridis 计数色标",
+  "width": 660,
+  "height": 330,
+  "padding": 8,
+  "autosize": "pad",
+
+  "title": {
+    "text": "马力 × 油耗 的二维密度：六边形分箱 vs 矩阵热力图",
+    "subtitle": "数据 cars.json（已剔除 Horsepower / Miles_per_Gallon 为 null 的记录）",
+    "fontSize": 14,
+    "subtitleFontSize": 10,
+    "anchor": "start",
+    "offset": 4
+  },
+
+  "signals": [
+    {
+      "description": "两个面板共用的『分箱密度』：左面板据此算蜂巢格宽，右面板据此设 bin.maxbins",
+      "name": "resolution",
+      "value": 12,
+      "bind": { "input": "range", "min": 6, "max": 26, "step": 1 }
+    },
+    {
+      "description": "最少样本数：聚合完成后再过滤，两个面板同时生效（也会收窄共享色标的 domain）",
+      "name": "minCount",
+      "value": 1,
+      "bind": { "input": "range", "min": 1, "max": 5, "step": 1 }
+    },
+    {
+      "description": "是否在矩阵格子里写出计数（格子太小的自动不写）",
+      "name": "showCounts",
+      "value": true,
+      "bind": { "input": "checkbox" }
+    },
+
+    { "description": "面板几何：两块等宽绘图区并排", "name": "panelW", "value": 248 },
+    { "name": "panelH", "value": 252 },
+    { "name": "panelTop", "value": 30 },
+    { "name": "leftX", "value": 46 },
+    { "name": "rightX", "value": 346 },
+
+    {
+      "description": "蜂巢格宽 dx = 相邻同行格心的水平间距 = r·√3",
+      "name": "hexDx",
+      "update": "panelW / resolution"
+    },
+    {
+      "description": "六边形外接圆半径（格心到顶点）",
+      "name": "hexRadius",
+      "update": "hexDx / sqrt(3)"
+    },
+    {
+      "description": "相邻行的垂直间距 dy = 1.5r（不是 2r：行间要交错咬合）",
+      "name": "hexDy",
+      "update": "hexRadius * 1.5"
+    },
+    {
+      "description": "symbol 的自定义 path 会被缩放 sqrt(size)/2 倍；单位六边形想画成半径 r 就取 size = 4r²",
+      "name": "hexSize",
+      "update": "4 * hexRadius * hexRadius"
+    },
+    {
+      "description": "半径 1 的『尖顶』正六边形，顶点在 k·60° 上：(sin θ, −cos θ)",
+      "name": "hexShape",
+      "value": "M0,-1L0.8660254,-0.5L0.8660254,0.5L0,1L-0.8660254,0.5L-0.8660254,-0.5Z"
+    }
+  ],
+
+  "data": [
+    {
+      "description": "cars.json 的 Horsepower 有 6 条 null，必须先剔除，否则比例尺 domain 会被污染；两个 extent 变换把数据范围导出成信号供 bin 使用",
+      "name": "cars",
+      "url": "../../assets/data/cars.json",
+      "format": { "type": "json" },
+      "transform": [
+        { "type": "filter", "expr": "datum.Horsepower != null && datum.Miles_per_Gallon != null" },
+        { "type": "extent", "field": "Horsepower", "signal": "hpExtent" },
+        { "type": "extent", "field": "Miles_per_Gallon", "signal": "mpgExtent" }
+      ]
+    },
+
+    {
+      "description": "六边形分箱：Vega 没有 hexbin 变换，所以在像素空间里手算格心（d3-hexbin 的算法），再按格心聚合",
+      "name": "hexbins",
+      "source": "cars",
+      "transform": [
+        { "type": "formula", "as": "fy", "expr": "scale('hy', datum.Miles_per_Gallon) / hexDy" },
+        { "type": "formula", "as": "j0", "expr": "round(datum.fy)" },
+        { "type": "formula", "as": "p0", "expr": "datum.j0 - 2 * floor(datum.j0 / 2)" },
+        { "type": "formula", "as": "fx", "expr": "scale('hx', datum.Horsepower) / hexDx - datum.p0 / 2" },
+        { "type": "formula", "as": "i0", "expr": "round(datum.fx)" },
+        { "type": "formula", "as": "i2", "expr": "datum.i0 + (datum.fx < datum.i0 ? -1 : 1) / 2" },
+        { "type": "formula", "as": "j2", "expr": "datum.j0 + (datum.fy < datum.j0 ? -1 : 1) " },
+        {
+          "description": "落在矩形格的上下角区域（|Δrow|·3 > 1）时，要和错位半格的邻居比一次真实距离",
+          "type": "formula",
+          "as": "swap",
+          "expr": "abs(datum.fy - datum.j0) * 3 > 1 && pow(datum.fx - datum.i0, 2) + pow(datum.fy - datum.j0, 2) > pow(datum.fx - datum.i2, 2) + pow(datum.fy - datum.j2, 2)"
+        },
+        { "type": "formula", "as": "hexI", "expr": "datum.swap ? datum.i2 + (datum.p0 == 1 ? 1 : -1) / 2 : datum.i0" },
+        { "type": "formula", "as": "hexJ", "expr": "datum.swap ? datum.j2 : datum.j0" },
+        { "type": "formula", "as": "hexX", "expr": "(datum.hexI + (datum.hexJ - 2 * floor(datum.hexJ / 2)) / 2) * hexDx" },
+        { "type": "formula", "as": "hexY", "expr": "datum.hexJ * hexDy" },
+        {
+          "description": "hexX / hexY 是 (hexI, hexJ) 的函数，一起 groupby 不改变分组，只是把格心带到聚合结果里",
+          "type": "aggregate",
+          "groupby": ["hexI", "hexJ", "hexX", "hexY"],
+          "ops": ["count"],
+          "as": ["count"]
+        },
+        { "type": "filter", "expr": "datum.count >= minCount" }
+      ]
+    },
+
+    {
+      "description": "矩阵热力图：两个维度各 bin 一次，再按四个边界聚合计数——这才是 Vega 的『内置』二维直方图写法",
+      "name": "matrix",
+      "source": "cars",
+      "transform": [
+        {
+          "type": "bin",
+          "field": "Horsepower",
+          "extent": { "signal": "hpExtent" },
+          "maxbins": { "signal": "resolution" },
+          "as": ["hp0", "hp1"]
+        },
+        {
+          "type": "bin",
+          "field": "Miles_per_Gallon",
+          "extent": { "signal": "mpgExtent" },
+          "maxbins": { "signal": "resolution" },
+          "as": ["mpg0", "mpg1"]
+        },
+        {
+          "type": "aggregate",
+          "groupby": ["hp0", "hp1", "mpg0", "mpg1"],
+          "ops": ["count"],
+          "as": ["count"]
+        },
+        { "type": "filter", "expr": "datum.count >= minCount" }
+      ]
+    },
+
+    {
+      "description": "只有勾选了 showCounts、且格子宽够放两位数字时才生成标签，避免文字挤成一团",
+      "name": "matrixLabels",
+      "source": "matrix",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "showCounts && (scale('mx', datum.hp1) - scale('mx', datum.hp0)) > 19 && (scale('my', datum.mpg0) - scale('my', datum.mpg1)) > 12"
+        }
+      ]
+    },
+
+    {
+      "description": "两个面板的标题：用一份数据 + 一个 text mark 画两段文字，避免复制粘贴两个 mark",
+      "name": "panelHeads",
+      "values": [
+        { "label": "① hexbin：formula 算格心 + symbol 自定义 path", "px": 46 },
+        { "label": "② 矩阵热力图：bin × bin + aggregate", "px": 346 }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "hx",
+      "type": "linear",
+      "domain": { "data": "cars", "field": "Horsepower" },
+      "range": [0, { "signal": "panelW" }],
+      "zero": false,
+      "padding": { "signal": "hexRadius" }
+    },
+    {
+      "name": "hy",
+      "type": "linear",
+      "domain": { "data": "cars", "field": "Miles_per_Gallon" },
+      "range": [{ "signal": "panelH" }, 0],
+      "zero": false,
+      "padding": { "signal": "hexRadius" }
+    },
+    {
+      "name": "mx",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          { "data": "matrix", "field": "hp0" },
+          { "data": "matrix", "field": "hp1" }
+        ]
+      },
+      "zero": false,
+      "range": [0, { "signal": "panelW" }]
+    },
+    {
+      "name": "my",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          { "data": "matrix", "field": "mpg0" },
+          { "data": "matrix", "field": "mpg1" }
+        ]
+      },
+      "zero": false,
+      "range": [{ "signal": "panelH" }, 0]
+    },
+    {
+      "name": "count",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          { "data": "hexbins", "field": "count" },
+          { "data": "matrix", "field": "count" }
+        ]
+      },
+      "range": { "scheme": "viridis" }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "count",
+      "type": "gradient",
+      "orient": "none",
+      "legendX": 600,
+      "legendY": 34,
+      "direction": "vertical",
+      "gradientLength": 190,
+      "gradientThickness": 12,
+      "title": "样本数（辆）",
+      "titleFontSize": 11,
+      "format": ".2~f",
+      "tickCount": 5
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "两块面板的小标题",
+      "type": "text",
+      "from": { "data": "panelHeads" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "field": "px" },
+          "y": { "value": 18 },
+          "text": { "field": "label" },
+          "align": { "value": "left" },
+          "baseline": { "value": "alphabetic" },
+          "fontSize": { "value": 10.5 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#444444" }
+        }
+      }
+    },
+
+    {
+      "description": "左面板：坐标轴放在外层 group，六边形放在内层 clip group —— clip 只裁几何，不会把轴标签一起裁掉",
+      "type": "group",
+      "name": "hexPanel",
+      "encode": {
+        "enter": {
+          "x": { "signal": "leftX" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "hx",
+          "title": "Horsepower（马力）",
+          "format": ".2~f",
+          "tickCount": 5,
+          "labelFontSize": 9.5
+        },
+        {
+          "orient": "left",
+          "scale": "hy",
+          "title": "Miles_per_Gallon（英里/加仑）",
+          "format": ".2~f",
+          "tickCount": 5,
+          "labelFontSize": 10
+        }
+      ],
+      "marks": [
+        {
+          "description": "绘图区底色，顺手当面板边框",
+          "type": "rect",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "value": 0 },
+              "y": { "value": 0 },
+              "width": { "signal": "panelW" },
+              "height": { "signal": "panelH" },
+              "fill": { "value": "#fbfbfb" },
+              "stroke": { "value": "#dddddd" }
+            }
+          }
+        },
+        {
+          "description": "内层裁剪组：格心在数据边界附近的六边形会越出绘图区约 r 像素，裁掉即可",
+          "type": "group",
+          "clip": true,
+          "encode": {
+            "enter": {
+              "x": { "value": 0 },
+              "y": { "value": 0 },
+              "width": { "signal": "panelW" },
+              "height": { "signal": "panelH" }
+            }
+          },
+          "marks": [
+            {
+              "description": "symbol + 自定义六边形 path：x/y 直接用像素格心（已经是绘图区坐标，无需再过比例尺）",
+              "type": "symbol",
+              "from": { "data": "hexbins" },
+              "encode": {
+                "enter": {
+                  "shape": { "signal": "hexShape" },
+                  "stroke": { "value": "#ffffff" },
+                  "strokeWidth": { "value": 0.5 }
+                },
+                "update": {
+                  "x": { "field": "hexX" },
+                  "y": { "field": "hexY" },
+                  "size": { "signal": "hexSize" },
+                  "fill": { "scale": "count", "field": "count" },
+                  "tooltip": {
+                    "signal": "'格心 ≈ ' + format(invert('hx', datum.hexX), '.2~f') + ' hp / ' + format(invert('hy', datum.hexY), '.2~f') + ' mpg · ' + datum.count + ' 辆'"
+                  },
+                  "zindex": { "value": 0 }
+                },
+                "hover": {
+                  "stroke": { "value": "#111111" },
+                  "strokeWidth": { "value": 1.5 },
+                  "zindex": { "value": 1 }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "description": "右面板：bin 边界直接当矩形的 x/x2、y/y2，格子严丝合缝铺满",
+      "type": "group",
+      "name": "matrixPanel",
+      "encode": {
+        "enter": {
+          "x": { "signal": "rightX" },
+          "y": { "signal": "panelTop" },
+          "width": { "signal": "panelW" },
+          "height": { "signal": "panelH" }
+        }
+      },
+      "axes": [
+        {
+          "orient": "bottom",
+          "scale": "mx",
+          "title": "Horsepower（马力）",
+          "format": ".2~f",
+          "tickCount": 5,
+          "labelFontSize": 9.5
+        },
+        {
+          "orient": "left",
+          "scale": "my",
+          "title": "Miles_per_Gallon（英里/加仑）",
+          "format": ".2~f",
+          "tickCount": 5,
+          "labelFontSize": 10
+        }
+      ],
+      "marks": [
+        {
+          "type": "rect",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "x": { "value": 0 },
+              "y": { "value": 0 },
+              "width": { "signal": "panelW" },
+              "height": { "signal": "panelH" },
+              "fill": { "value": "#fbfbfb" },
+              "stroke": { "value": "#dddddd" }
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "from": { "data": "matrix" },
+          "encode": {
+            "enter": {
+              "stroke": { "value": "#ffffff" },
+              "strokeWidth": { "value": 0.5 }
+            },
+            "update": {
+              "x": { "scale": "mx", "field": "hp0" },
+              "x2": { "scale": "mx", "field": "hp1" },
+              "y": { "scale": "my", "field": "mpg1" },
+              "y2": { "scale": "my", "field": "mpg0" },
+              "fill": { "scale": "count", "field": "count" },
+              "tooltip": {
+                "signal": "format(datum.hp0, '.2~f') + '–' + format(datum.hp1, '.2~f') + ' hp × ' + format(datum.mpg0, '.2~f') + '–' + format(datum.mpg1, '.2~f') + ' mpg · ' + datum.count + ' 辆'"
+              },
+              "zindex": { "value": 0 }
+            },
+            "hover": {
+              "stroke": { "value": "#111111" },
+              "strokeWidth": { "value": 1.5 },
+              "zindex": { "value": 1 }
+            }
+          }
+        },
+        {
+          "description": "格子里的计数：亮底（计数大）用深字，暗底用浅字，阈值取共享色标 domain 的 55%",
+          "type": "text",
+          "from": { "data": "matrixLabels" },
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 8.5 }
+            },
+            "update": {
+              "x": { "signal": "0.5 * (scale('mx', datum.hp0) + scale('mx', datum.hp1))" },
+              "y": { "signal": "0.5 * (scale('my', datum.mpg0) + scale('my', datum.mpg1))" },
+              "text": { "signal": "format(datum.count, 'd')" },
+              "fill": { "signal": "datum.count > 0.55 * peek(domain('count')) ? '#222222' : '#f0f0f0'" }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

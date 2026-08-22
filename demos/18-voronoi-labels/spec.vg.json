@@ -50,11 +50,13 @@
     {
       "name": "labelcars",
       "source": "pts",
+      "comment": "每个产地取马力最高的 2 辆。分区参数名是 groupby（不是 partitionby —— window 变换没有这个参数，写错会被静默忽略、退化成全局排名）。用 row_number 而不是 rank：cars 里 USA 有三辆 225 马力的车并列，rank 会给并列行同一个名次，datum.rank <= 2 会一次放出 4 条。",
       "transform": [
         {
           "type": "window",
-          "ops": ["rank"],
-          "partitionby": ["Origin"],
+          "ops": ["row_number"],
+          "as": ["rank"],
+          "groupby": ["Origin"],
           "sort": { "field": "Horsepower", "order": "descending" }
         },
         { "type": "filter", "expr": "datum.rank <= 2" }
@@ -105,17 +107,6 @@
 
   "marks": [
     {
-      "name": "cells",
-      "type": "path",
-      "from": { "data": "pts" },
-      "encode": {
-        "enter": {
-          "path": { "field": "cell" },
-          "fill": { "value": "transparent" }
-        }
-      }
-    },
-    {
       "name": "points",
       "type": "symbol",
       "from": { "data": "pts" },
@@ -152,6 +143,7 @@
       "name": "labels",
       "type": "text",
       "from": { "data": "labelpoints" },
+      "comment": "anchor 必须给足八个方位、offset 必须给一串递增值：实测只留上下左右时，单档 offset 4 只摆得下 2/6 条、换成这里的四档 offset 反而只剩 1/6 条，其余全被写成 opacity 0；补上四个斜方位才是 6/6。方位的先后顺序也会影响贪心结果，这里用的就是 label 变换的默认顺序。",
       "encode": {
         "enter": {
           "text": { "field": "datum.Name" },
@@ -164,10 +156,34 @@
           "type": "label",
           "size": { "signal": "[width, height]" },
           "avoidMarks": ["points"],
-          "anchor": ["top", "bottom", "right", "left"],
-          "offset": [4]
+          "anchor": [
+            "top-left", "left", "bottom-left", "top",
+            "bottom", "top-right", "right", "bottom-right"
+          ],
+          "offset": [5, 11, 18, 26]
         }
       ]
+    },
+    {
+      "name": "hovernamehalo",
+      "type": "text",
+      "from": { "data": "hovercar" },
+      "comment": "白色描边光环单独占一个 mark，必须画在 hovername 之前。Vega 的 text 渲染是先 fillText 再 strokeText，同一个 mark 上同时写 fill + 3px stroke 的话描边会把字身盖掉，出来是白底白字。",
+      "encode": {
+        "enter": {
+          "x": { "field": "px" },
+          "y": { "field": "py" },
+          "dy": { "value": -14 },
+          "text": { "field": "Name" },
+          "align": { "value": "center" },
+          "fontSize": { "value": 13 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": null },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 3 },
+          "strokeOpacity": { "value": 0.9 }
+        }
+      }
     },
     {
       "name": "hovername",
@@ -182,10 +198,19 @@
           "align": { "value": "center" },
           "fontSize": { "value": 13 },
           "fontWeight": { "value": "bold" },
-          "fill": { "value": "#222222" },
-          "stroke": { "value": "#ffffff" },
-          "strokeWidth": { "value": 3 },
-          "strokeOpacity": { "value": 0.9 }
+          "fill": { "value": "#222222" }
+        }
+      }
+    },
+    {
+      "name": "cells",
+      "type": "path",
+      "comment": "透明 Voronoi 拾取层必须是最后一个 mark：Vega 的命中测试按 mark 声明顺序逆序取第一个命中者，放在最前面会被上方的 points 抢走 pick，导致 @cells:mouseout 与 mouseover 反复互撞、高亮闪烁。",
+      "from": { "data": "pts" },
+      "encode": {
+        "enter": {
+          "path": { "field": "cell" },
+          "fill": { "value": "transparent" }
         }
       }
     }

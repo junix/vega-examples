@@ -1,18 +1,19 @@
 # vega-examples
 
-> 面向计算机 agent（也适合人类）的 **Vega 教学 demo 集**：21 个渐进式 demo，
-> 覆盖 Vega 的 JSON spec 语法（数据、变换、比例尺、标记、信号、事件）与 JS 运行时 API
-> （View、动态数据、自定义变换、无头渲染）。
+> 面向计算机 agent（也适合人类）的 **Vega 教学 demo 集**：41 个渐进式 demo，
+> 覆盖 Vega 的 JSON spec 语法（数据、变换、比例尺、标记、信号、事件）、JS 运行时 API
+> （View、动态数据、自定义变换、无头渲染），以及一整组**稀有与复杂图形**
+> （桑基、弦图、玫瑰图、等值线、六边形分箱、蜂群、小提琴、平行坐标、流图、K 线、
+> 日历热力图、矢量场、圆填充、径向树、瀑布、马赛克、Bump、甘特、邻接矩阵……）。
 
-本目录属于 vega monorepo 的一部分，但**完全独立**：不安装依赖、不构建、可离线，
-所有页面直接引用仓库自带的 `docs/vega.min.js`（v6.4.0，含 geo/force/hierarchy/wordcloud 等全部子包）
-与 `docs/data/` 数据集。
+本目录**完全独立**：不安装依赖、不构建、可离线，所有页面直接引用项目自带的
+`assets/vega.min.js`（v6.4.0，含 geo/force/hierarchy/wordcloud 等全部子包）与 `assets/data/` 数据集。
 
 ## 快速开始
 
 ```sh
 ./serve.sh
-# 打开 http://localhost:8000/vega-examples/
+# 打开 http://localhost:8000/
 ```
 
 ## 学习路径
@@ -23,10 +24,10 @@
 | | [02](demos/02-line-area-timeseries/) 折线/面积 | time scale、多序列分组、line/area mark |
 | | [03](demos/03-scatter-regression/) 散点+回归 | symbol mark、regression transform |
 | | [04](demos/04-histogram-binning/) 直方图 | bin + aggregate 变换 |
-| | [05](demos/05-stacked-grouped-bar/) 堆叠/分组 | stack 变换、facet、group mark |
+| | [05](demos/05-stacked-grouped-bar/) 堆叠/分组 | stack 变换、facet、group mark、**group 局部 width/height 信号** |
 | B. 数据变换 | [06](demos/06-data-pipeline/) 变换管线 | filter / formula / aggregate / window / sort |
-| | [07](demos/07-lookup-joins/) 表连接 | lookup 变换、多数据集 |
-| | [08](demos/08-reshape-fold-pivot/) 宽长互转 | fold / pivot 变换 |
+| | [07](demos/07-lookup-joins/) 表连接 | lookup 变换、多数据集、CSV 的 format.type |
+| | [08](demos/08-reshape-fold-pivot/) 宽长互转 | fold / pivot 变换、线性轴的 zero |
 | | [09](demos/09-crossfilter/) 联动过滤 | crossfilter 手法、多视图共享 signal |
 | C. 交互 | [10](demos/10-signals-bind/) 控件绑定 | signal、bind（滑杆/下拉/复选） |
 | | [11](demos/11-events-brush-zoom/) 刷选缩放 | 事件流语法、interval brush、pan/zoom |
@@ -34,12 +35,57 @@
 | | [13](demos/13-dynamic-data-runtime/) 动态数据 | view.insert/remove/change、signal()、runAsync |
 | D. 高级布局 | [14](demos/14-force-directed-graph/) 力导向图 | force 变换、节点拖拽 |
 | | [15](demos/15-hierarchies/) 层次布局 | treemap / partition、stratify |
-| | [16](demos/16-geo-choropleth/) 分级统计地图 | geo 投影、topojson、lookup 填色 |
+| | [16](demos/16-geo-choropleth/) 分级统计地图 | geo 投影、topojson、lookup 填色、domain 截断 |
 | | [17](demos/17-wordcloud/) 词云 | wordcloud 变换 |
 | | [18](demos/18-voronoi-labels/) 拾取与标签 | voronoi、label 防重叠 |
 | E. 运行时 API | [19](demos/19-runtime-api-tour/) View API 全览 | parse、View、监听器、toSVG 导出、resize |
 | | [20](demos/20-custom-transform-expr/) 自定义扩展 | 自定义 transform、表达式函数 |
-| | [21](demos/21-node-headless-render/) Node 无头渲染 | renderer:'none'、toSVG、file loader |
+| | [21](demos/21-node-headless-render/) Node 无头渲染 | renderer:'none'、toSVG、fs loader |
+| **F. 稀有与复杂图形** | [22](demos/22-sankey-alluvial/) 桑基 / 冲积图 | stack ×3、手工三次贝塞尔 path |
+| | [23](demos/23-chord-arc-diagram/) 弦图 / 弧线邻接图 | pie、arc、二次贝塞尔 Q / 椭圆弧 A |
+| | [24](demos/24-radial-rose-stack/) 玫瑰图 / 径向堆叠柱 | 极坐标 arc、**sqrt scale（面积正比）** |
+| | [25](demos/25-contour-density2d/) 等值线 / 二维核密度 | isocontour、kde2d、grid 栅格对象 |
+| | [26](demos/26-hexbin-matrix/) 六边形分箱 / 矩阵热力图 | 手算蜂巢格心、自定义 symbol shape |
+| | [27](demos/27-beeswarm-dotplot/) 蜂群图 / Wilkinson 点图 | force collide（static）、dotbin |
+| | [28](demos/28-violin-ridgeline/) 小提琴图 / 山脊线图 | kde、对称 area、重叠行布局 |
+| | [29](demos/29-boxplot-errorbar/) 箱线图 / 误差棒 | aggregate 五数、Tukey 围栏、stderr |
+| | [30](demos/30-parallel-coordinates/) 平行坐标图 | fold、归一化、逐轴刻度反算 |
+| | [31](demos/31-streamgraph/) 流图 | stack 的 offset zero/center/normalize |
+| | [32](demos/32-candlestick-ohlc/) K 线图 | 双面板共享 x scale、window lag、十字光标 |
+| | [33](demos/33-calendar-heatmap/) 日历热力图 | 手算 周/星期、facet 分年、gradient 图例 |
+| | [34](demos/34-vector-field/) 矢量场 / 风场图 | 自定义箭头字形、angle、**pow(2) size** |
+| | [35](demos/35-pack-dendrogram/) 圆填充 / 径向树状图 | pack、tree、linkpath(orient: radial) |
+| | [36](demos/36-custom-shapes-gradients/) 自定义形状与渐变 | symbol path、gradient、trail、clip |
+| | [37](demos/37-geo-projections-arcs/) 投影画廊 / 大圆航线 | projection、graticule、geoshape |
+| | [38](demos/38-waterfall-marimekko/) 瀑布图 / 马赛克图 | window 累计和、两级 stack |
+| | [39](demos/39-bump-slope-chart/) Bump 图 / 斜率图 | window(rank)、point 反向轴 |
+| | [40](demos/40-gantt-timeline/) 甘特图 / 时间线 | 区间 rect、依赖折线、time + band |
+| | [41](demos/41-matrix-adjacency/) 邻接矩阵 | 镜像边表、scale.domain 用 signal |
+
+F 组每个 demo 的 README 都带一节 **`## 与 matplotlib 的对照`**；
+整体横向对比见 **[COMPARISON.md](COMPARISON.md)**（Vega 在哪些图形上更强、
+在哪些上明显不如 matplotlib，逐项列表 + 诚实的短板清单）。
+
+## 导出：每个 demo 都能出 SVG 与透明 PNG
+
+每个 demo 页面顶部有统一的导出工具栏（`assets/demo.js` 自动注入）：
+
+- **SVG** —— `view.toSVG(scale)`，从场景图重新生成的真矢量（canvas 渲染的视图也能出）。
+- **PNG**，1×~4× 任选 —— `view.toCanvas(scale)` → `toDataURL('image/png')`。
+- **透明背景**开关，默认开 —— 导出前把内建 `background` signal 临时置 `null`，
+  所以透明这件事不依赖 spec 里怎么写；关掉则得到白底。
+
+批量导出：
+
+```sh
+node tools/export.cjs                    # 全部 demo → exports/，SVG + 透明 PNG(2×)
+node tools/export.cjs 22 33 --scale 3    # 只导指定 demo，3 倍分辨率
+node tools/export.cjs --opaque           # 白底对照
+node tools/export.cjs --svg --no-browser # 只导 SVG，不用浏览器
+```
+
+导出器会**就地校验透明度**：解 PNG 头确认是 RGBA（colorType 6），
+再采样统计全透明像素占比，写进 `exports/manifest.json`。
 
 ## 给 agent 的使用说明
 
@@ -48,11 +94,22 @@
   [Vega Editor](https://vega.github.io/editor/) 中粘贴调试（注意把数据 url 换成线上地址）。
 - 右侧的 **Signals 实时值面板**会显示 spec 中所有 signal 的当前值，交互时观察它是理解
   signal/事件机制最快的方式。
+- 无头驱动页面时等 `window.__sceneReady === true` 再截图/导出；
+  `window.__vegaDemo.views[i].view` 是 View 实例，`window.__vegaExport(opts)` 直接出图。
 
-## 校验
+## 校验与调试
 
 ```sh
-node tools/validate.cjs        # 解析 + 无头运行全部 demo 的 spec
+node tools/validate.cjs              # 纯 Node：契约 + parse + 真实数据流 + 布局溢出 + toSVG
+node tools/validate.cjs 06 12        # 只校验 slug 含 06 / 12 的
+node tools/inspect.cjs 22 --rows 6   # 打印数据样本(带类型)/比例尺 domain/SVG 里每段文字
+node tools/validate-browser.cjs      # 真实 Chromium：console 无报错 + 导出可用 + PNG 透明
 ```
 
-任何 demo 改动后都应跑到全绿。浏览器限定项（目前仅词云）只做 parse 校验。
+任何 demo 改动后 `validate.cjs` 都应跑到全绿；改渲染或导出相关代码时再跑一遍
+`validate-browser.cjs`。两者的分工与各自能抓什么，见 [AGENTS.md](AGENTS.md)。
+
+`inspect.cjs` 是排查「数据格式化/渲染不对」的主要工具：它把每个数据集的样本行
+（值带 `num` / `str` / `date` 类型前缀）、每个比例尺的真实 domain/range、
+以及**最终 SVG 里按渲染顺序的每一段文字**全部打出来 ——
+「本该是 9.7% 却显示 0.1」「该 parse 成数字却是字符串」这类问题不用开浏览器就能抓到。
