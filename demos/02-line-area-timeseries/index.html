@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 折线与面积（时间序列） · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '02-line-area-timeseries',
+  group: 'A. Grammar 基础',
+  title: '02 · 折线与面积：时间解析、time 比例尺与多序列分组',
+  concepts: ['format.parse: date', 'scale: time', 'axis format', 'from.facet + group mark', 'scale: ordinal + legend', 'aggregate: sum / argmax', 'formula', '多层数据叠加']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      彩色折线是五只股票各自的价格走势（<code>from.facet</code> 按 symbol 分组），
+      浅色面积是所有股票按日期求和后的总量衬底（独立数据集叠加在同一坐标系里）。
+      折线右端的粗体文字是每条序列的末端标注；悬停任一折线可看到 <code>hover</code> 编码的变淡效果。
+      右侧留白来自 <code>padding.right</code>，用来容纳图例与末端标注。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

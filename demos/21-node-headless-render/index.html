@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>21 Node 无头渲染导出 SVG · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '21-node-headless-render',
+  group: 'E. 运行时 API 与工程化',
+  title: '21 · Node 无头渲染导出 SVG：脱离浏览器跑 Vega',
+  concepts: ['renderer: none', 'vega.loader({mode:\'file\'})', 'view.toSVG()', 'Node.js 无头渲染', '.cjs 脚本']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      本图用 <code>renderDemo</code> 在浏览器里渲染（canvas + hover）。
+      真正的看点是 <code>render.cjs</code>：在 Node.js 里用同一份 spec 无头跑数据流并导出 SVG。
+      试试在终端里执行：<code>node demos/21-node-headless-render/render.cjs</code>
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals" class="demo-signals">
+    <h2>说明</h2>
+    <div class="demo-notes">
+      本 demo 无交互 signal。重点在 Node 端：<code>render.cjs</code>
+      读同一份 <code>spec.vg.json</code>，在无浏览器环境下跑完数据流，
+      用 <code>view.toSVG()</code> 导出矢量图到 <code>output.svg</code>。
+    </div>
+  </aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

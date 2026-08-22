@@ -1,0 +1,223 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "事件流教学：mousedown/mousemove/mouseup 区间刷选（brush rect + 高亮）+ 滚轮缩放 + Shift 拖拽平移（anchor/zoom 模式）",
+  "width": 640,
+  "height": 420,
+  "padding": 8,
+
+  "title": {
+    "text": "企鹅：喙长 vs 体重（拖拽框选 · Shift+拖拽平移 · 滚轮缩放 · 双击清除框选）",
+    "fontSize": 14
+  },
+
+  "signals": [
+    {
+      "name": "brush",
+      "value": null,
+      "on": [
+        {
+          "events": { "type": "mousedown", "filter": "!event.shiftKey" },
+          "update": "[x(), y(), x(), y()]"
+        },
+        {
+          "events": {
+            "source": "window",
+            "type": "mousemove",
+            "consume": true,
+            "between": [
+              { "type": "mousedown", "filter": "!event.shiftKey" },
+              { "source": "window", "type": "mouseup" }
+            ]
+          },
+          "update": "[brush[0], brush[1], x(), y()]"
+        },
+        {
+          "events": "dblclick",
+          "update": "null"
+        }
+      ]
+    },
+
+    {
+      "name": "panDown",
+      "value": null,
+      "on": [
+        { "events": { "type": "mousedown", "filter": "event.shiftKey" }, "update": "xy()" },
+        { "events": "window:mouseup", "update": "null" }
+      ]
+    },
+    {
+      "name": "xcur",
+      "value": null,
+      "on": [
+        { "events": { "type": "mousedown", "filter": "event.shiftKey" }, "update": "slice(xdom)" }
+      ]
+    },
+    {
+      "name": "ycur",
+      "value": null,
+      "on": [
+        { "events": { "type": "mousedown", "filter": "event.shiftKey" }, "update": "slice(ydom)" }
+      ]
+    },
+    {
+      "name": "delta",
+      "value": [0, 0],
+      "on": [
+        {
+          "events": {
+            "source": "window",
+            "type": "mousemove",
+            "consume": true,
+            "between": [
+              { "type": "mousedown", "filter": "event.shiftKey" },
+              { "source": "window", "type": "mouseup" }
+            ]
+          },
+          "update": "panDown ? [panDown[0] - x(), y() - panDown[1]] : [0, 0]"
+        }
+      ]
+    },
+
+    {
+      "name": "anchor",
+      "value": [0, 0],
+      "on": [
+        { "events": "wheel", "update": "[invert('xscale', x()), invert('yscale', y())]" }
+      ]
+    },
+    {
+      "name": "zoom",
+      "value": 1,
+      "on": [
+        {
+          "events": "wheel!",
+          "force": true,
+          "update": "pow(1.0015, event.deltaY * pow(16, event.deltaMode))"
+        }
+      ]
+    },
+
+    {
+      "name": "xdom",
+      "update": "slice(xext)",
+      "on": [
+        {
+          "events": { "signal": "delta" },
+          "update": "[xcur[0] + span(xcur) * delta[0] / width, xcur[1] + span(xcur) * delta[0] / width]"
+        },
+        {
+          "events": { "signal": "zoom" },
+          "update": "[anchor[0] + (xdom[0] - anchor[0]) * zoom, anchor[0] + (xdom[1] - anchor[0]) * zoom]"
+        }
+      ]
+    },
+    {
+      "name": "ydom",
+      "update": "slice(yext)",
+      "on": [
+        {
+          "events": { "signal": "delta" },
+          "update": "[ycur[0] + span(ycur) * delta[1] / height, ycur[1] + span(ycur) * delta[1] / height]"
+        },
+        {
+          "events": { "signal": "zoom" },
+          "update": "[anchor[1] + (ydom[0] - anchor[1]) * zoom, anchor[1] + (ydom[1] - anchor[1]) * zoom]"
+        }
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "name": "penguins",
+      "url": "../../assets/data/penguins.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum['Beak Length (mm)'] != null && datum['Body Mass (g)'] != null"
+        },
+        { "type": "extent", "field": "Beak Length (mm)", "signal": "xext" },
+        { "type": "extent", "field": "Body Mass (g)", "signal": "yext" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "xscale",
+      "zero": false,
+      "domain": { "signal": "xdom" },
+      "range": "width"
+    },
+    {
+      "name": "yscale",
+      "zero": false,
+      "domain": { "signal": "ydom" },
+      "range": "height"
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "penguins", "field": "Species" },
+      "range": "category"
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "xscale", "title": "Beak Length (mm)", "grid": true, "gridOpacity": 0.2 },
+    { "orient": "left", "scale": "yscale", "title": "Body Mass (g)", "grid": true, "gridOpacity": 0.2 }
+  ],
+
+  "legends": [
+    { "fill": "color", "title": "Species", "orient": "right" }
+  ],
+
+  "marks": [
+    {
+      "name": "points",
+      "type": "symbol",
+      "from": { "data": "penguins" },
+      "clip": true,
+      "encode": {
+        "enter": {
+          "size": { "value": 60 },
+          "fillOpacity": { "value": 0.75 }
+        },
+        "update": {
+          "x": { "scale": "xscale", "field": "Beak Length (mm)" },
+          "y": { "scale": "yscale", "field": "Body Mass (g)" },
+          "fill": [
+            {
+              "test": "!brush || (inrange(scale('xscale', datum['Beak Length (mm)']), [min(brush[0], brush[2]), max(brush[0], brush[2])]) && inrange(scale('yscale', datum['Body Mass (g)']), [min(brush[1], brush[3]), max(brush[1], brush[3])]))",
+              "scale": "color",
+              "field": "Species"
+            },
+            { "value": "#d3d3d3" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "brushRect",
+      "type": "rect",
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "fill": { "value": "#4e79a7" },
+          "fillOpacity": { "value": 0.12 },
+          "stroke": { "value": "#4e79a7" },
+          "strokeWidth": { "value": 1 },
+          "strokeDash": { "value": [4, 3] }
+        },
+        "update": {
+          "opacity": { "signal": "brush ? 1 : 0" },
+          "x": { "signal": "brush ? min(brush[0], brush[2]) : 0" },
+          "x2": { "signal": "brush ? max(brush[0], brush[2]) : 0" },
+          "y": { "signal": "brush ? min(brush[1], brush[3]) : 0" },
+          "y2": { "signal": "brush ? max(brush[1], brush[3]) : 0" }
+        }
+      }
+    }
+  ]
+}

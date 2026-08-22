@@ -1,0 +1,88 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "最基础的柱状图：inline 数据 + band/linear 比例尺 + 坐标轴 + rect/text 标记 + hover 编码集",
+  "width": 640,
+  "height": 320,
+  "padding": 8,
+
+  "title": {
+    "text": "一周访问量（虚构数据）",
+    "fontSize": 14
+  },
+
+  "data": [
+    {
+      "name": "visits",
+      "values": [
+        { "day": "周一", "uv": 120 },
+        { "day": "周二", "uv": 200 },
+        { "day": "周三", "uv": 150 },
+        { "day": "周四", "uv": 80 },
+        { "day": "周五", "uv": 230 },
+        { "day": "周六", "uv": 260 },
+        { "day": "周日", "uv": 190 }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": { "data": "visits", "field": "day" },
+      "range": "width",
+      "padding": 0.15
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": { "data": "visits", "field": "uv" },
+      "range": "height",
+      "nice": true,
+      "zero": true
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "x", "title": "星期" },
+    { "orient": "left", "scale": "y", "title": "独立访客数", "grid": true, "gridOpacity": 0.3 }
+  ],
+
+  "marks": [
+    {
+      "type": "rect",
+      "from": { "data": "visits" },
+      "encode": {
+        "enter": {
+          "x": { "scale": "x", "field": "day" },
+          "width": { "scale": "x", "band": 1 },
+          "y": { "scale": "y", "field": "uv" },
+          "y2": { "scale": "y", "value": 0 }
+        },
+        "update": {
+          "fill": { "value": "#4e79a7" }
+        },
+        "hover": {
+          "fill": { "value": "#e15759" }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": { "data": "visits" },
+      "encode": {
+        "enter": {
+          "x": { "scale": "x", "field": "day", "band": 0.5 },
+          "y": { "scale": "y", "field": "uv", "offset": -4 },
+          "text": { "field": "uv" },
+          "align": { "value": "center" },
+          "fill": { "value": "#333333" }
+        }
+      }
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 11 }
+  }
+}

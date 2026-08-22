@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14 力导向图与节点拖拽 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '14-force-directed-graph',
+  group: 'D. 高级布局与扩展',
+  title: '14 · 力导向图：force 变换、linkpath 连线与可拖拽节点',
+  concepts: ['transform: force', 'forces: link/nbody/collide/center', 'mark 级 transform', 'transform: linkpath', 'signal 事件流拖拽', 'trigger: modify', 'scale: ordinal', 'tooltip']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      <strong>按住一个节点拖动</strong>：mousedown 把节点钉在光标处（写入 <code>fx/fy</code>），
+      拖动中仿真持续 restart，mouseup 释放（<code>fx/fy</code> 置 null）。
+      右侧 Signals 面板里的 <code>nodeCharge</code> / <code>linkDistance</code> / <code>nodeRadius</code>
+      滑杆可以实时调节四种力，观察布局如何重新平衡；拖动时留意 <code>fix</code> / <code>dragged</code> / <code>restart</code>
+      三个信号的变化。悬停节点可看到角色名（tooltip 通道）。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

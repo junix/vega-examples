@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vega-examples · Vega 教学 demo 集</title>
+<link rel="stylesheet" href="./assets/demo.css">
+</head>
+<body>
+<header class="demo-header">
+  <h1>vega-examples</h1>
+  <div class="crumb">
+    通过渐进式 demo 学习 Vega（可视化语法）的 JSON spec 与 JS 运行时 API。
+    所有 demo 直接引用本仓库 <code>docs/vega.min.js</code> 构建与 <code>docs/data/</code> 数据集，零安装、可离线。
+  </div>
+  <div class="links">
+    <a href="./README.md" target="_blank">README</a>
+    <a href="https://vega.github.io/vega/docs/" target="_blank">Vega 官方文档</a>
+    <a href="https://vega.github.io/editor/" target="_blank">在线 Editor</a>
+  </div>
+</header>
+<main class="gallery-main" id="gallery"></main>
+
+<script>
+var GROUPS = [
+  { name: 'A. Grammar 基础', demos: [
+    ['01-bar-chart', '柱状图：数据、比例尺、坐标轴与矩形标记', ['scale', 'axis', 'rect', 'encode']],
+    ['02-line-area-timeseries', '折线与面积图：时间比例尺与多序列', ['time scale', 'line/area', '多序列']],
+    ['03-scatter-regression', '散点图与回归线', ['symbol', 'regression', 'quantitative']],
+    ['04-histogram-binning', '直方图：分箱与聚合', ['bin', 'aggregate', 'rect']],
+    ['05-stacked-grouped-bar', '堆叠与分组柱状图', ['stack', 'facet', 'group mark']]
+  ]},
+  { name: 'B. 数据变换', demos: [
+    ['06-data-pipeline', '变换管线：过滤/派生/聚合/窗口/排序', ['filter', 'formula', 'aggregate', 'window']],
+    ['07-lookup-joins', 'lookup：多表连接', ['lookup', '多数据集']],
+    ['08-reshape-fold-pivot', '宽长表互转：fold 与 pivot', ['fold', 'pivot']],
+    ['09-crossfilter', 'Crossfilter：多视图联动过滤', ['crossfilter', '联动', 'signal']]
+  ]},
+  { name: 'C. 交互', demos: [
+    ['10-signals-bind', 'Signal 与输入控件绑定', ['signal', 'bind', '表达式']],
+    ['11-events-brush-zoom', '事件流：刷选与平移缩放', ['events', 'interval brush', 'pan/zoom']],
+    ['12-hover-tooltip-legend', '悬停提示与图例交互', ['tooltip', 'legend', 'hover']],
+    ['13-dynamic-data-runtime', '运行时动态增删改数据', ['view.insert', 'change', 'runAsync']]
+  ]},
+  { name: 'D. 高级布局与扩展', demos: [
+    ['14-force-directed-graph', '力导向图与节点拖拽', ['force', 'node-link', '拖拽事件']],
+    ['15-hierarchies', '层次布局：Treemap 与 Sunburst', ['treemap', 'partition', 'stratify']],
+    ['16-geo-choropleth', '地理投影与分级统计地图', ['geo', 'projection', 'topojson']],
+    ['17-wordcloud', '词云布局', ['wordcloud', 'text']],
+    ['18-voronoi-labels', 'Voronoi 拾取与标签防重叠', ['voronoi', 'label']]
+  ]},
+  { name: 'E. 运行时 API 与工程化', demos: [
+    ['19-runtime-api-tour', 'View API 全览：监听/导出/缩放', ['parse', 'View', 'toSVG', 'resize']],
+    ['20-custom-transform-expr', '自定义 Transform 与表达式函数', ['transforms.extend', 'expressionFunction']],
+    ['21-node-headless-render', 'Node 无头渲染导出 SVG', ['node', 'headless', 'toSVG']]
+  ]}
+];
+
+var gallery = document.getElementById('gallery');
+GROUPS.forEach(function (g) {
+  var section = document.createElement('section');
+  section.className = 'gallery-group';
+  var h2 = document.createElement('h2');
+  h2.textContent = g.name;
+  section.appendChild(h2);
+  var grid = document.createElement('div');
+  grid.className = 'gallery-grid';
+  g.demos.forEach(function (d) {
+    var card = document.createElement('a');
+    card.className = 'gallery-card';
+    card.href = './demos/' + d[0] + '/index.html';
+    var t = document.createElement('div');
+    t.className = 't';
+    t.textContent = d[0] + ' · ' + d[1];
+    card.appendChild(t);
+    var tags = document.createElement('div');
+    tags.className = 'tags';
+    d[2].forEach(function (c) {
+      var tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = c;
+      tags.appendChild(tag);
+    });
+    card.appendChild(tags);
+    grid.appendChild(card);
+  });
+  section.appendChild(grid);
+  gallery.appendChild(section);
+});
+</script>
+</body>
+</html>

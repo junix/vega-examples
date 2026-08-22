@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 信号与控件绑定 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '10-signals-bind',
+  group: 'C. 交互',
+  title: '10 · 信号与控件绑定：bind 全家桶驱动过滤与视觉通道',
+  concepts: ['signal', 'bind: select/range/checkbox/number', 'filter 变换引用 signal', 'size/opacity 由 signal 驱动', 'title: signal 表达式']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      图表左上角的控件全部由 spec 里 <code>signal</code> 的 <code>bind</code> 自动生成，没有任何手写 UI 代码。
+      拖动控件时请<b>同时观察右侧 Signals 面板</b>：每个 signal 的实时值会随操作更新，
+      图表标题里的统计文字也是一条 signal 表达式拼出来的。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

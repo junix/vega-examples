@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 lookup 表连接 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '07-lookup-joins',
+  group: 'B. 数据变换',
+  title: '07 · lookup 表连接：主表扩展、default 兜底与反向聚合',
+  concepts: ['transform: lookup', 'lookup: values/default 参数', 'data: source 数组合并 (union)', 'aggregate: values 收集组内行', 'expression: pluck/join', '多面板 group mark']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      两张表：<code>lookup_people.csv</code>（name→age/height）与 <code>lookup_groups.csv</code>（group→person）。
+      左图把 <strong>groups 当主表</strong> lookup 回 people，再 aggregate 出每组平均身高，并用
+      <code>aggregate 的 values 操作 + join(pluck(...))</code> 拼出成员名单；右表把 <strong>people 当主表</strong> lookup groups，
+      红色行是人为构造的无匹配人员 Zoe，演示 <code>default</code> 参数兜底。
+      注意：lookup 挂到主表行上的是<strong>单个匹配行对象</strong>（不是数组），取字段写作
+      <code>datum.membership.group</code>。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

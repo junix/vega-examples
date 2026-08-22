@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>16 分级统计地图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '16-geo-choropleth',
+  group: 'D. 高级布局与扩展',
+  title: '16 · 分级统计地图：TopoJSON、地理投影与 lookup 填色',
+  concepts: ['format: topojson', 'projection: albersUsa', 'transform: lookup', 'transform: geoshape', 'mark: shape', 'scale: quantize', 'legend']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      把鼠标悬停在县（county）色块上：色块变红并弹出 tooltip 显示 FIPS 码与失业率。
+      地图由两层 <code>shape</code> 标记叠加而成——下层是按失业率填色的县多边形，
+      上层是只描白边、不填充的州界。全部地理形状都来自同一份 TopoJSON 文件
+      <code>us-10m.json</code>，只是 <code>format.feature</code> 取了不同的 object。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

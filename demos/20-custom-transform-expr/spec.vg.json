@@ -1,0 +1,56 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "MSFT 收盘价折线（基础图）。注意：滑动平均变换 MovingAverage 与表达式函数 pctChange 是 main.js 里注册的自定义扩展，相关片段由 main.js 在 parse 前注入；本文件只含内置语法，保证可独立解析/渲染（无头校验器直接用原装 vega 解析本文件）。",
+  "width": 640,
+  "height": 320,
+  "padding": 8,
+
+  "data": [
+    {
+      "name": "msft",
+      "url": "../../assets/data/stocks.csv",
+      "format": { "type": "csv", "parse": { "price": "number", "date": "date" } },
+      "transform": [
+        { "type": "filter", "expr": "datum.symbol === 'MSFT'" },
+        { "type": "collect", "sort": { "field": "date", "order": "ascending" } }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "time",
+      "domain": { "data": "msft", "field": "date" },
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": { "data": "msft", "field": "price" },
+      "range": "height",
+      "nice": true,
+      "zero": false
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "x", "title": "日期", "format": "%Y" },
+    { "orient": "left", "scale": "y", "title": "收盘价（美元）", "grid": true, "gridOpacity": 0.25, "format": "$.0f" }
+  ],
+
+  "marks": [
+    {
+      "type": "line",
+      "from": { "data": "msft" },
+      "encode": {
+        "enter": {
+          "x": { "scale": "x", "field": "date" },
+          "y": { "scale": "y", "field": "price" },
+          "stroke": { "value": "#9db2c4" },
+          "strokeWidth": { "value": 1 }
+        }
+      }
+    }
+  ]
+}

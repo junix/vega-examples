@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 运行时动态数据 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '13-dynamic-data-runtime',
+  group: 'C. 交互',
+  title: '13 · 运行时动态数据：changeset 增量增删的实时数据流',
+  concepts: ['vega.changeset()', 'view.change + runAsync', 'data: values 空初始值', 'domain: signal 表达式', 'signal bind: range', 'transform: aggregate']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-controls">
+      <button id="btn-toggle" type="button">开始</button>
+      <button id="btn-step" type="button">单步</button>
+      <button id="btn-clear" type="button">清空</button>
+    </div>
+    <div class="demo-notes">
+      本图的数据<b>不是</b> spec 加载的：spec 里 <code>data "live"</code> 初始为空，
+      所有点都由 <code>main.js</code> 通过 <code>vega.changeset()</code> +
+      <code>view.change('live', cs).runAsync()</code> 增量推入（随机游走，500ms 一个点）。
+      <b>开始/暂停</b>控制定时器，<b>单步</b>手动插入一个点，<b>清空</b>用谓词 remove 删除全部元组；
+      拖动图表下方的 <code>window</code> 滑块（signal bind 生成）可改变 x 域窗口宽度，
+      窗口外的旧点会被同步剔除。右侧 Signals 面板可实时观察 <code>window</code> 的值。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

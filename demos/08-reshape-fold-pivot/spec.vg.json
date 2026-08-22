@@ -1,0 +1,246 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "宽长互转：fold 把宽表转成长表画多序列折线，pivot 把长表转回宽表画数据表格",
+  "width": 560,
+  "height": 630,
+  "padding": 8,
+
+  "data": [
+    {
+      "name": "sales-wide",
+      "values": [
+        { "year": 2019, "q1": 120, "q2": 185, "q3": 150, "q4": 230 },
+        { "year": 2020, "q1": 100, "q2": 90,  "q3": 130, "q4": 180 },
+        { "year": 2021, "q1": 140, "q2": 200, "q3": 175, "q4": 260 },
+        { "year": 2022, "q1": 160, "q2": 210, "q3": 195, "q4": 300 },
+        { "year": 2023, "q1": 180, "q2": 240, "q3": 210, "q4": 330 },
+        { "year": 2024, "q1": 200, "q2": 255, "q3": 230, "q4": 360 }
+      ]
+    },
+    {
+      "name": "sales-long",
+      "source": "sales-wide",
+      "transform": [
+        { "type": "fold", "fields": ["q1", "q2", "q3", "q4"], "as": ["quarter", "sales"] }
+      ]
+    },
+    {
+      "name": "sales-pivoted",
+      "source": "sales-long",
+      "transform": [
+        { "type": "pivot", "groupby": ["year"], "field": "quarter", "value": "sales", "op": "sum" }
+      ]
+    },
+    {
+      "name": "sales-cells",
+      "source": "sales-pivoted",
+      "transform": [
+        { "type": "fold", "fields": ["q1", "q2", "q3", "q4"], "as": ["quarter", "sales"] }
+      ]
+    },
+    {
+      "name": "quarters",
+      "values": [
+        { "quarter": "q1" },
+        { "quarter": "q2" },
+        { "quarter": "q3" },
+        { "quarter": "q4" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": ["q1", "q2", "q3", "q4"],
+      "range": { "scheme": "category10" }
+    }
+  ],
+
+  "legends": [
+    { "fill": "color", "orient": "right", "title": "季度" }
+  ],
+
+  "marks": [
+    {
+      "type": "group",
+      "name": "fold-section",
+      "encode": {
+        "enter": {
+          "y": { "value": 30 },
+          "width": { "signal": "width" },
+          "height": { "value": 280 }
+        }
+      },
+
+      "scales": [
+        {
+          "name": "x",
+          "type": "linear",
+          "domain": { "data": "sales-long", "field": "year" },
+          "range": "width"
+        },
+        {
+          "name": "y",
+          "type": "linear",
+          "domain": { "data": "sales-long", "field": "sales" },
+          "range": "height",
+          "nice": true,
+          "zero": true
+        }
+      ],
+
+      "axes": [
+        { "orient": "bottom", "scale": "x", "title": "年份", "format": "d", "tickMinStep": 1 },
+        { "orient": "left", "scale": "y", "title": "销售额", "grid": true, "gridOpacity": 0.3 }
+      ],
+
+      "marks": [
+        {
+          "type": "text",
+          "encode": {
+            "enter": {
+              "x": { "value": 0 },
+              "y": { "value": -14 },
+              "text": { "value": "① fold：宽表 → 长表，每个季度一条折线" },
+              "fontSize": { "value": 13 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#333333" }
+            }
+          }
+        },
+        {
+          "type": "group",
+          "from": { "facet": { "name": "series", "data": "sales-long", "groupby": "quarter" } },
+          "marks": [
+            {
+              "type": "line",
+              "from": { "data": "series" },
+              "encode": {
+                "enter": {
+                  "x": { "scale": "x", "field": "year" },
+                  "y": { "scale": "y", "field": "sales" },
+                  "stroke": { "scale": "color", "field": "quarter" },
+                  "strokeWidth": { "value": 2 }
+                }
+              }
+            },
+            {
+              "type": "symbol",
+              "from": { "data": "series" },
+              "encode": {
+                "enter": {
+                  "x": { "scale": "x", "field": "year" },
+                  "y": { "scale": "y", "field": "sales" },
+                  "fill": { "scale": "color", "field": "quarter" },
+                  "size": { "value": 36 }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "pivot-section",
+      "encode": {
+        "enter": {
+          "y": { "value": 440 },
+          "width": { "signal": "width" },
+          "height": { "value": 180 }
+        }
+      },
+
+      "scales": [
+        {
+          "name": "xcol",
+          "type": "band",
+          "domain": ["q1", "q2", "q3", "q4"],
+          "range": "width"
+        },
+        {
+          "name": "yrow",
+          "type": "band",
+          "domain": { "data": "sales-pivoted", "field": "year", "sort": true },
+          "range": "height"
+        }
+      ],
+
+      "marks": [
+        {
+          "type": "text",
+          "encode": {
+            "enter": {
+              "x": { "value": 0 },
+              "y": { "value": -34 },
+              "text": { "value": "② pivot：长表 → 宽表（行 = year，列 = q1..q4，值 = sum(sales)）" },
+              "fontSize": { "value": 13 },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#333333" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "quarters" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "xcol", "field": "quarter", "band": 0.5 },
+              "y": { "value": -10 },
+              "text": { "field": "quarter" },
+              "align": { "value": "center" },
+              "baseline": { "value": "bottom" },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#333333" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "sales-pivoted" },
+          "encode": {
+            "enter": {
+              "x": { "value": -10 },
+              "y": { "scale": "yrow", "field": "year", "band": 0.5 },
+              "text": { "field": "year" },
+              "align": { "value": "right" },
+              "baseline": { "value": "middle" },
+              "fontWeight": { "value": "bold" },
+              "fill": { "value": "#333333" }
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "from": { "data": "sales-cells" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "xcol", "field": "quarter" },
+              "width": { "scale": "xcol", "band": 1 },
+              "y": { "scale": "yrow", "field": "year" },
+              "height": { "scale": "yrow", "band": 1 },
+              "fill": { "value": "#f7f9fc" },
+              "stroke": { "value": "#d5dbe3" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "sales-cells" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "xcol", "field": "quarter", "band": 0.5 },
+              "y": { "scale": "yrow", "field": "year", "band": 0.5 },
+              "text": { "field": "sales" },
+              "align": { "value": "center" },
+              "baseline": { "value": "middle" },
+              "fill": { "value": "#333333" }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

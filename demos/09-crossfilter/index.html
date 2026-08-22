@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09 crossfilter 联动过滤 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '09-crossfilter',
+  group: 'B. 数据变换',
+  title: '09 · 联动过滤：crossfilter 三直方图',
+  concepts: ['transform: crossfilter', 'transform: resolvefilter', 'signal 事件流（brush）', 'transform: bin + aggregate', 'formula: hours()', 'group mark 多视图联动']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      在任意直方图上<strong>按住拖动</strong>刷选一个区间，其余两图会按「满足所有刷选条件」的子集重算分布；
+      <strong>双击</strong>某张图重置该维度的刷选。灰色柱是全集背景（不变），蓝色柱是当前子集，黄色半透明框是各图自己的刷选区间。
+      刷选时注意看右侧 Signals 面板里 <code>delayRange / hourRange / distRange</code> 的实时变化。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

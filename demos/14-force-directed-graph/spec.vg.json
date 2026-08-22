@@ -1,0 +1,151 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "力导向节点-链接图（悲惨世界人物共现关系），节点可拖拽固定/释放",
+  "width": 640,
+  "height": 500,
+  "padding": 0,
+  "autosize": "none",
+
+  "signals": [
+    { "name": "cx", "update": "width / 2" },
+    { "name": "cy", "update": "height / 2" },
+    {
+      "description": "节点半径（像素），同时驱动 symbol 面积与 collide 力半径",
+      "name": "nodeRadius", "value": 6,
+      "bind": { "input": "range", "min": 2, "max": 20, "step": 1 }
+    },
+    {
+      "description": "nbody 力强度：负值互相排斥，正值互相吸引",
+      "name": "nodeCharge", "value": -30,
+      "bind": { "input": "range", "min": -100, "max": 10, "step": 1 }
+    },
+    {
+      "description": "link 力的目标边长",
+      "name": "linkDistance", "value": 30,
+      "bind": { "input": "range", "min": 5, "max": 100, "step": 5 }
+    },
+    {
+      "description": "拖拽状态机（1/3）：当前被按住的节点（场景 item）。mousedown 后一直保持引用，mouseup 不清空——释放时还要靠它找到该节点来清除 fx/fy。",
+      "name": "dragged", "value": null,
+      "on": [
+        { "events": "symbol:mousedown", "update": "item()" }
+      ]
+    },
+    {
+      "description": "拖拽状态机（2/3）：拖拽中的光标坐标 [x,y]，未拖拽时为 false。between 事件流 [down, up] > move 表示『只捕获按下到抬起之间的移动』。",
+      "name": "fix", "value": false,
+      "on": [
+        { "events": "symbol:mousedown", "update": "xy()" },
+        { "events": "[symbol:mousedown, window:mouseup] > window:mousemove!", "update": "xy()", "force": true },
+        { "events": "window:mouseup", "update": "false" }
+      ]
+    },
+    {
+      "description": "拖拽状态机（3/3）：fix 一变（按下/移动/抬起）就置 true，绑到 force 变换的 restart 参数上给仿真重新加热（reheat），布局才能跟着拖拽动起来。",
+      "name": "restart", "value": false,
+      "on": [
+        { "events": { "signal": "fix" }, "update": "true" }
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "name": "node-data",
+      "url": "../../assets/data/miserables.json",
+      "format": { "type": "json", "property": "nodes" }
+    },
+    {
+      "name": "link-data",
+      "url": "../../assets/data/miserables.json",
+      "format": { "type": "json", "property": "links" }
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "node-data", "field": "group" },
+      "range": { "scheme": "category20" }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "先声明边、后声明节点：绘制顺序按声明先后，节点压在边上。",
+      "name": "links",
+      "type": "path",
+      "from": { "data": "link-data" },
+      "interactive": false,
+      "encode": {
+        "update": {
+          "stroke": { "value": "#999999" },
+          "strokeOpacity": { "value": 0.4 },
+          "strokeWidth": { "signal": "sqrt(datum.value)" }
+        }
+      },
+      "transform": [
+        {
+          "type": "linkpath",
+          "require": { "signal": "force" },
+          "shape": "line",
+          "sourceX": "datum.source.x", "sourceY": "datum.source.y",
+          "targetX": "datum.target.x", "targetY": "datum.target.y"
+        }
+      ]
+    },
+    {
+      "name": "nodes",
+      "type": "symbol",
+      "from": { "data": "node-data" },
+
+      "on": [
+        {
+          "description": "fix 为数组（拖拽中）：把被拖节点的 fx/fy 钉到光标坐标",
+          "trigger": "fix",
+          "modify": "dragged",
+          "values": "{fx: fix[0], fy: fix[1]}"
+        },
+        {
+          "description": "fix 变回 false（已抬起）：清除 fx/fy，节点恢复自由。注意此时 dragged 仍指向刚被拖过的节点。",
+          "trigger": "!fix",
+          "modify": "dragged",
+          "values": "{fx: null, fy: null}"
+        }
+      ],
+
+      "encode": {
+        "enter": {
+          "fill": { "scale": "color", "field": "group" },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 1 },
+          "tooltip": { "field": "name" }
+        },
+        "update": {
+          "size": { "signal": "2 * nodeRadius * nodeRadius" },
+          "cursor": { "value": "pointer" }
+        },
+        "hover": {
+          "stroke": { "value": "#de2d26" },
+          "strokeWidth": { "value": 2 }
+        }
+      },
+
+      "transform": [
+        {
+          "type": "force",
+          "iterations": 300,
+          "restart": { "signal": "restart" },
+          "signal": "force",
+          "forces": [
+            { "force": "center", "x": { "signal": "cx" }, "y": { "signal": "cy" } },
+            { "force": "collide", "radius": { "signal": "nodeRadius" } },
+            { "force": "nbody", "strength": { "signal": "nodeCharge" } },
+            { "force": "link", "links": "link-data", "distance": { "signal": "linkDistance" } }
+          ]
+        }
+      ]
+    }
+  ]
+}

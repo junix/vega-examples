@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>19 View API 全览 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '19-runtime-api-tour',
+  group: 'E. 运行时 API 与工程化',
+  title: '19 · View API 全览：双渲染器 / 事件与信号监听 / 导出 / 动态尺寸',
+  concepts: ['vega.parse', 'View 生命周期', 'renderer: canvas/svg', 'addEventListener', 'addSignalListener', 'toSVG / toCanvas', 'width/height + runAsync']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      同一份 <code>spec.vg.json</code> 经 <code>vega.parse</code> 一次后喂给两个独立 View：
+      左 <code>canvas</code> 渲染器，右 <code>svg</code> 渲染器。<b>点击散点</b>把 datum 打进日志；
+      拖动任一视图下方的 <code>pointSize</code> 滑块触发 signal 监听（监听器按 View 各自注册）；
+      底部按钮演示导出与动态尺寸。所有输出打印到日志区。
+    </div>
+    <div class="demo-controls">
+      <button id="btn-svg">导出 SVG（canvas 视图的 scenegraph）</button>
+      <button id="btn-png">导出 PNG（canvas 视图 toCanvas）</button>
+      <button id="btn-resize">切换尺寸 520×340 ⇄ 480×300</button>
+    </div>
+    <div style="display:flex; gap:24px; flex-wrap:wrap;">
+      <div>
+        <div class="demo-notes">renderer: <code>canvas</code></div>
+        <div id="view-canvas"></div>
+      </div>
+      <div>
+        <div class="demo-notes">renderer: <code>svg</code></div>
+        <div id="view-svg"></div>
+      </div>
+    </div>
+    <pre id="log" style="background:#f6f8fa; border:1px solid #d8dee4; border-radius:6px; padding:10px; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; max-height:200px; overflow:auto; white-space:pre-wrap;"></pre>
+  </div>
+  <aside id="signals" class="demo-signals">
+    <h2>Signals 实时值</h2>
+    <table>
+      <tr><td class="k">pointSize</td><td class="v">…</td></tr>
+    </table>
+    <div class="demo-notes">
+      本面板由 main.js 里的 <code>addSignalListener</code> 驱动，
+      显示 canvas 视图中的 <code>pointSize</code> 值。
+    </div>
+  </aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

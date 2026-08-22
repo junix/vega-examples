@@ -1,0 +1,5 @@
+{
+  "name": "vega-examples-tools",
+  "private": true,
+  "description": "vega-examples 的校验工具（commonjs，便于 require 仓库根的 UMD 构建）"
+}

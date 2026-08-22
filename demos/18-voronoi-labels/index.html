@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>18 Voronoi 拾取与标签防重叠 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '18-voronoi-labels',
+  group: 'D. 高级布局与扩展',
+  title: '18 · Voronoi 单元格拾取与 label 防重叠标签',
+  concepts: ['transform: voronoi', 'transform: label', '事件: @mark:mouseover', 'signal 联动过滤', 'transform: window rank', 'mark 作为数据源']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      在散点区域<strong>随意移动鼠标</strong>：事件其实由一层透明的 Voronoi 单元格
+      （<code>@cells:mouseover</code>）捕获，离鼠标最近的那个点会被放大高亮并显示车名——
+      不需要给 300 多个点逐个挂监听。带红圈的点是「每个产地马力最大的前 2 名」，
+      它们的名字由 <code>label</code> 变换自动摆放、彼此不重叠也不压点。
+      右侧 Signals 面板可实时看到 <code>hovered</code> 的当前值。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

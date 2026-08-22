@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12 悬停提示与图例交互 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '12-hover-tooltip-legend',
+  group: 'C. 交互',
+  title: '12 · 悬停提示与图例交互：tooltip 通道、hover 联动高亮、点击图例筛选',
+  concepts: ['tooltip 通道', 'encode: hover', 'signal 记录悬停 datum', '@legendSymbol:click 图例点击', 'legend 样式定制', 'scale: ordinal (color/shape)']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      ① 把鼠标悬停到散点上：出现自定义 <code>tooltip</code>（多行文本由 signal 表达式拼接），
+      悬停点放大并加粗描边，其余点变暗。② 点击右侧「产地 Origin（点击筛选）」图例的颜色或文字：
+      只高亮该产地，其余变灰；再次点击同一项（或点击图表空白处）还原。
+      右侧 Signals 面板可实时看到 <code>hovered</code> 与 <code>clickedOrigin</code> 两个 signal 的值。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

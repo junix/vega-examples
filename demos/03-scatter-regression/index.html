@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 散点与回归拟合 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '03-scatter-regression',
+  group: 'A. Grammar 基础',
+  title: '03 · 散点图与回归：filter 滤空值、ordinal 着色与 regression 变换',
+  concepts: ['transform: filter', 'mark: symbol', 'scale: ordinal + legend', 'transform: regression（method/order/extent/as）', 'strokeDash 虚线', 'axis title/grid']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      每个点是一辆汽车，颜色区分产地（悬停散点可提亮）。
+      实线是<strong>线性回归</strong>（<code>method: "linear"</code>），
+      虚线是<strong>二次多项式拟合</strong>（<code>method: "poly", order: 2</code>）；
+      两者都按 Origin 分组拟合，且都只画在各自组的数据范围内（regression 缺省的 extent 行为）。
+      原始数据里有 6 辆车的 Horsepower 为 null，已被 <code>filter</code> 变换滤除。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

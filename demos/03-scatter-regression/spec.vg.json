@@ -1,0 +1,163 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "散点图 + 分组回归拟合：filter 滤除空值、ordinal 着色、regression 变换（linear 与 poly order=2 对比）",
+  "width": 640,
+  "height": 420,
+  "padding": 8,
+
+  "title": {
+    "text": "马力 vs 油耗：按产地分组的一次（实线）/ 二次（虚线）回归拟合",
+    "fontSize": 14
+  },
+
+  "data": [
+    {
+      "name": "cars",
+      "url": "../../assets/data/cars.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.Horsepower != null && datum.Miles_per_Gallon != null"
+        }
+      ]
+    },
+    {
+      "name": "trendLinear",
+      "source": "cars",
+      "transform": [
+        {
+          "type": "regression",
+          "groupby": ["Origin"],
+          "method": "linear",
+          "x": "Horsepower",
+          "y": "Miles_per_Gallon",
+          "as": ["u", "v"]
+        }
+      ]
+    },
+    {
+      "name": "trendQuad",
+      "source": "cars",
+      "transform": [
+        {
+          "type": "regression",
+          "groupby": ["Origin"],
+          "method": "poly",
+          "order": 2,
+          "x": "Horsepower",
+          "y": "Miles_per_Gallon",
+          "as": ["u", "v"]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": { "data": "cars", "field": "Horsepower" },
+      "range": "width",
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": { "data": "cars", "field": "Miles_per_Gallon" },
+      "range": "height",
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "cars", "field": "Origin" },
+      "range": "category"
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "x", "title": "Horsepower（马力）", "grid": true, "gridOpacity": 0.3 },
+    { "orient": "left", "scale": "y", "title": "Miles_per_Gallon（每加仑英里数）", "grid": true, "gridOpacity": 0.3 }
+  ],
+
+  "legends": [
+    { "fill": "color", "title": "产地（Origin）" }
+  ],
+
+  "marks": [
+    {
+      "type": "symbol",
+      "from": { "data": "cars" },
+      "encode": {
+        "enter": {
+          "x": { "scale": "x", "field": "Horsepower" },
+          "y": { "scale": "y", "field": "Miles_per_Gallon" },
+          "fill": { "scale": "color", "field": "Origin" },
+          "size": { "value": 40 }
+        },
+        "update": {
+          "fillOpacity": { "value": 0.55 }
+        },
+        "hover": {
+          "fillOpacity": { "value": 1 }
+        }
+      }
+    },
+    {
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "curveLinear",
+          "data": "trendLinear",
+          "groupby": "Origin"
+        }
+      },
+      "marks": [
+        {
+          "type": "line",
+          "from": { "data": "curveLinear" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "x", "field": "u" },
+              "y": { "scale": "y", "field": "v" },
+              "stroke": { "scale": "color", "field": "Origin" },
+              "strokeWidth": { "value": 2.5 }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "curveQuad",
+          "data": "trendQuad",
+          "groupby": "Origin"
+        }
+      },
+      "marks": [
+        {
+          "type": "line",
+          "from": { "data": "curveQuad" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "x", "field": "u" },
+              "y": { "scale": "y", "field": "v" },
+              "stroke": { "scale": "color", "field": "Origin" },
+              "strokeWidth": { "value": 2.5 },
+              "strokeDash": { "value": [6, 4] },
+              "strokeOpacity": { "value": 0.85 }
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 11 }
+  }
+}

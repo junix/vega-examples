@@ -1,0 +1,83 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "cars 散点图：Horsepower × Miles_per_Gallon，按 Origin 着色。本 demo 的重点不在 spec，而在 main.js 里的 View 运行时 API 演示。",
+  "width": 520,
+  "height": 340,
+  "padding": 8,
+
+  "signals": [
+    {
+      "name": "pointSize",
+      "value": 60,
+      "bind": { "input": "range", "min": 10, "max": 200, "step": 10 }
+    }
+  ],
+
+  "data": [
+    {
+      "name": "cars",
+      "url": "../../assets/data/cars.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.Horsepower != null && datum.Miles_per_Gallon != null"
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": { "data": "cars", "field": "Horsepower" },
+      "range": "width",
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": { "data": "cars", "field": "Miles_per_Gallon" },
+      "range": "height",
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "cars", "field": "Origin" },
+      "range": { "scheme": "category10" }
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "x", "title": "Horsepower（马力）", "grid": true, "gridOpacity": 0.2 },
+    { "orient": "left", "scale": "y", "title": "Miles per Gallon（油耗）", "grid": true, "gridOpacity": 0.2 }
+  ],
+
+  "legends": [
+    { "fill": "color", "title": "Origin（产地）" }
+  ],
+
+  "marks": [
+    {
+      "type": "symbol",
+      "from": { "data": "cars" },
+      "encode": {
+        "enter": {
+          "x": { "scale": "x", "field": "Horsepower" },
+          "y": { "scale": "y", "field": "Miles_per_Gallon" },
+          "fill": { "scale": "color", "field": "Origin" },
+          "fillOpacity": { "value": 0.65 }
+        },
+        "update": {
+          "size": { "signal": "pointSize" }
+        },
+        "hover": {
+          "fillOpacity": { "value": 1 }
+        }
+      }
+    }
+  ]
+}

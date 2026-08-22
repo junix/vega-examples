@@ -1,0 +1,84 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Node 无头渲染 demo：用 inline 数据绘制季度销售额柱状图，可在 Node.js 里直接跑 toSVG() 导出矢量文件。",
+  "width": 500,
+  "height": 260,
+  "padding": 8,
+  "autosize": "fit",
+
+  "data": [
+    {
+      "name": "sales",
+      "values": [
+        {"quarter": "Q1-2024", "revenue": 120},
+        {"quarter": "Q2-2024", "revenue": 180},
+        {"quarter": "Q3-2024", "revenue": 150},
+        {"quarter": "Q4-2024", "revenue": 220},
+        {"quarter": "Q1-2025", "revenue": 160},
+        {"quarter": "Q2-2025", "revenue": 250},
+        {"quarter": "Q3-2025", "revenue": 200},
+        {"quarter": "Q4-2025", "revenue": 310}
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {"data": "sales", "field": "quarter"},
+      "range": "width",
+      "padding": 0.2
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {"data": "sales", "field": "revenue"},
+      "range": "height",
+      "nice": true,
+      "zero": true
+    }
+  ],
+
+  "axes": [
+    {"orient": "bottom", "scale": "x", "labelAngle": -30},
+    {"orient": "left", "scale": "y", "title": "营收（万元）", "grid": true, "gridOpacity": 0.2}
+  ],
+
+  "marks": [
+    {
+      "type": "rect",
+      "from": {"data": "sales"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "quarter"},
+          "width": {"scale": "x", "band": 1},
+          "y": {"scale": "y", "field": "revenue"},
+          "y2": {"scale": "y", "value": 0},
+          "fill": {"value": "#4c78a8"}
+        },
+        "update": {
+          "tooltip": {"signal": "datum.quarter + ': ' + datum.revenue + ' 万元'"}
+        },
+        "hover": {
+          "fill": {"value": "#e45756"}
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {"data": "sales"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "quarter", "band": 0.5},
+          "y": {"scale": "y", "field": "revenue", "offset": -6},
+          "align": {"value": "center"},
+          "baseline": {"value": "bottom"},
+          "fontSize": {"value": 11},
+          "fill": {"value": "#24292f"},
+          "text": {"field": "revenue"}
+        }
+      }
+    }
+  ]
+}

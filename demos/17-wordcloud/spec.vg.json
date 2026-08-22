@@ -1,0 +1,120 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Vega 概念词云：inline 数据 + wordcloud 变换（权重映射字号、字段控制字重与旋转、信号驱动布局参数）",
+  "width": 760,
+  "height": 420,
+  "padding": 0,
+
+  "title": {
+    "text": "Vega 概念词汇云（字号 = 权重）",
+    "fontSize": 15
+  },
+
+  "signals": [
+    {
+      "name": "padding",
+      "value": 2,
+      "bind": { "input": "range", "min": 0, "max": 8, "step": 1 }
+    },
+    {
+      "name": "maxFont",
+      "value": 58,
+      "bind": { "input": "range", "min": 24, "max": 80, "step": 2 }
+    }
+  ],
+
+  "data": [
+    {
+      "name": "words",
+      "values": [
+        { "text": "scale",       "weight": 100, "cat": "grammar",     "rot": 0,  "fw": "bold" },
+        { "text": "mark",        "weight": 96,  "cat": "grammar",     "rot": 0,  "fw": "bold" },
+        { "text": "data",        "weight": 92,  "cat": "grammar",     "rot": 0,  "fw": "bold" },
+        { "text": "encode",      "weight": 90,  "cat": "grammar",     "rot": 0,  "fw": "bold" },
+        { "text": "transform",   "weight": 88,  "cat": "grammar",     "rot": 0,  "fw": "bold" },
+        { "text": "signal",      "weight": 86,  "cat": "grammar",     "rot": 0,  "fw": "bold" },
+        { "text": "axis",        "weight": 70,  "cat": "grammar",     "rot": 0,  "fw": "bold" },
+        { "text": "legend",      "weight": 66,  "cat": "grammar",     "rot": 0,  "fw": "bold" },
+        { "text": "projection",  "weight": 60,  "cat": "grammar",     "rot": 0,  "fw": "bold" },
+        { "text": "spec",        "weight": 52,  "cat": "grammar",     "rot": 90, "fw": "normal" },
+        { "text": "aggregate",   "weight": 62,  "cat": "transform",   "rot": 0,  "fw": "bold" },
+        { "text": "filter",      "weight": 58,  "cat": "transform",   "rot": 0,  "fw": "bold" },
+        { "text": "formula",     "weight": 52,  "cat": "transform",   "rot": 0,  "fw": "normal" },
+        { "text": "lookup",      "weight": 50,  "cat": "transform",   "rot": 0,  "fw": "normal" },
+        { "text": "bin",         "weight": 48,  "cat": "transform",   "rot": 0,  "fw": "normal" },
+        { "text": "stack",       "weight": 46,  "cat": "transform",   "rot": 0,  "fw": "normal" },
+        { "text": "window",      "weight": 42,  "cat": "transform",   "rot": 90, "fw": "normal" },
+        { "text": "fold",        "weight": 30,  "cat": "transform",   "rot": 90, "fw": "normal" },
+        { "text": "pivot",       "weight": 28,  "cat": "transform",   "rot": 0,  "fw": "normal" },
+        { "text": "force",       "weight": 56,  "cat": "layout",      "rot": 0,  "fw": "bold" },
+        { "text": "wordcloud",   "weight": 54,  "cat": "layout",      "rot": 0,  "fw": "normal" },
+        { "text": "voronoi",     "weight": 50,  "cat": "layout",      "rot": 0,  "fw": "normal" },
+        { "text": "geoshape",    "weight": 46,  "cat": "layout",      "rot": 0,  "fw": "normal" },
+        { "text": "treemap",     "weight": 44,  "cat": "layout",      "rot": 0,  "fw": "normal" },
+        { "text": "linkpath",    "weight": 40,  "cat": "layout",      "rot": 0,  "fw": "normal" },
+        { "text": "pack",        "weight": 34,  "cat": "layout",      "rot": 90, "fw": "normal" },
+        { "text": "pie",         "weight": 30,  "cat": "layout",      "rot": 0,  "fw": "normal" },
+        { "text": "stream",      "weight": 58,  "cat": "interaction", "rot": 0,  "fw": "bold" },
+        { "text": "crossfilter", "weight": 54,  "cat": "interaction", "rot": 0,  "fw": "normal" },
+        { "text": "brush",       "weight": 52,  "cat": "interaction", "rot": 0,  "fw": "normal" },
+        { "text": "bind",        "weight": 48,  "cat": "interaction", "rot": 0,  "fw": "normal" },
+        { "text": "hover",       "weight": 44,  "cat": "interaction", "rot": 90, "fw": "normal" },
+        { "text": "tooltip",     "weight": 42,  "cat": "interaction", "rot": 90, "fw": "normal" },
+        { "text": "view",        "weight": 50,  "cat": "runtime",     "rot": 0,  "fw": "normal" },
+        { "text": "parse",       "weight": 46,  "cat": "runtime",     "rot": 0,  "fw": "normal" },
+        { "text": "dataflow",    "weight": 44,  "cat": "runtime",     "rot": 0,  "fw": "normal" },
+        { "text": "expression",  "weight": 42,  "cat": "runtime",     "rot": 0,  "fw": "normal" },
+        { "text": "scenegraph",  "weight": 38,  "cat": "runtime",     "rot": 90, "fw": "normal" }
+      ],
+      "transform": [
+        {
+          "type": "wordcloud",
+          "size": [ { "signal": "width" }, { "signal": "height" } ],
+          "text": { "field": "text" },
+          "font": "Helvetica Neue, Arial",
+          "fontSize": { "field": "weight" },
+          "fontSizeRange": [ 14, { "signal": "maxFont" } ],
+          "fontWeight": { "field": "fw" },
+          "rotate": { "field": "rot" },
+          "padding": { "signal": "padding" }
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "words", "field": "cat" },
+      "range": [ "#4e79a7", "#f28e2b", "#59a14f", "#e15759", "#b07aa1" ]
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "text",
+      "from": { "data": "words" },
+      "encode": {
+        "enter": {
+          "text": { "field": "text" },
+          "align": { "value": "center" },
+          "baseline": { "value": "middle" },
+          "font": { "field": "font" },
+          "fill": { "scale": "color", "field": "cat" }
+        },
+        "update": {
+          "x": { "field": "x" },
+          "y": { "field": "y" },
+          "angle": { "field": "angle" },
+          "fontSize": { "field": "fontSize" },
+          "fontWeight": { "field": "fontWeight" },
+          "fillOpacity": { "value": 1 }
+        },
+        "hover": {
+          "fillOpacity": { "value": 0.4 }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "signal + bind 教学：下拉/滑杆/复选框/数字输入驱动 filter 变换与 size/opacity 通道，标题也是 signal",
+  "width": 640,
+  "height": 400,
+  "padding": 8,
+
+  "title": {
+    "text": {
+      "signal": "'西雅图每日天气 · ' + (weatherType === 'All' ? '全部类型' : weatherType) + ' · 风速 ≤ ' + format(windMax, '.1f') + ' m/s · 可见 ' + length(data('weather')) + ' 天'"
+    },
+    "fontSize": 14
+  },
+
+  "signals": [
+    {
+      "name": "weatherType",
+      "value": "All",
+      "bind": {
+        "input": "select",
+        "name": "天气类型：",
+        "options": ["All", "drizzle", "rain", "sun", "snow", "fog"]
+      }
+    },
+    {
+      "name": "windMax",
+      "value": 9.5,
+      "bind": { "input": "range", "name": "风速上限 (m/s)：", "min": 0.5, "max": 9.5, "step": 0.1 }
+    },
+    {
+      "name": "precipOnly",
+      "value": false,
+      "bind": { "input": "checkbox", "name": "只看降水日（precipitation > 0）：" }
+    },
+    {
+      "name": "pointSize",
+      "value": 80,
+      "bind": { "input": "number", "name": "点大小 (size)：", "min": 20, "max": 400, "step": 20 }
+    },
+    {
+      "name": "pointOpacity",
+      "value": 0.7,
+      "bind": { "input": "range", "name": "点不透明度：", "min": 0.1, "max": 1, "step": 0.05 }
+    }
+  ],
+
+  "data": [
+    {
+      "name": "weather",
+      "url": "../../assets/data/seattle-weather.csv",
+      "format": {
+        "type": "csv",
+        "parse": { "precipitation": "number", "temp_max": "number", "temp_min": "number", "wind": "number" }
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "(weatherType === 'All' || datum.weather === weatherType) && datum.wind <= windMax && (!precipOnly || datum.precipitation > 0)"
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "zero": false,
+      "nice": true,
+      "domain": { "data": "weather", "field": "temp_max" },
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "zero": true,
+      "nice": true,
+      "domain": { "data": "weather", "field": "precipitation" },
+      "range": "height"
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": ["drizzle", "rain", "sun", "snow", "fog"],
+      "range": "category"
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "x", "title": "日最高气温 temp_max (°C)", "grid": true, "gridOpacity": 0.2 },
+    { "orient": "left", "scale": "y", "title": "降水量 precipitation (mm)", "grid": true, "gridOpacity": 0.2 }
+  ],
+
+  "legends": [
+    { "fill": "color", "title": "weather（天气类型）", "orient": "right" }
+  ],
+
+  "marks": [
+    {
+      "name": "points",
+      "type": "symbol",
+      "from": { "data": "weather" },
+      "encode": {
+        "enter": {
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 0.5 }
+        },
+        "update": {
+          "x": { "scale": "x", "field": "temp_max" },
+          "y": { "scale": "y", "field": "precipitation" },
+          "fill": { "scale": "color", "field": "weather" },
+          "size": { "signal": "pointSize" },
+          "fillOpacity": { "signal": "pointOpacity" }
+        },
+        "hover": {
+          "fillOpacity": { "value": 1 }
+        }
+      }
+    }
+  ]
+}

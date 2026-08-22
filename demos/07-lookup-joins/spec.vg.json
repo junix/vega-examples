@@ -1,0 +1,259 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "lookup 变换教学：people↔groups 双向连接、values/default 参数形态、source 数组合并、nest+pluck/join 成员名单、aggregate 组统计",
+  "width": 780,
+  "height": 320,
+  "padding": 8,
+
+  "title": {
+    "text": "lookup：人员 ↔ 分组 双向连接",
+    "subtitle": "左：以 groups 为主表 lookup people → 每组平均身高 + 成员名单；右：以 people 为主表 lookup groups（红色为无匹配，演示 default）",
+    "fontSize": 14,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#666666"
+  },
+
+  "data": [
+    {
+      "name": "people",
+      "url": "../../assets/data/lookup_people.csv"
+    },
+    {
+      "name": "groups",
+      "url": "../../assets/data/lookup_groups.csv"
+    },
+    {
+      "name": "newcomers",
+      "comment": "人为构造的一行无匹配数据：Zoe 不在 groups 表里，用来演示 lookup 失败时的 default",
+      "values": [
+        { "name": "Zoe", "age": 28, "height": 169 }
+      ]
+    },
+    {
+      "name": "roster",
+      "comment": "people ∪ newcomers 作为左面板数据源：每人一行，带匹配结果与行号",
+      "source": ["people", "newcomers"],
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "groups",
+          "key": "person",
+          "fields": ["name"],
+          "as": ["membership"]
+        },
+        {
+          "type": "lookup",
+          "from": "groups",
+          "key": "person",
+          "fields": ["name"],
+          "values": ["group"],
+          "as": ["group_flat"],
+          "default": "?"
+        },
+        {
+          "type": "formula",
+          "as": "group_id",
+          "expr": "datum.membership ? datum.membership.group : null"
+        },
+        {
+          "type": "formula",
+          "as": "sort_key",
+          "expr": "datum.group_id == null ? 99 : datum.group_id"
+        },
+        {
+          "type": "collect",
+          "sort": { "field": ["sort_key", "name"], "order": ["ascending", "ascending"] }
+        },
+        {
+          "type": "window",
+          "ops": ["row_number"],
+          "as": ["idx"]
+        }
+      ]
+    },
+    {
+      "name": "members",
+      "comment": "反向：以 groups 为主表，lookup people 把 age/height 平铺回每组-成员行",
+      "source": "groups",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "people",
+          "key": "name",
+          "fields": ["person"],
+          "values": ["age", "height"]
+        }
+      ]
+    },
+    {
+      "name": "group_stats",
+      "source": "members",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["group"],
+          "ops": ["mean", "count"],
+          "fields": ["height", "height"],
+          "as": ["avg_height", "n"]
+        }
+      ]
+    },
+    {
+      "name": "group_roster",
+      "comment": "aggregate 的 values 操作把同组行收集成数组，formula 用 pluck+join 拼成员名单",
+      "source": "groups",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["group"],
+          "ops": ["values"],
+          "fields": ["person"],
+          "as": ["member_list"]
+        },
+        {
+          "type": "formula",
+          "as": "member_names",
+          "expr": "join(pluck(datum.member_list, 'person'), '、')"
+        }
+      ]
+    }
+  ],
+
+  "marks": [
+    {
+      "name": "panelA",
+      "type": "group",
+      "title": {
+        "text": "每组平均身高与成员名单",
+        "orient": "top",
+        "anchor": "start",
+        "fontSize": 12,
+        "fontWeight": "bold",
+        "offset": 4
+      },
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 20 },
+          "width": { "value": 380 },
+          "height": { "value": 210 },
+          "fill": { "value": "#fafafa" },
+          "stroke": { "value": "#dddddd" }
+        }
+      },
+      "scales": [
+        {
+          "name": "xg",
+          "type": "band",
+          "domain": { "data": "group_stats", "field": "group" },
+          "range": "width",
+          "padding": 0.25
+        },
+        {
+          "name": "yg",
+          "type": "linear",
+          "domain": { "data": "group_stats", "field": "avg_height" },
+          "range": "height",
+          "nice": true,
+          "zero": true
+        }
+      ],
+      "axes": [
+        { "orient": "bottom", "scale": "xg" },
+        { "orient": "left", "scale": "yg", "title": "平均身高 (cm)", "grid": true, "gridOpacity": 0.3 }
+      ],
+      "marks": [
+        {
+          "type": "rect",
+          "from": { "data": "group_stats" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "xg", "field": "group" },
+              "width": { "scale": "xg", "band": 1 },
+              "y": { "scale": "yg", "field": "avg_height" },
+              "y2": { "scale": "yg", "value": 0 },
+              "fill": { "value": "#4e79a7" }
+            },
+            "hover": {
+              "fillOpacity": { "value": 0.7 }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "group_stats" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "xg", "field": "group", "band": 0.5 },
+              "y": { "scale": "yg", "field": "avg_height", "offset": -3 },
+              "align": { "value": "center" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 11 },
+              "fill": { "value": "#333333" },
+              "text": { "signal": "format(datum.avg_height, '.1f') + ' cm · n=' + datum.n" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "group_roster" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "xg", "field": "group", "band": 0.5 },
+              "y": { "value": 250 },
+              "align": { "value": "center" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#666666" },
+              "text": { "field": "member_names" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "panelB",
+      "type": "group",
+      "title": {
+        "text": "人员 → 组 匹配结果（红色 = 未匹配）",
+        "orient": "top",
+        "anchor": "start",
+        "fontSize": 12,
+        "fontWeight": "bold",
+        "offset": 4
+      },
+      "encode": {
+        "enter": {
+          "x": { "value": 430 },
+          "y": { "value": 20 },
+          "width": { "value": 340 },
+          "height": { "value": 230 },
+          "fill": { "value": "#fafafa" },
+          "stroke": { "value": "#dddddd" }
+        }
+      },
+      "marks": [
+        {
+          "type": "text",
+          "from": { "data": "roster" },
+          "encode": {
+            "enter": {
+              "x": { "value": 10 },
+              "y": { "signal": "12 + datum.idx * 20" },
+              "baseline": { "value": "middle" },
+              "fontSize": { "value": 11 },
+              "fill": { "signal": "datum.membership ? '#333333' : '#d62728'" },
+              "text": {
+                "signal": "datum.idx + '. ' + datum.name + '（' + datum.age + '岁, ' + datum.height + 'cm）→ ' + (datum.membership ? '组 ' + datum.group_id : '未匹配，group_flat = default \"' + datum.group_flat + '\"')"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 10 }
+  }
+}

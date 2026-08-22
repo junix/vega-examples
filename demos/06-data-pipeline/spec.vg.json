@@ -1,0 +1,218 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "数据变换管线教学：filter → formula → window(rank) → filter → collect，旁路 aggregate 均值；group mark + facet 按 Origin 分面",
+  "width": 780,
+  "height": 210,
+  "padding": 8,
+
+  "title": {
+    "text": "每个 Origin 功率重量比 Top-3 车型",
+    "subtitle": "power_ratio = Horsepower ÷ Weight_in_lbs · 组下方脚注为该 Origin 全体车型均值（旁路 aggregate）",
+    "fontSize": 14,
+    "subtitleFontSize": 11,
+    "subtitleColor": "#666666"
+  },
+
+  "signals": [
+    {
+      "name": "cellWidth",
+      "update": "bandwidth('gpos') * 0.86"
+    },
+    {
+      "name": "cellHeight",
+      "value": 128
+    }
+  ],
+
+  "data": [
+    {
+      "name": "cars_clean",
+      "url": "../../assets/data/cars.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.Horsepower != null && datum.Weight_in_lbs != null"
+        },
+        {
+          "type": "formula",
+          "as": "power_ratio",
+          "expr": "datum.Horsepower / datum.Weight_in_lbs"
+        }
+      ]
+    },
+    {
+      "name": "top3",
+      "source": "cars_clean",
+      "transform": [
+        {
+          "type": "window",
+          "groupby": ["Origin"],
+          "sort": { "field": "power_ratio", "order": "descending" },
+          "ops": ["rank"],
+          "as": ["rank"]
+        },
+        {
+          "type": "filter",
+          "expr": "datum.rank <= 3"
+        },
+        {
+          "type": "collect",
+          "sort": { "field": ["Origin", "rank"], "order": ["ascending", "ascending"] }
+        }
+      ]
+    },
+    {
+      "name": "origin_avg",
+      "source": "cars_clean",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["Origin"],
+          "ops": ["mean"],
+          "fields": ["power_ratio"],
+          "as": ["avg_ratio"]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "gpos",
+      "type": "band",
+      "domain": { "data": "top3", "field": "Origin" },
+      "range": "width",
+      "padding": 0.12
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "top3", "field": "Origin" },
+      "range": { "scheme": "tableau10" }
+    }
+  ],
+
+  "marks": [
+    {
+      "name": "cell",
+      "type": "group",
+      "from": {
+        "facet": { "name": "cells", "data": "top3", "groupby": "Origin" }
+      },
+      "encode": {
+        "enter": {
+          "x": { "scale": "gpos", "field": "Origin" },
+          "y": { "value": 16 },
+          "width": { "signal": "cellWidth" },
+          "height": { "signal": "cellHeight" },
+          "fill": { "value": "#fafafa" },
+          "stroke": { "value": "#dddddd" }
+        }
+      },
+      "scales": [
+        {
+          "name": "x",
+          "type": "linear",
+          "domain": { "data": "cells", "field": "power_ratio" },
+          "range": [0, { "signal": "cellWidth" }],
+          "nice": true,
+          "zero": true
+        },
+        {
+          "name": "y",
+          "type": "band",
+          "domain": { "data": "cells", "field": "rank" },
+          "range": [14, { "signal": "cellHeight" }],
+          "padding": 0.15
+        }
+      ],
+      "axes": [
+        { "orient": "bottom", "scale": "x", "tickCount": 5, "format": ".3f" },
+        { "orient": "left", "scale": "y", "tickSize": 0, "labelPadding": 4, "title": "rank" }
+      ],
+      "marks": [
+        {
+          "type": "rect",
+          "from": { "data": "cells" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "x", "value": 0 },
+              "x2": { "scale": "x", "field": "power_ratio" },
+              "y": { "scale": "y", "field": "rank" },
+              "height": { "scale": "y", "band": 0.62 },
+              "fill": { "scale": "color", "field": "Origin" }
+            },
+            "hover": {
+              "fillOpacity": { "value": 0.7 }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "cells" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "x", "value": 0, "offset": 2 },
+              "y": { "scale": "y", "field": "rank", "offset": -2 },
+              "baseline": { "value": "bottom" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#333333" },
+              "text": { "field": "Name" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "from": { "data": "cells" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "x", "field": "power_ratio", "offset": 4 },
+              "y": { "scale": "y", "field": "rank", "band": 0.31 },
+              "baseline": { "value": "middle" },
+              "align": { "value": "left" },
+              "fontSize": { "value": 10 },
+              "fill": { "value": "#777777" },
+              "text": { "signal": "format(datum.power_ratio, '.4f')" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "from": { "data": "cell" },
+      "encode": {
+        "enter": {
+          "x": { "signal": "datum.x + datum.width / 2" },
+          "y": { "field": "y", "offset": -3 },
+          "align": { "value": "center" },
+          "baseline": { "value": "bottom" },
+          "fontSize": { "value": 12 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#222222" },
+          "text": { "field": "datum.Origin" }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": { "data": "origin_avg" },
+      "encode": {
+        "enter": {
+          "x": { "scale": "gpos", "field": "Origin", "band": 0.5 },
+          "y": { "value": 178 },
+          "align": { "value": "center" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#666666" },
+          "text": { "signal": "'组均值 ' + format(datum.avg_ratio, '.4f')" }
+        }
+      }
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 10 }
+  }
+}

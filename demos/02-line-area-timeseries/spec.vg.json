@@ -1,0 +1,148 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "时间序列多序列折线 + 总量面积衬底：format.parse 解析日期、time 比例尺、from.facet 分组、末端文字标注",
+  "width": 720,
+  "height": 360,
+  "padding": { "left": 8, "top": 8, "right": 64, "bottom": 8 },
+
+  "title": {
+    "text": "五大科技股走势（2000–2010）：折线 + 总量面积衬底",
+    "fontSize": 14
+  },
+
+  "data": [
+    {
+      "name": "stocks",
+      "url": "../../assets/data/stocks.csv",
+      "format": { "type": "csv", "parse": { "date": "date", "price": "number" } }
+    },
+    {
+      "name": "total",
+      "source": "stocks",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["date"],
+          "ops": ["sum"],
+          "fields": ["price"],
+          "as": ["total_price"]
+        }
+      ]
+    },
+    {
+      "name": "endpoints",
+      "source": "stocks",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": ["symbol"],
+          "ops": ["argmax"],
+          "fields": ["date"],
+          "as": ["last"]
+        },
+        {
+          "type": "formula",
+          "as": "dy",
+          "expr": "datum.symbol === 'IBM' ? -8 : datum.symbol === 'AMZN' ? 8 : 0"
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "time",
+      "domain": { "data": "stocks", "field": "date" },
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": { "data": "total", "field": "total_price" },
+      "range": "height",
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "stocks", "field": "symbol" },
+      "range": "category"
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "x", "format": "%Y", "title": "年份" },
+    { "orient": "left", "scale": "y", "title": "股价（美元）", "grid": true, "gridOpacity": 0.3 }
+  ],
+
+  "legends": [
+    { "stroke": "color", "title": "股票代码" }
+  ],
+
+  "marks": [
+    {
+      "type": "area",
+      "from": { "data": "total" },
+      "encode": {
+        "enter": {
+          "x": { "scale": "x", "field": "date" },
+          "y": { "scale": "y", "field": "total_price" },
+          "y2": { "scale": "y", "value": 0 },
+          "fill": { "value": "#4e79a7" },
+          "fillOpacity": { "value": 0.12 }
+        }
+      }
+    },
+    {
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "series",
+          "data": "stocks",
+          "groupby": "symbol"
+        }
+      },
+      "marks": [
+        {
+          "type": "line",
+          "from": { "data": "series" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "x", "field": "date" },
+              "y": { "scale": "y", "field": "price" },
+              "stroke": { "scale": "color", "field": "symbol" },
+              "strokeWidth": { "value": 2 }
+            },
+            "update": {
+              "strokeOpacity": { "value": 1 }
+            },
+            "hover": {
+              "strokeOpacity": { "value": 0.4 }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "from": { "data": "endpoints" },
+      "encode": {
+        "enter": {
+          "x": { "scale": "x", "field": "last.date", "offset": 8 },
+          "y": { "scale": "y", "field": "last.price" },
+          "dy": { "field": "dy" },
+          "text": { "field": "symbol" },
+          "fill": { "scale": "color", "field": "symbol" },
+          "baseline": { "value": "middle" },
+          "fontWeight": { "value": "bold" }
+        }
+      }
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 11 }
+  }
+}

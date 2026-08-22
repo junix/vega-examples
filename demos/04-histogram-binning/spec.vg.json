@@ -1,0 +1,166 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "直方图：bin 变换把连续的延误分钟数切成区间，aggregate 统计每箱航班数，rule + text 标出平均延误",
+  "width": 640,
+  "height": 360,
+  "padding": 8,
+
+  "title": {
+    "text": "航班起飞延误分布（flights-2k，extent [-60, 200] 分钟）",
+    "fontSize": 14
+  },
+
+  "signals": [
+    {
+      "name": "maxbins",
+      "value": 20,
+      "bind": { "input": "select", "options": [10, 20, 40], "name": "最大分箱数 maxbins：" }
+    },
+    {
+      "name": "binCount",
+      "update": "(bins.stop - bins.start) / bins.step"
+    }
+  ],
+
+  "data": [
+    {
+      "name": "flights",
+      "url": "../../assets/data/flights-2k.json"
+    },
+    {
+      "name": "in-range",
+      "source": "flights",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.delay >= -60 && datum.delay <= 200"
+        }
+      ]
+    },
+    {
+      "name": "binned",
+      "source": "in-range",
+      "transform": [
+        {
+          "type": "bin",
+          "field": "delay",
+          "extent": [-60, 200],
+          "maxbins": { "signal": "maxbins" },
+          "signal": "bins"
+        },
+        {
+          "type": "aggregate",
+          "key": "bin0",
+          "groupby": ["bin0", "bin1"],
+          "fields": ["bin0"],
+          "ops": ["count"],
+          "as": ["count"]
+        }
+      ]
+    },
+    {
+      "name": "stats",
+      "source": "in-range",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": ["delay"],
+          "ops": ["mean"],
+          "as": ["mean_delay"]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "xscale",
+      "type": "linear",
+      "domain": { "signal": "[bins.start, bins.stop]" },
+      "range": "width",
+      "bins": { "signal": "bins" }
+    },
+    {
+      "name": "yscale",
+      "type": "linear",
+      "domain": { "data": "binned", "field": "count" },
+      "range": "height",
+      "round": true,
+      "zero": true,
+      "nice": true
+    }
+  ],
+
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "xscale",
+      "title": "起飞延误（分钟）· bin 区间左闭右开 [bin0, bin1)",
+      "labelOverlap": true,
+      "zindex": 1
+    },
+    {
+      "orient": "left",
+      "scale": "yscale",
+      "title": "航班数量",
+      "tickCount": 8,
+      "grid": true,
+      "gridOpacity": 0.3
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "rect",
+      "from": { "data": "binned" },
+      "encode": {
+        "update": {
+          "x": { "scale": "xscale", "field": "bin0" },
+          "x2": { "scale": "xscale", "field": "bin1" },
+          "y": { "scale": "yscale", "field": "count" },
+          "y2": { "scale": "yscale", "value": 0 },
+          "fill": { "value": "#4e79a7" }
+        },
+        "hover": {
+          "fill": { "value": "#e15759" }
+        }
+      }
+    },
+    {
+      "type": "rule",
+      "from": { "data": "stats" },
+      "encode": {
+        "update": {
+          "x": { "scale": "xscale", "field": "mean_delay" },
+          "x2": { "scale": "xscale", "field": "mean_delay" },
+          "y": { "value": 0 },
+          "y2": { "signal": "height" },
+          "stroke": { "value": "#e15759" },
+          "strokeWidth": { "value": 2 },
+          "strokeDash": { "value": [6, 4] }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": { "data": "stats" },
+      "encode": {
+        "enter": {
+          "y": { "value": 6 },
+          "align": { "value": "left" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 12 },
+          "fill": { "value": "#e15759" }
+        },
+        "update": {
+          "x": { "scale": "xscale", "field": "mean_delay", "offset": 6 },
+          "text": { "signal": "'平均延误 ' + format(datum.mean_delay, '.1f') + ' 分钟'" }
+        }
+      }
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 11 }
+  }
+}

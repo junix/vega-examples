@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>15 层次布局：Treemap 与 Sunburst · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '15-hierarchies',
+  group: 'D. 高级布局与扩展',
+  title: '15 · 层次布局：一棵层级树的 Treemap 与 Sunburst 两种画法',
+  concepts: ['transform: stratify', 'transform: treemap', 'transform: partition', '产出字段 x0/y0/x1/y1 与 a0/r0/a1/r1', 'mark: rect / arc', 'scale: ordinal(depth)', 'filter 控制标签密度']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      同一份 flare 层级数据、同一棵 stratify 生成的树的两种空间填充布局：
+      <strong>左侧 Treemap</strong> 用嵌套矩形（面积 ∝ size，颜色 = 深度）；
+      <strong>右侧 Sunburst</strong> 用径向扇环（弧长 ∝ size，中心留空）。
+      右侧 Signals 面板可切换 treemap 的 <code>layout</code> 切分算法与 <code>aspectRatio</code> 长宽比目标。
+      悬停扇环可看到节点名与 size。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

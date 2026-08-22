@@ -1,0 +1,258 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "同一 spec 两个 group mark 面板：上为 stack 堆叠柱状图，下为 facet 分组柱状图（population 2000 年）",
+  "width": 640,
+  "height": 510,
+  "padding": 8,
+
+  "title": {
+    "text": "2000 年美国人口年龄-性别分布：堆叠 vs 分组",
+    "fontSize": 14
+  },
+
+  "data": [
+    {
+      "name": "population",
+      "url": "../../assets/data/population.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.year === 2000"
+        },
+        {
+          "type": "aggregate",
+          "groupby": ["age", "sex"],
+          "fields": ["people"],
+          "ops": ["sum"],
+          "as": ["people"]
+        }
+      ]
+    },
+    {
+      "name": "stacked",
+      "source": "population",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": ["age"],
+          "sort": { "field": "sex" },
+          "field": "people",
+          "as": ["y0", "y1"]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": [1, 2],
+      "range": ["#4e79a7", "#f28e2b"]
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "title": "性别",
+      "encode": {
+        "labels": {
+          "update": {
+            "text": { "signal": "datum.value === 1 ? '男' : '女'" }
+          }
+        }
+      }
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "group",
+      "name": "stacked-panel",
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 0 },
+          "width": { "signal": "width" },
+          "height": { "value": 220 },
+          "stroke": { "value": "#e0e0e0" }
+        }
+      },
+
+      "scales": [
+        {
+          "name": "x-age",
+          "type": "band",
+          "domain": { "data": "stacked", "field": "age" },
+          "range": "width",
+          "padding": 0.15
+        },
+        {
+          "name": "y-stack",
+          "type": "linear",
+          "domain": { "data": "stacked", "field": "y1" },
+          "range": "height",
+          "zero": true,
+          "nice": true
+        }
+      ],
+
+      "axes": [
+        { "orient": "bottom", "scale": "x-age", "title": "年龄（岁）" },
+        {
+          "orient": "left", "scale": "y-stack", "title": "人口数（堆叠合计）",
+          "format": "~s", "grid": true, "gridOpacity": 0.3
+        }
+      ],
+
+      "marks": [
+        {
+          "type": "rect",
+          "from": { "data": "stacked" },
+          "encode": {
+            "enter": {
+              "x": { "scale": "x-age", "field": "age" },
+              "width": { "scale": "x-age", "band": 1 },
+              "y": { "scale": "y-stack", "field": "y0" },
+              "y2": { "scale": "y-stack", "field": "y1" },
+              "fill": { "scale": "color", "field": "sex" }
+            },
+            "update": {
+              "fillOpacity": { "value": 1 }
+            },
+            "hover": {
+              "fillOpacity": { "value": 0.5 }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "encode": {
+            "enter": {
+              "x": { "signal": "width", "offset": -6 },
+              "y": { "value": 6 },
+              "align": { "value": "right" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 12 },
+              "fill": { "value": "#777777" },
+              "text": { "value": "上面板：堆叠柱状图 · stack 变换产出 y0 / y1" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "grouped-panel",
+      "encode": {
+        "enter": {
+          "x": { "value": 0 },
+          "y": { "value": 290 },
+          "width": { "signal": "width" },
+          "height": { "value": 220 },
+          "stroke": { "value": "#e0e0e0" }
+        }
+      },
+
+      "scales": [
+        {
+          "name": "x-age-gr",
+          "type": "band",
+          "domain": { "data": "population", "field": "age" },
+          "range": "width",
+          "padding": 0.15
+        },
+        {
+          "name": "y-group",
+          "type": "linear",
+          "domain": { "data": "population", "field": "people" },
+          "range": "height",
+          "zero": true,
+          "nice": true
+        }
+      ],
+
+      "axes": [
+        { "orient": "bottom", "scale": "x-age-gr", "title": "年龄（岁）" },
+        {
+          "orient": "left", "scale": "y-group", "title": "人口数（按性别分列）",
+          "format": "~s", "grid": true, "gridOpacity": 0.3
+        }
+      ],
+
+      "marks": [
+        {
+          "type": "text",
+          "encode": {
+            "enter": {
+              "x": { "signal": "width", "offset": -6 },
+              "y": { "value": 6 },
+              "align": { "value": "right" },
+              "baseline": { "value": "top" },
+              "fontSize": { "value": 12 },
+              "fill": { "value": "#777777" },
+              "text": { "value": "下面板：分组柱状图 · group mark facet + 嵌套 band 比例尺" }
+            }
+          }
+        },
+        {
+          "type": "group",
+          "name": "age-group",
+          "from": {
+            "facet": {
+              "data": "population",
+              "name": "by-age",
+              "groupby": "age"
+            }
+          },
+
+          "encode": {
+            "enter": {
+              "x": { "scale": "x-age-gr", "field": "age" },
+              "y": { "value": 0 },
+              "width": { "signal": "bandwidth('x-age-gr')" },
+              "height": { "signal": "height" }
+            }
+          },
+
+          "scales": [
+            {
+              "name": "x-sex",
+              "type": "band",
+              "domain": { "data": "by-age", "field": "sex" },
+              "range": "width",
+              "padding": 0.12
+            }
+          ],
+
+          "marks": [
+            {
+              "type": "rect",
+              "from": { "data": "by-age" },
+              "encode": {
+                "enter": {
+                  "x": { "scale": "x-sex", "field": "sex" },
+                  "width": { "scale": "x-sex", "band": 1 },
+                  "y": { "scale": "y-group", "field": "people" },
+                  "y2": { "scale": "y-group", "value": 0 },
+                  "fill": { "scale": "color", "field": "sex" }
+                },
+                "update": {
+                  "fillOpacity": { "value": 1 }
+                },
+                "hover": {
+                  "fillOpacity": { "value": 0.5 }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 11 }
+  }
+}

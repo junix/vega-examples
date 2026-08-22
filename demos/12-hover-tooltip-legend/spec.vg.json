@@ -1,0 +1,185 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "散点图：tooltip 通道、signal 驱动的悬停联动高亮、可点击图例筛选（再次点击还原）",
+  "width": 640,
+  "height": 420,
+  "padding": 8,
+
+  "title": { "text": "汽车：马力 × 油耗（颜色与形状双图例表示产地）", "fontSize": 14 },
+
+  "signals": [
+    {
+      "name": "hovered",
+      "value": null,
+      "on": [
+        { "events": "@point:mouseover", "update": "datum" },
+        { "events": "@point:mouseout",  "update": "null" }
+      ]
+    },
+    {
+      "name": "clickedOrigin",
+      "value": null,
+      "on": [
+        {
+          "events": "@legendSymbol:click, @legendLabel:click",
+          "update": "clickedOrigin === datum.value ? null : datum.value",
+          "force": true
+        },
+        {
+          "events": "pointerup[!event.item]",
+          "update": "null",
+          "force": true
+        }
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "name": "source",
+      "url": "../../assets/data/cars.json",
+      "format": { "type": "json", "parse": { "Year": "date" } },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.Horsepower != null && datum.Miles_per_Gallon != null && datum.Origin != null"
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": { "data": "source", "field": "Horsepower" },
+      "range": "width",
+      "nice": true,
+      "zero": false,
+      "round": true
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": { "data": "source", "field": "Miles_per_Gallon" },
+      "range": "height",
+      "nice": true,
+      "zero": false,
+      "round": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": { "data": "source", "field": "Origin" },
+      "range": { "scheme": "category10" }
+    },
+    {
+      "name": "shape",
+      "type": "ordinal",
+      "domain": { "data": "source", "field": "Origin" },
+      "range": [ "circle", "square", "triangle-up" ]
+    }
+  ],
+
+  "axes": [
+    {
+      "orient": "bottom", "scale": "x", "title": "马力 Horsepower (hp)",
+      "grid": true, "gridOpacity": 0.2, "domain": false, "tickCount": 8
+    },
+    {
+      "orient": "left", "scale": "y", "title": "油耗 Miles_per_Gallon (mpg)",
+      "grid": true, "gridOpacity": 0.2, "domain": false
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "title": "产地 Origin（点击筛选）",
+      "orient": "right",
+      "titleFontSize": 13,
+      "labelFontSize": 12,
+      "symbolType": "circle",
+      "symbolSize": 120,
+      "encode": {
+        "symbols": {
+          "name": "legendSymbol",
+          "interactive": true,
+          "update": {
+            "cursor": { "value": "pointer" },
+            "opacity": [
+              { "test": "!clickedOrigin || datum.value === clickedOrigin", "value": 1 },
+              { "value": 0.2 }
+            ]
+          }
+        },
+        "labels": {
+          "name": "legendLabel",
+          "interactive": true,
+          "update": {
+            "cursor": { "value": "pointer" },
+            "opacity": [
+              { "test": "!clickedOrigin || datum.value === clickedOrigin", "value": 1 },
+              { "value": 0.35 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "shape": "shape",
+      "title": "产地 Origin（形状对照）",
+      "orient": "right",
+      "titleFontSize": 13,
+      "labelFontSize": 12,
+      "symbolStrokeColor": "#555555",
+      "symbolStrokeWidth": 1.5
+    }
+  ],
+
+  "marks": [
+    {
+      "name": "point",
+      "type": "symbol",
+      "from": { "data": "source" },
+      "encode": {
+        "update": {
+          "x": { "scale": "x", "field": "Horsepower" },
+          "y": { "scale": "y", "field": "Miles_per_Gallon" },
+          "shape": { "scale": "shape", "field": "Origin" },
+          "tooltip": {
+            "signal": "datum.Name + '\\n产地 Origin: ' + datum.Origin + '\\n年份 Year: ' + utcFormat(datum.Year, '%Y') + '\\n马力 Horsepower: ' + datum.Horsepower + ' hp\\n油耗 MPG: ' + datum.Miles_per_Gallon"
+          },
+          "fill": [
+            { "test": "clickedOrigin && datum.Origin !== clickedOrigin", "value": "#cccccc" },
+            { "scale": "color", "field": "Origin" }
+          ],
+          "size": [
+            { "test": "datum === hovered", "value": 260 },
+            { "value": 110 }
+          ],
+          "stroke": [
+            { "test": "datum === hovered", "value": "#24292f" },
+            { "value": "#ffffff" }
+          ],
+          "strokeWidth": [
+            { "test": "datum === hovered", "value": 2.5 },
+            { "value": 0.8 }
+          ],
+          "opacity": [
+            { "test": "hovered && datum !== hovered", "value": 0.15 },
+            { "test": "clickedOrigin && datum.Origin !== clickedOrigin", "value": 0.2 },
+            { "value": 0.85 }
+          ]
+        },
+        "hover": {
+          "cursor": { "value": "pointer" }
+        }
+      }
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 11 }
+  }
+}

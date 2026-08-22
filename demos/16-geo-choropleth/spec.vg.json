@@ -1,0 +1,104 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "美国县级失业率分级统计地图（choropleth）：TopoJSON 数据 + lookup 连接 + albersUsa 投影 + quantize 填色",
+  "width": 960,
+  "height": 600,
+  "padding": 8,
+  "autosize": "none",
+
+  "title": {
+    "text": "2009 年美国各县失业率（%）",
+    "fontSize": 15
+  },
+
+  "data": [
+    {
+      "name": "unemployment",
+      "url": "../../assets/data/unemployment.tsv",
+      "format": { "type": "tsv", "parse": "auto" }
+    },
+    {
+      "name": "counties",
+      "url": "../../assets/data/us-10m.json",
+      "format": { "type": "topojson", "feature": "counties" },
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "unemployment",
+          "key": "id",
+          "fields": ["id"],
+          "values": ["rate"]
+        },
+        {
+          "type": "filter",
+          "expr": "datum.rate != null"
+        }
+      ]
+    },
+    {
+      "name": "states",
+      "url": "../../assets/data/us-10m.json",
+      "format": { "type": "topojson", "feature": "states" }
+    }
+  ],
+
+  "projections": [
+    {
+      "name": "usa",
+      "type": "albersUsa"
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "color",
+      "type": "quantize",
+      "domain": [0, 0.15],
+      "range": { "scheme": "bluepurple", "count": 7 }
+    }
+  ],
+
+  "legends": [
+    {
+      "fill": "color",
+      "orient": "bottom-right",
+      "title": "失业率",
+      "format": "0.1%"
+    }
+  ],
+
+  "marks": [
+    {
+      "type": "shape",
+      "from": { "data": "counties" },
+      "encode": {
+        "enter": {
+          "tooltip": { "signal": "'FIPS ' + datum.id + '：' + format(datum.rate, '0.1%')" }
+        },
+        "update": {
+          "fill": { "scale": "color", "field": "rate" }
+        },
+        "hover": {
+          "fill": { "value": "#e45756" }
+        }
+      },
+      "transform": [
+        { "type": "geoshape", "projection": "usa" }
+      ]
+    },
+    {
+      "type": "shape",
+      "from": { "data": "states" },
+      "encode": {
+        "enter": {
+          "fill": { "value": null },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 0.75 }
+        }
+      },
+      "transform": [
+        { "type": "geoshape", "projection": "usa" }
+      ]
+    }
+  ]
+}

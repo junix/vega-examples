@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 直方图与 bin 分箱 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '04-histogram-binning',
+  group: 'A. Grammar 基础',
+  title: '04 · 直方图：bin 分箱变换、频数聚合与均值参考线',
+  concepts: ['transform: bin', 'bin0 / bin1 产出字段', 'transform: aggregate', 'transform 的 signal 产出', 'scale.bins 对齐刻度', 'mark: rule', 'signal: bind 交互']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      切换左上角的 <code>maxbins</code> 下拉框，观察柱子数量、x 轴刻度与右侧 Signals 面板中
+      <code>binCount</code> 的联动；悬停柱子看 <code>hover</code> 编码效果。红色虚线是平均延误，
+      由独立的 <code>stats</code> 数据集（aggregate mean）驱动。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

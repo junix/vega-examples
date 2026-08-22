@@ -1,0 +1,101 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "实时数据流骨架：data live 初始为空（由 main.js 推入），x 域跟随 signal window 的宽度，y 域随数据自适应",
+  "width": 640,
+  "height": 300,
+  "padding": 8,
+
+  "title": { "text": "随机游走实时流（数据由 main.js 在运行时推入）", "fontSize": 14 },
+
+  "signals": [
+    {
+      "name": "window",
+      "value": 40,
+      "bind": { "input": "range", "min": 10, "max": 120, "step": 10, "name": "窗口大小 N（最近 N 个点）" }
+    }
+  ],
+
+  "data": [
+    {
+      "name": "live",
+      "values": []
+    },
+    {
+      "name": "stats",
+      "source": "live",
+      "transform": [
+        {
+          "type": "aggregate",
+          "fields": [ "t", "v", "v" ],
+          "ops": [ "max", "min", "max" ],
+          "as": [ "maxT", "minV", "maxV" ]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "signal": "data('stats').length ? [data('stats')[0].maxT - window + 1, data('stats')[0].maxT] : [0, window - 1]"
+      },
+      "range": "width",
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "signal": "data('stats').length ? [data('stats')[0].minV - 2, data('stats')[0].maxV + 2] : [-10, 10]"
+      },
+      "range": "height",
+      "nice": true,
+      "zero": false
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "x", "title": "采样序号 t", "format": "d", "tickCount": 10 },
+    { "orient": "left", "scale": "y", "title": "随机游走值 v", "grid": true, "gridOpacity": 0.3 }
+  ],
+
+  "marks": [
+    {
+      "type": "line",
+      "from": { "data": "live" },
+      "clip": true,
+      "encode": {
+        "enter": {
+          "stroke": { "value": "#4e79a7" },
+          "strokeWidth": { "value": 2 }
+        },
+        "update": {
+          "x": { "scale": "x", "field": "t" },
+          "y": { "scale": "y", "field": "v" }
+        }
+      }
+    },
+    {
+      "type": "symbol",
+      "from": { "data": "live" },
+      "clip": true,
+      "encode": {
+        "enter": {
+          "fill": { "value": "#4e79a7" },
+          "size": { "value": 36 }
+        },
+        "update": {
+          "x": { "scale": "x", "field": "t" },
+          "y": { "scale": "y", "field": "v" },
+          "tooltip": { "signal": "'t = ' + datum.t + '\\nv = ' + datum.v" }
+        }
+      }
+    }
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 11 }
+  }
+}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>11 事件流：刷选与缩放 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '11-events-brush-zoom',
+  group: 'C. 交互',
+  title: '11 · 事件流：interval 刷选 + 滚轮缩放 + Shift 拖拽平移',
+  concepts: ['events: source/type/between/filter/consume', 'interval brush（像素区间）', 'invert() / scale() 表达式', 'wheel 缩放（anchor/zoom 模式）', 'Shift+拖拽平移', 'extent 变换输出 signal']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      操作：<b>按住鼠标拖拽</b>＝框选（半透明矩形，范围内保持彩色、范围外变灰）；
+      <b>Shift + 拖拽</b>＝平移；<b>滚轮</b>＝以指针为锚点缩放；<b>双击</b>＝清除框选。
+      操作时观察右侧 Signals 面板：<code>brush</code> / <code>delta</code> / <code>xdom</code> / <code>ydom</code>
+      的实时变化就是事件流驱动数据流的直接证据。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

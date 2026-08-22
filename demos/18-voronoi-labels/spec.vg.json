@@ -1,0 +1,193 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Voronoi 单元格拾取 + label 防重叠标签：cars 数据集的马力-油耗散点图",
+  "width": 640,
+  "height": 400,
+  "padding": 8,
+
+  "title": {
+    "text": "汽车马力 vs 油耗：Voronoi 拾取与自动标签",
+    "fontSize": 15
+  },
+
+  "signals": [
+    {
+      "name": "hovered",
+      "value": null,
+      "on": [
+        { "events": "@cells:mouseover", "update": "datum" },
+        { "events": "@cells:mouseout", "update": "null" }
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "name": "cars",
+      "url": "../../assets/data/cars.json",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.Horsepower != null && datum.Miles_per_Gallon != null"
+        }
+      ]
+    },
+    {
+      "name": "pts",
+      "source": "cars",
+      "transform": [
+        { "type": "formula", "as": "px", "expr": "scale('x', datum.Horsepower)" },
+        { "type": "formula", "as": "py", "expr": "scale('y', datum.Miles_per_Gallon)" },
+        {
+          "type": "voronoi",
+          "x": "px",
+          "y": "py",
+          "extent": { "signal": "[[0, 0], [width, height]]" },
+          "as": "cell"
+        }
+      ]
+    },
+    {
+      "name": "labelcars",
+      "source": "pts",
+      "transform": [
+        {
+          "type": "window",
+          "ops": ["rank"],
+          "partitionby": ["Origin"],
+          "sort": { "field": "Horsepower", "order": "descending" }
+        },
+        { "type": "filter", "expr": "datum.rank <= 2" }
+      ]
+    },
+    {
+      "name": "hovercar",
+      "source": "pts",
+      "transform": [
+        { "type": "filter", "expr": "datum === hovered" }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": { "data": "cars", "field": "Horsepower" },
+      "range": "width",
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": { "data": "cars", "field": "Miles_per_Gallon" },
+      "range": "height",
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "c",
+      "type": "ordinal",
+      "domain": { "data": "cars", "field": "Origin" },
+      "range": ["#4e79a7", "#f28e2b", "#59a14f"]
+    }
+  ],
+
+  "axes": [
+    { "orient": "bottom", "scale": "x", "title": "马力 Horsepower", "grid": true, "gridOpacity": 0.3 },
+    { "orient": "left", "scale": "y", "title": "每加仑英里数 Miles_per_Gallon", "grid": true, "gridOpacity": 0.3 }
+  ],
+
+  "legends": [
+    { "fill": "c", "orient": "top-right", "title": "产地 Origin" }
+  ],
+
+  "marks": [
+    {
+      "name": "cells",
+      "type": "path",
+      "from": { "data": "pts" },
+      "encode": {
+        "enter": {
+          "path": { "field": "cell" },
+          "fill": { "value": "transparent" }
+        }
+      }
+    },
+    {
+      "name": "points",
+      "type": "symbol",
+      "from": { "data": "pts" },
+      "encode": {
+        "enter": {
+          "x": { "field": "px" },
+          "y": { "field": "py" },
+          "fill": { "scale": "c", "field": "Origin" }
+        },
+        "update": {
+          "size": { "signal": "datum === hovered ? 300 : 60" },
+          "fillOpacity": { "signal": "hovered == null || datum === hovered ? 0.75 : 0.2" },
+          "stroke": { "signal": "datum === hovered ? '#333333' : '#ffffff'" },
+          "strokeWidth": { "signal": "datum === hovered ? 2 : 0.5" }
+        }
+      }
+    },
+    {
+      "name": "labelpoints",
+      "type": "symbol",
+      "from": { "data": "labelcars" },
+      "encode": {
+        "enter": {
+          "x": { "field": "px" },
+          "y": { "field": "py" },
+          "size": { "value": 220 },
+          "fillOpacity": { "value": 0 },
+          "stroke": { "value": "#e45756" },
+          "strokeWidth": { "value": 1.5 }
+        }
+      }
+    },
+    {
+      "name": "labels",
+      "type": "text",
+      "from": { "data": "labelpoints" },
+      "encode": {
+        "enter": {
+          "text": { "field": "datum.Name" },
+          "fontSize": { "value": 10 },
+          "fill": { "value": "#333333" }
+        }
+      },
+      "transform": [
+        {
+          "type": "label",
+          "size": { "signal": "[width, height]" },
+          "avoidMarks": ["points"],
+          "anchor": ["top", "bottom", "right", "left"],
+          "offset": [4]
+        }
+      ]
+    },
+    {
+      "name": "hovername",
+      "type": "text",
+      "from": { "data": "hovercar" },
+      "encode": {
+        "enter": {
+          "x": { "field": "px" },
+          "y": { "field": "py" },
+          "dy": { "value": -14 },
+          "text": { "field": "Name" },
+          "align": { "value": "center" },
+          "fontSize": { "value": 13 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#222222" },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 3 },
+          "strokeOpacity": { "value": 0.9 }
+        }
+      }
+    }
+  ]
+}

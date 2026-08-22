@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>17 词云布局 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '17-wordcloud',
+  group: 'D. 高级布局与扩展',
+  title: '17 · 词云：wordcloud 变换与文字布局回写',
+  concepts: ['transform: wordcloud', 'mark: text', 'data.values', 'signal: bind', 'scale: ordinal', '布局字段回写']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      拖动图表上方的 <code>padding</code> / <code>maxFont</code> 滑杆：词之间的间距与最大字号是
+      <strong>signal 驱动的 wordcloud 变换参数</strong>，改动后布局会整体重排。
+      悬停到单词上可看到 <code>hover</code> 编码集的半透明效果；颜色按概念类别
+      （语法 / 变换 / 布局 / 交互 / 运行时）经 ordinal 比例尺映射。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>05 堆叠与分组柱状图 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '05-stacked-grouped-bar',
+  group: 'A. Grammar 基础',
+  title: '05 · 堆叠与分组柱状图：stack 变换、group mark 面板与 facet 分面',
+  concepts: ['transform: stack', 'stack 产出 y0 / y1', 'mark: group 面板布局', 'from.facet 按组分面', '嵌套 band 比例尺', 'legend encode 改写标签']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      同一个 spec 里的两个 <code>group</code> 标记面板（灰色描边即各自范围）：上面板用
+      <code>stack</code> 变换把男女两段人口叠成一根柱；下面板用 <code>from.facet</code>
+      按年龄各生成一个子分组，组内再用嵌套 band 比例尺并排画两根柱。两个面板共享同一个
+      <code>color</code> 比例尺与图例（图例标签由 <code>legend.encode.labels</code> 改写为
+      男/女）。悬停任意柱子看 <code>hover</code> 效果。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>08 宽长互转 fold/pivot · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '08-reshape-fold-pivot',
+  group: 'B. 数据变换',
+  title: '08 · 宽长互转：fold 与 pivot 变换',
+  concepts: ['transform: fold', 'transform: pivot', 'facet 多序列分组', 'group mark 分区布局', 'scale: band（表格单元格）', 'legend']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      上半部分是 <code>fold</code> 之后的多序列折线（每个季度一条线），下半部分是
+      <code>pivot</code> 还原出的宽表。对照两部分的数字：fold 与 pivot 互为逆操作。
+      数据管线为 <code>sales-wide → sales-long → sales-pivoted</code>，全部在 spec 的
+      <code>data</code> 段里声明。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

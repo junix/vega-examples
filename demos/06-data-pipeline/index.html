@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 数据变换管线 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '06-data-pipeline',
+  group: 'B. 数据变换',
+  title: '06 · 数据变换管线：每个 Origin 功率重量比 Top-3',
+  concepts: ['transform: filter', 'transform: formula', 'transform: window (rank)', 'transform: collect (sort)', 'transform: aggregate', 'data: source 派生', 'mark: group + facet']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      本图的教学主线是 <code>spec.vg.json</code> 里 <code>data</code> 段的变换管线：
+      <code>cars_clean</code>（filter → formula）→ <code>top3</code>（window → filter → collect），
+      旁路 <code>origin_avg</code>（aggregate）给每组一个均值脚注。
+      三个面板由 <strong>group mark + facet</strong> 按 Origin 切分；面板内的比例尺、坐标轴都是各自独立的。
+      右侧 Signals 面板可看到 <code>cellWidth</code> 如何用 <code>bandwidth('gpos')</code> 自动跟随画布宽度。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

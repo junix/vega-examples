@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 柱状图基础 · vega-examples</title>
+<link rel="stylesheet" href="../../assets/demo.css">
+<script>
+/* DEMO_META 会被 assets/demo.js 用来渲染统一页头（面包屑/标题/概念标签） */
+window.DEMO_META = {
+  slug: '01-bar-chart',
+  group: 'A. Grammar 基础',
+  title: '01 · 柱状图：数据、比例尺、坐标轴与矩形标记',
+  concepts: ['data.values', 'scale: band', 'scale: linear', 'axis', 'mark: rect', 'mark: text', 'encode: enter/update/hover']
+};
+</script>
+</head>
+<body>
+<main class="demo-main">
+  <div class="demo-view">
+    <div class="demo-notes">
+      把鼠标悬停到柱子上看 <code>hover</code> 编码集的效果。本图的全部内容都由
+      <code>spec.vg.json</code> 一份 JSON 声明式描述，没有任何手写绘图代码。
+    </div>
+    <div id="view"></div>
+  </div>
+  <aside id="signals"></aside>
+</main>
+<script src="../../assets/vega.min.js"></script>
+<script src="../../assets/demo.js"></script>
+<script src="./main.js"></script>
+</body>
+</html>

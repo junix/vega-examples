@@ -1,0 +1,457 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "经典 crossfilter：在任意直方图上刷选，其余两图按选中子集重算分布（灰色=全集背景，蓝色=子集），双击重置",
+  "width": 560,
+  "padding": 8,
+
+  "signals": [
+    { "name": "chartHeight", "value": 110 },
+    { "name": "chartGap", "value": 60 },
+    { "name": "height", "update": "(chartHeight + chartGap) * 3" },
+
+    { "name": "delayExtent", "value": [-60, 370] },
+    { "name": "hourExtent", "value": [0, 24] },
+    { "name": "distExtent", "value": [0, 4200] },
+
+    { "name": "delayAnchor", "value": 0,
+      "on": [
+        { "events": "@delay:pointerdown!", "update": "invert('delayScale', x())" }
+      ]
+    },
+    { "name": "delayRange", "update": "delayExtent",
+      "on": [
+        {
+          "events": "@delay:dblclick!",
+          "update": "[delayExtent[0], delayExtent[1]]"
+        },
+        {
+          "events": "[@delay:pointerdown, window:pointerup] > window:pointermove!",
+          "update": "[min(delayAnchor, invert('delayScale', x())), max(delayAnchor, invert('delayScale', x()))]"
+        }
+      ]
+    },
+
+    { "name": "hourAnchor", "value": 0,
+      "on": [
+        { "events": "@hour:pointerdown!", "update": "invert('hourScale', x())" }
+      ]
+    },
+    { "name": "hourRange", "update": "hourExtent",
+      "on": [
+        {
+          "events": "@hour:dblclick!",
+          "update": "[hourExtent[0], hourExtent[1]]"
+        },
+        {
+          "events": "[@hour:pointerdown, window:pointerup] > window:pointermove!",
+          "update": "[min(hourAnchor, invert('hourScale', x())), max(hourAnchor, invert('hourScale', x()))]"
+        }
+      ]
+    },
+
+    { "name": "distAnchor", "value": 0,
+      "on": [
+        { "events": "@dist:pointerdown!", "update": "invert('distScale', x())" }
+      ]
+    },
+    { "name": "distRange", "update": "distExtent",
+      "on": [
+        {
+          "events": "@dist:dblclick!",
+          "update": "[distExtent[0], distExtent[1]]"
+        },
+        {
+          "events": "[@dist:pointerdown, window:pointerup] > window:pointermove!",
+          "update": "[min(distAnchor, invert('distScale', x())), max(distAnchor, invert('distScale', x()))]"
+        }
+      ]
+    }
+  ],
+
+  "data": [
+    {
+      "name": "flights-raw",
+      "url": "../../assets/data/flights-2k.json",
+      "format": { "type": "json", "parse": { "date": "date:'%Y/%m/%d %H:%M'" } },
+      "transform": [
+        { "type": "formula", "as": "hour", "expr": "hours(datum.date)" },
+        { "type": "bin", "field": "delay", "extent": { "signal": "delayExtent" }, "step": 10, "as": ["delay0", "delay1"] },
+        { "type": "bin", "field": "hour", "extent": { "signal": "hourExtent" }, "step": 1, "as": ["hour0", "hour1"] },
+        { "type": "bin", "field": "distance", "extent": { "signal": "distExtent" }, "step": 100, "as": ["dist0", "dist1"] }
+      ]
+    },
+    {
+      "name": "flights",
+      "source": "flights-raw",
+      "transform": [
+        {
+          "type": "crossfilter",
+          "signal": "xfilter",
+          "fields": ["delay", "hour", "distance"],
+          "query": [
+            { "signal": "delayRange" },
+            { "signal": "hourRange" },
+            { "signal": "distRange" }
+          ]
+        }
+      ]
+    }
+  ],
+
+  "scales": [
+    {
+      "name": "layout",
+      "type": "band",
+      "domain": ["delay", "hour", "distance"],
+      "range": "height"
+    },
+    {
+      "name": "delayScale",
+      "type": "linear",
+      "round": true,
+      "domain": { "signal": "delayExtent" },
+      "range": "width"
+    },
+    {
+      "name": "hourScale",
+      "type": "linear",
+      "round": true,
+      "domain": { "signal": "hourExtent" },
+      "range": "width"
+    },
+    {
+      "name": "distScale",
+      "type": "linear",
+      "round": true,
+      "domain": { "signal": "distExtent" },
+      "range": "width"
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "延误直方图",
+      "name": "delay",
+      "type": "group",
+      "encode": {
+        "enter": {
+          "y": { "scale": "layout", "value": "delay", "offset": 25 },
+          "width": { "signal": "width" },
+          "height": { "signal": "chartHeight" },
+          "fill": { "value": "transparent" }
+        }
+      },
+
+      "data": [
+        {
+          "name": "delay-bg",
+          "source": "flights-raw",
+          "transform": [
+            { "type": "aggregate", "groupby": ["delay0", "delay1"], "key": "delay0", "drop": false }
+          ]
+        },
+        {
+          "name": "delay-fg",
+          "source": "flights",
+          "transform": [
+            { "type": "resolvefilter", "ignore": 1, "filter": { "signal": "xfilter" } },
+            { "type": "aggregate", "groupby": ["delay0", "delay1"], "key": "delay0", "drop": false }
+          ]
+        }
+      ],
+
+      "scales": [
+        {
+          "name": "yscale",
+          "type": "linear",
+          "nice": true,
+          "domain": { "data": "delay-bg", "field": "count" },
+          "range": [ { "signal": "chartHeight" }, 0 ]
+        }
+      ],
+
+      "axes": [
+        { "orient": "bottom", "scale": "delayScale" }
+      ],
+
+      "marks": [
+        {
+          "type": "rect",
+          "interactive": false,
+          "from": { "data": "delay-bg" },
+          "encode": {
+            "enter": { "fill": { "value": "#dcdcdc" } },
+            "update": {
+              "x": { "scale": "delayScale", "field": "delay0" },
+              "x2": { "scale": "delayScale", "field": "delay1", "offset": -1 },
+              "y": { "scale": "yscale", "field": "count" },
+              "y2": { "scale": "yscale", "value": 0 }
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "interactive": false,
+          "from": { "data": "delay-fg" },
+          "encode": {
+            "enter": { "fill": { "value": "#4e79a7" } },
+            "update": {
+              "x": { "scale": "delayScale", "field": "delay0" },
+              "x2": { "scale": "delayScale", "field": "delay1", "offset": -1 },
+              "y": { "scale": "yscale", "field": "count" },
+              "y2": { "scale": "yscale", "value": 0 }
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "y": { "value": 0 },
+              "height": { "signal": "chartHeight" },
+              "fill": { "value": "#f2cf5b" },
+              "fillOpacity": { "value": 0.18 },
+              "stroke": { "value": "#d4a017" },
+              "strokeWidth": { "value": 1 }
+            },
+            "update": {
+              "x": { "signal": "scale('delayScale', delayRange[0])" },
+              "x2": { "signal": "scale('delayScale', delayRange[1])" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "y": { "value": -8 },
+              "text": { "value": "到达延误（分钟）" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 13 },
+              "fontWeight": { "value": 500 },
+              "fill": { "value": "#333333" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "起飞时刻直方图",
+      "name": "hour",
+      "type": "group",
+      "encode": {
+        "enter": {
+          "y": { "scale": "layout", "value": "hour", "offset": 25 },
+          "width": { "signal": "width" },
+          "height": { "signal": "chartHeight" },
+          "fill": { "value": "transparent" }
+        }
+      },
+
+      "data": [
+        {
+          "name": "hour-bg",
+          "source": "flights-raw",
+          "transform": [
+            { "type": "aggregate", "groupby": ["hour0", "hour1"], "key": "hour0", "drop": false }
+          ]
+        },
+        {
+          "name": "hour-fg",
+          "source": "flights",
+          "transform": [
+            { "type": "resolvefilter", "ignore": 2, "filter": { "signal": "xfilter" } },
+            { "type": "aggregate", "groupby": ["hour0", "hour1"], "key": "hour0", "drop": false }
+          ]
+        }
+      ],
+
+      "scales": [
+        {
+          "name": "yscale",
+          "type": "linear",
+          "nice": true,
+          "domain": { "data": "hour-bg", "field": "count" },
+          "range": [ { "signal": "chartHeight" }, 0 ]
+        }
+      ],
+
+      "axes": [
+        { "orient": "bottom", "scale": "hourScale", "tickCount": 12 }
+      ],
+
+      "marks": [
+        {
+          "type": "rect",
+          "interactive": false,
+          "from": { "data": "hour-bg" },
+          "encode": {
+            "enter": { "fill": { "value": "#dcdcdc" } },
+            "update": {
+              "x": { "scale": "hourScale", "field": "hour0" },
+              "x2": { "scale": "hourScale", "field": "hour1", "offset": -1 },
+              "y": { "scale": "yscale", "field": "count" },
+              "y2": { "scale": "yscale", "value": 0 }
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "interactive": false,
+          "from": { "data": "hour-fg" },
+          "encode": {
+            "enter": { "fill": { "value": "#4e79a7" } },
+            "update": {
+              "x": { "scale": "hourScale", "field": "hour0" },
+              "x2": { "scale": "hourScale", "field": "hour1", "offset": -1 },
+              "y": { "scale": "yscale", "field": "count" },
+              "y2": { "scale": "yscale", "value": 0 }
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "y": { "value": 0 },
+              "height": { "signal": "chartHeight" },
+              "fill": { "value": "#f2cf5b" },
+              "fillOpacity": { "value": 0.18 },
+              "stroke": { "value": "#d4a017" },
+              "strokeWidth": { "value": 1 }
+            },
+            "update": {
+              "x": { "signal": "scale('hourScale', hourRange[0])" },
+              "x2": { "signal": "scale('hourScale', hourRange[1])" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "y": { "value": -8 },
+              "text": { "value": "起飞时刻（小时）" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 13 },
+              "fontWeight": { "value": 500 },
+              "fill": { "value": "#333333" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "description": "航程直方图",
+      "name": "dist",
+      "type": "group",
+      "encode": {
+        "enter": {
+          "y": { "scale": "layout", "value": "distance", "offset": 25 },
+          "width": { "signal": "width" },
+          "height": { "signal": "chartHeight" },
+          "fill": { "value": "transparent" }
+        }
+      },
+
+      "data": [
+        {
+          "name": "dist-bg",
+          "source": "flights-raw",
+          "transform": [
+            { "type": "aggregate", "groupby": ["dist0", "dist1"], "key": "dist0", "drop": false }
+          ]
+        },
+        {
+          "name": "dist-fg",
+          "source": "flights",
+          "transform": [
+            { "type": "resolvefilter", "ignore": 4, "filter": { "signal": "xfilter" } },
+            { "type": "aggregate", "groupby": ["dist0", "dist1"], "key": "dist0", "drop": false }
+          ]
+        }
+      ],
+
+      "scales": [
+        {
+          "name": "yscale",
+          "type": "linear",
+          "nice": true,
+          "domain": { "data": "dist-bg", "field": "count" },
+          "range": [ { "signal": "chartHeight" }, 0 ]
+        }
+      ],
+
+      "axes": [
+        { "orient": "bottom", "scale": "distScale" }
+      ],
+
+      "marks": [
+        {
+          "type": "rect",
+          "interactive": false,
+          "from": { "data": "dist-bg" },
+          "encode": {
+            "enter": { "fill": { "value": "#dcdcdc" } },
+            "update": {
+              "x": { "scale": "distScale", "field": "dist0" },
+              "x2": { "scale": "distScale", "field": "dist1", "offset": -1 },
+              "y": { "scale": "yscale", "field": "count" },
+              "y2": { "scale": "yscale", "value": 0 }
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "interactive": false,
+          "from": { "data": "dist-fg" },
+          "encode": {
+            "enter": { "fill": { "value": "#4e79a7" } },
+            "update": {
+              "x": { "scale": "distScale", "field": "dist0" },
+              "x2": { "scale": "distScale", "field": "dist1", "offset": -1 },
+              "y": { "scale": "yscale", "field": "count" },
+              "y2": { "scale": "yscale", "value": 0 }
+            }
+          }
+        },
+        {
+          "type": "rect",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "y": { "value": 0 },
+              "height": { "signal": "chartHeight" },
+              "fill": { "value": "#f2cf5b" },
+              "fillOpacity": { "value": 0.18 },
+              "stroke": { "value": "#d4a017" },
+              "strokeWidth": { "value": 1 }
+            },
+            "update": {
+              "x": { "signal": "scale('distScale', distRange[0])" },
+              "x2": { "signal": "scale('distScale', distRange[1])" }
+            }
+          }
+        },
+        {
+          "type": "text",
+          "interactive": false,
+          "encode": {
+            "enter": {
+              "y": { "value": -8 },
+              "text": { "value": "航程（英里）" },
+              "baseline": { "value": "bottom" },
+              "fontSize": { "value": 13 },
+              "fontWeight": { "value": 500 },
+              "fill": { "value": "#333333" }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

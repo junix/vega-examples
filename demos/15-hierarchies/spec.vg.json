@@ -1,0 +1,192 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "同一棵层级树的两种空间填充布局：左 treemap（嵌套矩形），右 sunburst（径向扇环，中心留空）",
+  "width": 960,
+  "height": 500,
+  "padding": 5,
+  "autosize": "none",
+
+  "signals": [
+    {
+      "description": "treemap 切分算法",
+      "name": "layout", "value": "squarify",
+      "bind": {
+        "input": "select",
+        "options": ["squarify", "binary", "slicedice", "slice", "dice"]
+      }
+    },
+    {
+      "description": "squarify 的目标长宽比（越接近 1 越方）",
+      "name": "aspectRatio", "value": 1.6,
+      "bind": { "input": "range", "min": 1, "max": 4, "step": 0.1 }
+    },
+    { "name": "tmWidth", "update": "width / 2 - 20" },
+    { "name": "tmHeight", "update": "height - 30" },
+    { "name": "sunRadius", "update": "min(tmHeight, width - tmWidth - 40) / 2" },
+    { "name": "sunCx", "update": "tmWidth + 30 + sunRadius" },
+    { "name": "sunCy", "update": "height / 2" }
+  ],
+
+  "data": [
+    {
+      "name": "flare-flat",
+      "url": "../../assets/data/flare.json"
+    },
+    {
+      "name": "tree-treemap",
+      "source": "flare-flat",
+      "transform": [
+        {
+          "type": "stratify",
+          "key": "id",
+          "parentKey": "parent"
+        },
+        {
+          "type": "treemap",
+          "field": "size",
+          "sort": { "field": "value", "order": "descending" },
+          "round": true,
+          "padding": 1,
+          "method": { "signal": "layout" },
+          "ratio": { "signal": "aspectRatio" },
+          "size": [ { "signal": "tmWidth" }, { "signal": "tmHeight" } ]
+        }
+      ]
+    },
+    {
+      "description": "只为面积足够大的叶子生成标签，控制标签密度",
+      "name": "treemap-labels",
+      "source": "tree-treemap",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "!datum.children && datum.x1 - datum.x0 > 40 && datum.y1 - datum.y0 > 14"
+        }
+      ]
+    },
+    {
+      "name": "tree-sunburst",
+      "source": "flare-flat",
+      "transform": [
+        {
+          "type": "stratify",
+          "key": "id",
+          "parentKey": "parent"
+        },
+        {
+          "type": "partition",
+          "field": "size",
+          "sort": { "field": "value", "order": "descending" },
+          "size": [ { "signal": "2 * PI" }, { "signal": "sunRadius" } ],
+          "as": ["a0", "r0", "a1", "r1", "depth", "children"]
+        }
+      ]
+    },
+    {
+      "description": "sunburst 不画根节点（depth=0），中心自然留空",
+      "name": "sunburst-arcs",
+      "source": "tree-sunburst",
+      "transform": [
+        { "type": "filter", "expr": "datum.depth > 0" }
+      ]
+    },
+    {
+      "name": "sunburst-center",
+      "values": [ { "name": "flare" } ]
+    }
+  ],
+
+  "scales": [
+    {
+      "description": "两个面板共享的深度配色：domain 按数据出现顺序推断为 [0,1,2,3,4]（flare 共五级）",
+      "name": "depthColor",
+      "type": "ordinal",
+      "domain": { "data": "tree-treemap", "field": "depth" },
+      "range": { "scheme": "tableau10" }
+    }
+  ],
+
+  "marks": [
+    {
+      "description": "Treemap：全部节点都画成矩形。数据按先根遍历输出，父节点先画、子节点压在上面，天然形成嵌套效果",
+      "type": "rect",
+      "from": { "data": "tree-treemap" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "fill": { "scale": "depthColor", "field": "depth" },
+          "stroke": { "value": "#ffffff" }
+        },
+        "update": {
+          "x": { "field": "x0" },
+          "y": { "field": "y0" },
+          "x2": { "field": "x1" },
+          "y2": { "field": "y1" }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": { "data": "treemap-labels" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "text": { "field": "name" },
+          "align": { "value": "center" },
+          "baseline": { "value": "middle" },
+          "fill": { "value": "#222222" },
+          "fontSize": { "value": 10 }
+        },
+        "update": {
+          "x": { "signal": "0.5 * (datum.x0 + datum.x1)" },
+          "y": { "signal": "0.5 * (datum.y0 + datum.y1)" }
+        }
+      }
+    },
+    {
+      "description": "Sunburst：partition 的 y 输出当半径、x 输出当弧度（已用 as 重命名为 a0/r0/a1/r1）",
+      "type": "arc",
+      "from": { "data": "sunburst-arcs" },
+      "encode": {
+        "enter": {
+          "x": { "signal": "sunCx" },
+          "y": { "signal": "sunCy" },
+          "fill": { "scale": "depthColor", "field": "depth" },
+          "tooltip": { "signal": "datum.name + (datum.size ? ' · size=' + datum.size : '')" }
+        },
+        "update": {
+          "startAngle": { "field": "a0" },
+          "endAngle": { "field": "a1" },
+          "innerRadius": { "field": "r0" },
+          "outerRadius": { "field": "r1" },
+          "stroke": { "value": "#ffffff" },
+          "strokeWidth": { "value": 1 },
+          "zindex": { "value": 0 }
+        },
+        "hover": {
+          "stroke": { "value": "#333333" },
+          "strokeWidth": { "value": 2 },
+          "zindex": { "value": 1 }
+        }
+      }
+    },
+    {
+      "description": "中心留白处放上根节点名称",
+      "type": "text",
+      "from": { "data": "sunburst-center" },
+      "interactive": false,
+      "encode": {
+        "enter": {
+          "x": { "signal": "sunCx" },
+          "y": { "signal": "sunCy" },
+          "text": { "field": "name" },
+          "align": { "value": "center" },
+          "baseline": { "value": "middle" },
+          "fontSize": { "value": 14 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#555555" }
+        }
+      }
+    }
+  ]
+}
