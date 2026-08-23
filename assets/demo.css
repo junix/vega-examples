@@ -113,16 +113,53 @@ a:hover { text-decoration: underline; }
 /* gallery 首页 */
 .gallery-main { max-width: 1560px; margin: 24px auto; padding: 0 24px; }
 .gallery-group h2 { font-size: 17px; border-bottom: 1px solid #d8dee4; padding-bottom: 6px; margin-top: 28px; }
-.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 .gallery-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border: 1px solid #d8dee4;
   border-radius: 8px;
-  padding: 12px 14px;
+  overflow: hidden;
   color: inherit;
 }
-.gallery-card:hover { border-color: #0969da; text-decoration: none; }
+.gallery-card:hover { border-color: #0969da; text-decoration: none; box-shadow: 0 2px 10px rgba(9, 105, 218, .12); }
+
+/*
+ * 卡片缩略图：thumbs/<slug>.png，由 tools/thumbs.cjs 生成（透明底）。
+ * 各 demo 的画幅长宽比差得很远（600×194 的宽条到 329×380 的竖幅都有），
+ * 所以卡片上固定一个取景框、图片 contain 居中 —— 只留白，绝不裁切或拉伸。
+ * 取景框比例 30:19 与生成器的 --box 600x380 对齐，最宽/最高的图刚好铺满。
+ */
+.gallery-thumb {
+  aspect-ratio: 30 / 19;
+  background: #fff;
+  border-bottom: 1px solid #eaeef2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  overflow: hidden;
+}
+.gallery-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+}
+/* 缩略图还没生成时的占位（不是死图标，直接把补图命令写出来） */
+.gallery-thumb.is-missing {
+  background: #f6f8fa;
+  color: #8c959f;
+  font-size: 12px;
+  line-height: 1.8;
+  text-align: center;
+  padding: 12px;
+}
+.gallery-thumb.is-missing code { background: #eaeef2; border-radius: 4px; padding: 1px 6px; }
+
+.gallery-card .body { padding: 10px 14px 12px; }
 .gallery-card .t { font-weight: 600; margin-bottom: 6px; }
 .gallery-card .tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .gallery-card .tag { font-size: 11px; background: #eaeef2; color: #57606a; border-radius: 8px; padding: 1px 8px; }

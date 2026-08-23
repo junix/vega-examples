@@ -86,6 +86,35 @@ var GROUPS = [
   ]}
 ];
 
+/*
+ * 每张卡片配一张缩略图 thumbs/<slug>.png —— 由 tools/thumbs.cjs 从 demo 页面里的
+ * View 直接 toCanvas 缩绘出来（不是截屏），所以画的就是这个 demo 本身。
+ * 用 loading="lazy" 让首屏之外的 47 张图按需加载；缩略图缺失时不留破图，
+ * 而是就地显示补图命令。
+ */
+function buildThumb(slug, title) {
+  var box = document.createElement('div');
+  box.className = 'gallery-thumb';
+  var img = document.createElement('img');
+  img.src = './thumbs/' + slug + '.png';
+  img.alt = title + ' 缩略图';
+  img.loading = 'lazy';
+  img.decoding = 'async';
+  img.addEventListener('error', function () {
+    // 占位内容包一层 div：.gallery-thumb 是 flex 容器，裸 <br> 会被当成 flex item 而不换行
+    var note = document.createElement('div');
+    note.appendChild(document.createTextNode('缩略图未生成'));
+    note.appendChild(document.createElement('br'));
+    var code = document.createElement('code');
+    code.textContent = 'node tools/thumbs.cjs ' + slug.slice(0, 2);
+    note.appendChild(code);
+    box.classList.add('is-missing');
+    box.replaceChildren(note);
+  });
+  box.appendChild(img);
+  return box;
+}
+
 var gallery = document.getElementById('gallery');
 GROUPS.forEach(function (g) {
   var section = document.createElement('section');
@@ -99,10 +128,14 @@ GROUPS.forEach(function (g) {
     var card = document.createElement('a');
     card.className = 'gallery-card';
     card.href = './demos/' + d[0] + '/index.html';
+    card.appendChild(buildThumb(d[0], d[0] + ' · ' + d[1]));
+
+    var body = document.createElement('div');
+    body.className = 'body';
     var t = document.createElement('div');
     t.className = 't';
     t.textContent = d[0] + ' · ' + d[1];
-    card.appendChild(t);
+    body.appendChild(t);
     var tags = document.createElement('div');
     tags.className = 'tags';
     d[2].forEach(function (c) {
@@ -111,7 +144,8 @@ GROUPS.forEach(function (g) {
       tag.textContent = c;
       tags.appendChild(tag);
     });
-    card.appendChild(tags);
+    body.appendChild(tags);
+    card.appendChild(body);
     grid.appendChild(card);
   });
   section.appendChild(grid);

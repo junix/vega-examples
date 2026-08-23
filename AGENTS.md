@@ -41,6 +41,8 @@ demos/NN-slug/
   说明这张图在 Vega 里靠什么语法元素声明式表达出来、换命令式绘图库要付什么代价。
   校验器逐字检查这些标题。
 - 文档与注释用**中文**；标识符、spec JSON 保持英文。
+- 新增 demo 除了在 `index.html` 的 `GROUPS` 里登记，还要跑
+  `node tools/thumbs.cjs <NN>` 生成首页缩略图 `thumbs/<slug>.png`（见下文）。
 
 ## 共享助手 API（assets/demo.js）
 
@@ -79,6 +81,39 @@ Vega 默认就是 `null`，但**如果 spec 里写了 `"background"`，会被继
 "透明"这件事不依赖 spec 怎么写。批量导出时 `tools/export.cjs` 会解 PNG 头验证
 （colorType 6 = RGBA）并采样统计全透明像素占比，把结论量出来而不是声称。
 
+## 首页缩略图：thumbs/<slug>.png
+
+首页画廊每张卡片都要有缩略图，由 `tools/thumbs.cjs` 生成 —— 走的是和导出工具栏
+同一条路（headless Chromium 打开 demo 页 → 等 `__sceneReady` → 拿页面里注册的 View →
+`view.toCanvas(scale)`），**不是截屏**：先按 1× 量出图表自然尺寸，
+再按 `min(600/宽, 380/高)` 重画一遍，缩放发生在绘制阶段，文字与曲线重新描边。
+
+与 `tools/export.cjs` 的分工：
+
+| | 输出 | 进版本库？ | 用途 |
+| --- | --- | --- | --- |
+| `export.cjs` | `exports/<slug>.{svg,png}` 原尺寸 | 否（`.gitignore`） | 拿出去用的成品图 |
+| `thumbs.cjs` | `thumbs/<slug>.png` 适配卡片 | **是** | 首页画廊；clone 下来就有图 |
+
+```sh
+node tools/thumbs.cjs              # 只重生成过期/缺失的
+node tools/thumbs.cjs --force      # 全部重生成
+node tools/thumbs.cjs 42 43        # 只处理指定 demo（新增 demo 时用这个）
+node tools/thumbs.cjs --check      # 不启浏览器，只报告缺失/过期
+```
+
+几条硬约定：
+
+- **新增 demo 必须补一张缩略图**（`node tools/thumbs.cjs <NN>`），
+  否则 `tools/validate.cjs` 的首页检查会 FAIL。
+- **改了 spec 要重跑**。"过期"= 缩略图 mtime 早于该 demo 的
+  `index.html` / `spec.vg.json` / `main.js`；`--check` 会点出来，
+  默认（不带 `--force`）也只重生成这些。
+- 生成后会解 PNG 采样统计"有内容的像素占比"，低于 1% 判为几乎空白并 WARN ——
+  防止"等到了 `__sceneReady` 但图其实没画出来"被静默写成一张白板。
+- 缩略图是透明底 PNG，卡片上用固定取景框 + `contain` 居中，**不裁切**；
+  取景框比例（`assets/demo.css` 的 `.gallery-thumb`，30:19）与默认 `--box 600x380` 对齐。
+
 ## 工具箱（tools/，全部零依赖）
 
 | 命令 | 用途 |
@@ -87,6 +122,7 @@ Vega 默认就是 `null`，但**如果 spec 里写了 `"background"`，会被继
 | `node tools/inspect.cjs <slug片段> [--rows N] [--texts] [--data 名] [--svg 文件]` | **调试利器**。打印数据样本（值带 `num`/`str`/`date` 类型前缀）、比例尺真实 domain/range、以及**最终 SVG 里按渲染顺序的每一段文字** |
 | `node tools/validate-browser.cjs [slug片段…] [--shots 目录]` | 浏览器端校验：console 无报错 + 画布非空 + SVG/PNG 导出可用 + **PNG 透明与白底成对断言** |
 | `node tools/export.cjs [slug片段…] [--out 目录] [--svg\|--png] [--scale N] [--opaque]` | 批量导出 SVG + PNG（默认透明）到 `exports/`，附 `manifest.json` |
+| `node tools/thumbs.cjs [slug片段…] [--force] [--check] [--box WxH]` | 生成首页画廊缩略图 `thumbs/<slug>.png`（**随仓库提交**）；`--check` 只查缺失/过期 |
 | `node tools/cdp.cjs` | 库，不直接跑：极小 CDP 客户端 + 静态服务器 + PNG 解码器 |
 
 ### 校验分两层，两层都要绿
@@ -94,6 +130,7 @@ Vega 默认就是 `null`，但**如果 spec 里写了 `"background"`，会被继
 ```sh
 node tools/validate.cjs            # 纯 Node，快，每次改动都跑
 node tools/validate-browser.cjs    # 真实 Chromium，改渲染/导出相关代码时跑
+node tools/thumbs.cjs --check      # 纯 fs，查首页缩略图是否齐全且不过期
 ```
 
 `validate.cjs` 会：查文件契约与 README 小节 → 查 `$schema` 是 v6 → `vega.parse` →

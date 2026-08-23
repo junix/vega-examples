@@ -1,0 +1,718 @@
+{
+  "generatedBy": "tools/thumbs.cjs",
+  "options": {
+    "box": {
+      "w": 600,
+      "h": 380
+    },
+    "maxScale": 2,
+    "transparent": true
+  },
+  "demos": {
+    "01-bar-chart": {
+      "file": "thumbs/01-bar-chart.png",
+      "bytes": 20777,
+      "width": 600,
+      "height": 344,
+      "natural": [
+        697,
+        400
+      ],
+      "scale": 0.8608,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.5144,
+      "sourceMtime": "2026-08-22T10:14:51.871Z"
+    },
+    "02-line-area-timeseries": {
+      "file": "thumbs/02-line-area-timeseries.png",
+      "bytes": 55897,
+      "width": 600,
+      "height": 284,
+      "natural": [
+        912,
+        433
+      ],
+      "scale": 0.6579,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.3025,
+      "sourceMtime": "2026-08-22T15:19:06.049Z"
+    },
+    "03-scatter-regression": {
+      "file": "thumbs/03-scatter-regression.png",
+      "bytes": 71192,
+      "width": 600,
+      "height": 376,
+      "natural": [
+        786,
+        493
+      ],
+      "scale": 0.7634,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1031,
+      "sourceMtime": "2026-08-22T15:14:27.264Z"
+    },
+    "04-histogram-binning": {
+      "file": "thumbs/04-histogram-binning.png",
+      "bytes": 25277,
+      "width": 600,
+      "height": 362,
+      "natural": [
+        716,
+        433
+      ],
+      "scale": 0.838,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1905,
+      "sourceMtime": "2026-08-22T10:14:51.871Z"
+    },
+    "05-stacked-grouped-bar": {
+      "file": "thumbs/05-stacked-grouped-bar.png",
+      "bytes": 44804,
+      "width": 483,
+      "height": 380,
+      "natural": [
+        745,
+        585
+      ],
+      "scale": 0.6496,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.4325,
+      "sourceMtime": "2026-08-22T10:49:37.456Z"
+    },
+    "06-data-pipeline": {
+      "file": "thumbs/06-data-pipeline.png",
+      "bytes": 27019,
+      "width": 600,
+      "height": 194,
+      "natural": [
+        796,
+        258
+      ],
+      "scale": 0.7538,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.4002,
+      "sourceMtime": "2026-08-22T15:19:19.186Z"
+    },
+    "07-lookup-joins": {
+      "file": "thumbs/07-lookup-joins.png",
+      "bytes": 40268,
+      "width": 600,
+      "height": 266,
+      "natural": [
+        836,
+        371
+      ],
+      "scale": 0.7177,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.5487,
+      "sourceMtime": "2026-08-22T15:20:35.256Z"
+    },
+    "08-reshape-fold-pivot": {
+      "file": "thumbs/08-reshape-fold-pivot.png",
+      "bytes": 38045,
+      "width": 389,
+      "height": 380,
+      "natural": [
+        662,
+        646
+      ],
+      "scale": 0.5882,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.3183,
+      "sourceMtime": "2026-08-22T10:53:34.042Z"
+    },
+    "09-crossfilter": {
+      "file": "thumbs/09-crossfilter.png",
+      "bytes": 17575,
+      "width": 422,
+      "height": 380,
+      "natural": [
+        585,
+        526
+      ],
+      "scale": 0.7224,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.6164,
+      "sourceMtime": "2026-08-22T10:51:18.052Z"
+    },
+    "10-signals-bind": {
+      "file": "thumbs/10-signals-bind.png",
+      "bytes": 84724,
+      "width": 600,
+      "height": 346,
+      "natural": [
+        816,
+        471
+      ],
+      "scale": 0.7353,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.0907,
+      "sourceMtime": "2026-08-22T15:28:21.102Z"
+    },
+    "11-events-brush-zoom": {
+      "file": "thumbs/11-events-brush-zoom.png",
+      "bytes": 66094,
+      "width": 600,
+      "height": 373,
+      "natural": [
+        781,
+        486
+      ],
+      "scale": 0.7682,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1488,
+      "sourceMtime": "2026-08-22T15:22:16.772Z"
+    },
+    "12-hover-tooltip-legend": {
+      "file": "thumbs/12-hover-tooltip-legend.png",
+      "bytes": 77170,
+      "width": 600,
+      "height": 345,
+      "natural": [
+        855,
+        493
+      ],
+      "scale": 0.7018,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.146,
+      "sourceMtime": "2026-08-22T10:14:51.872Z"
+    },
+    "13-dynamic-data-runtime": {
+      "file": "thumbs/13-dynamic-data-runtime.png",
+      "bytes": 29807,
+      "width": 600,
+      "height": 321,
+      "natural": [
+        697,
+        373
+      ],
+      "scale": 0.8608,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.0919,
+      "sourceMtime": "2026-08-22T15:15:16.976Z"
+    },
+    "14-force-directed-graph": {
+      "file": "thumbs/14-force-directed-graph.png",
+      "bytes": 66647,
+      "width": 486,
+      "height": 380,
+      "natural": [
+        640,
+        500
+      ],
+      "scale": 0.76,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.091,
+      "sourceMtime": "2026-08-22T15:16:42.269Z"
+    },
+    "15-hierarchies": {
+      "file": "thumbs/15-hierarchies.png",
+      "bytes": 86778,
+      "width": 600,
+      "height": 315,
+      "natural": [
+        970,
+        510
+      ],
+      "scale": 0.6186,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.6336,
+      "sourceMtime": "2026-08-22T15:21:05.761Z"
+    },
+    "16-geo-choropleth": {
+      "file": "thumbs/16-geo-choropleth.png",
+      "bytes": 192516,
+      "width": 567,
+      "height": 380,
+      "natural": [
+        976,
+        654
+      ],
+      "scale": 0.581,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.3793,
+      "sourceMtime": "2026-08-22T15:23:08.197Z"
+    },
+    "17-wordcloud": {
+      "file": "thumbs/17-wordcloud.png",
+      "bytes": 87436,
+      "width": 595,
+      "height": 380,
+      "natural": [
+        760,
+        485
+      ],
+      "scale": 0.7835,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.145,
+      "sourceMtime": "2026-08-22T15:19:17.429Z"
+    },
+    "18-voronoi-labels": {
+      "file": "thumbs/18-voronoi-labels.png",
+      "bytes": 85297,
+      "width": 562,
+      "height": 380,
+      "natural": [
+        699,
+        472
+      ],
+      "scale": 0.8051,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1419,
+      "sourceMtime": "2026-08-22T15:29:22.911Z"
+    },
+    "19-runtime-api-tour": {
+      "file": "thumbs/19-runtime-api-tour.png",
+      "bytes": 61723,
+      "width": 600,
+      "height": 354,
+      "natural": [
+        665,
+        393
+      ],
+      "scale": 0.9023,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1268,
+      "sourceMtime": "2026-08-22T15:14:47.597Z"
+    },
+    "20-custom-transform-expr": {
+      "file": "thumbs/20-custom-transform-expr.png",
+      "bytes": 52871,
+      "width": 600,
+      "height": 320,
+      "natural": [
+        699,
+        373
+      ],
+      "scale": 0.8584,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1017,
+      "sourceMtime": "2026-08-22T15:17:43.502Z"
+    },
+    "21-node-headless-render": {
+      "file": "thumbs/21-node-headless-render.png",
+      "bytes": 21996,
+      "width": 600,
+      "height": 320,
+      "natural": [
+        516,
+        276
+      ],
+      "scale": 1.1628,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.3593,
+      "sourceMtime": "2026-08-22T15:21:54.434Z"
+    },
+    "22-sankey-alluvial": {
+      "file": "thumbs/22-sankey-alluvial.png",
+      "bytes": 75339,
+      "width": 600,
+      "height": 260,
+      "natural": [
+        1203,
+        522
+      ],
+      "scale": 0.4988,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.5118,
+      "sourceMtime": "2026-08-22T10:45:18.579Z"
+    },
+    "23-chord-arc-diagram": {
+      "file": "thumbs/23-chord-arc-diagram.png",
+      "bytes": 143400,
+      "width": 600,
+      "height": 369,
+      "natural": [
+        996,
+        614
+      ],
+      "scale": 0.6024,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1569,
+      "sourceMtime": "2026-08-22T10:50:54.584Z"
+    },
+    "24-radial-rose-stack": {
+      "file": "thumbs/24-radial-rose-stack.png",
+      "bytes": 94663,
+      "width": 600,
+      "height": 351,
+      "natural": [
+        960,
+        563
+      ],
+      "scale": 0.625,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.142,
+      "sourceMtime": "2026-08-22T10:55:29.967Z"
+    },
+    "25-contour-density2d": {
+      "file": "thumbs/25-contour-density2d.png",
+      "bytes": 123408,
+      "width": 600,
+      "height": 265,
+      "natural": [
+        939,
+        415
+      ],
+      "scale": 0.639,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.5064,
+      "sourceMtime": "2026-08-22T10:50:15.252Z"
+    },
+    "26-hexbin-matrix": {
+      "file": "thumbs/26-hexbin-matrix.png",
+      "bytes": 55637,
+      "width": 600,
+      "height": 331,
+      "natural": [
+        682,
+        377
+      ],
+      "scale": 0.8798,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.5448,
+      "sourceMtime": "2026-08-22T10:51:08.273Z"
+    },
+    "27-beeswarm-dotplot": {
+      "file": "thumbs/27-beeswarm-dotplot.png",
+      "bytes": 80170,
+      "width": 600,
+      "height": 285,
+      "natural": [
+        978,
+        466
+      ],
+      "scale": 0.6135,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1613,
+      "sourceMtime": "2026-08-22T10:50:42.197Z"
+    },
+    "28-violin-ridgeline": {
+      "file": "thumbs/28-violin-ridgeline.png",
+      "bytes": 94608,
+      "width": 600,
+      "height": 371,
+      "natural": [
+        1061,
+        657
+      ],
+      "scale": 0.5655,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.2207,
+      "sourceMtime": "2026-08-22T15:48:19.405Z"
+    },
+    "29-boxplot-errorbar": {
+      "file": "thumbs/29-boxplot-errorbar.png",
+      "bytes": 51476,
+      "width": 600,
+      "height": 319,
+      "natural": [
+        972,
+        517
+      ],
+      "scale": 0.6173,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.108,
+      "sourceMtime": "2026-08-22T10:52:26.910Z"
+    },
+    "30-parallel-coordinates": {
+      "file": "thumbs/30-parallel-coordinates.png",
+      "bytes": 342798,
+      "width": 600,
+      "height": 346,
+      "natural": [
+        912,
+        526
+      ],
+      "scale": 0.6579,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.3953,
+      "sourceMtime": "2026-08-22T10:51:43.473Z"
+    },
+    "31-streamgraph": {
+      "file": "thumbs/31-streamgraph.png",
+      "bytes": 123259,
+      "width": 394,
+      "height": 380,
+      "natural": [
+        716,
+        689
+      ],
+      "scale": 0.5515,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.4006,
+      "sourceMtime": "2026-08-22T10:53:11.391Z"
+    },
+    "32-candlestick-ohlc": {
+      "file": "thumbs/32-candlestick-ohlc.png",
+      "bytes": 46864,
+      "width": 529,
+      "height": 380,
+      "natural": [
+        847,
+        608
+      ],
+      "scale": 0.625,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1572,
+      "sourceMtime": "2026-08-22T10:55:32.054Z"
+    },
+    "33-calendar-heatmap": {
+      "file": "thumbs/33-calendar-heatmap.png",
+      "bytes": 137390,
+      "width": 486,
+      "height": 380,
+      "natural": [
+        808,
+        631
+      ],
+      "scale": 0.6022,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.5507,
+      "sourceMtime": "2026-08-22T10:51:07.406Z"
+    },
+    "34-vector-field": {
+      "file": "thumbs/34-vector-field.png",
+      "bytes": 89563,
+      "width": 600,
+      "height": 292,
+      "natural": [
+        977,
+        477
+      ],
+      "scale": 0.6141,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.4498,
+      "sourceMtime": "2026-08-22T10:54:56.880Z"
+    },
+    "35-pack-dendrogram": {
+      "file": "thumbs/35-pack-dendrogram.png",
+      "bytes": 121939,
+      "width": 576,
+      "height": 380,
+      "natural": [
+        1130,
+        745
+      ],
+      "scale": 0.5101,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.2554,
+      "sourceMtime": "2026-08-22T15:35:28.276Z"
+    },
+    "36-custom-shapes-gradients": {
+      "file": "thumbs/36-custom-shapes-gradients.png",
+      "bytes": 108766,
+      "width": 490,
+      "height": 380,
+      "natural": [
+        962,
+        745
+      ],
+      "scale": 0.5101,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.7572,
+      "sourceMtime": "2026-08-22T10:56:04.808Z"
+    },
+    "37-geo-projections-arcs": {
+      "file": "thumbs/37-geo-projections-arcs.png",
+      "bytes": 113051,
+      "width": 329,
+      "height": 380,
+      "natural": [
+        984,
+        1136
+      ],
+      "scale": 0.3345,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.3652,
+      "sourceMtime": "2026-08-22T10:56:33.489Z"
+    },
+    "38-waterfall-marimekko": {
+      "file": "thumbs/38-waterfall-marimekko.png",
+      "bytes": 46813,
+      "width": 600,
+      "height": 303,
+      "natural": [
+        1007,
+        509
+      ],
+      "scale": 0.5958,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.3673,
+      "sourceMtime": "2026-08-22T10:55:08.162Z"
+    },
+    "39-bump-slope-chart": {
+      "file": "thumbs/39-bump-slope-chart.png",
+      "bytes": 83003,
+      "width": 600,
+      "height": 328,
+      "natural": [
+        976,
+        534
+      ],
+      "scale": 0.6148,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1131,
+      "sourceMtime": "2026-08-22T10:54:37.339Z"
+    },
+    "40-gantt-timeline": {
+      "file": "thumbs/40-gantt-timeline.png",
+      "bytes": 85345,
+      "width": 600,
+      "height": 327,
+      "natural": [
+        976,
+        532
+      ],
+      "scale": 0.6148,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1091,
+      "sourceMtime": "2026-08-22T10:57:02.488Z"
+    },
+    "41-matrix-adjacency": {
+      "file": "thumbs/41-matrix-adjacency.png",
+      "bytes": 91514,
+      "width": 382,
+      "height": 380,
+      "natural": [
+        791,
+        785
+      ],
+      "scale": 0.4841,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.6619,
+      "sourceMtime": "2026-08-22T10:56:46.845Z"
+    },
+    "42-job-voyager": {
+      "file": "thumbs/42-job-voyager.png",
+      "bytes": 277532,
+      "width": 537,
+      "height": 380,
+      "natural": [
+        877,
+        620
+      ],
+      "scale": 0.6129,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.7504,
+      "sourceMtime": "2026-08-22T16:29:26.850Z"
+    },
+    "43-edge-bundling": {
+      "file": "thumbs/43-edge-bundling.png",
+      "bytes": 162462,
+      "width": 390,
+      "height": 380,
+      "natural": [
+        920,
+        896
+      ],
+      "scale": 0.4241,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.2599,
+      "sourceMtime": "2026-08-22T16:35:31.060Z"
+    },
+    "44-tree-layout": {
+      "file": "thumbs/44-tree-layout.png",
+      "bytes": 133967,
+      "width": 568,
+      "height": 380,
+      "natural": [
+        1132,
+        756
+      ],
+      "scale": 0.5026,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1461,
+      "sourceMtime": "2026-08-22T16:39:19.969Z"
+    },
+    "45-radar-chart": {
+      "file": "thumbs/45-radar-chart.png",
+      "bytes": 65622,
+      "width": 467,
+      "height": 380,
+      "natural": [
+        640,
+        520
+      ],
+      "scale": 0.7308,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.1144,
+      "sourceMtime": "2026-08-22T16:39:40.643Z"
+    },
+    "46-connected-scatter": {
+      "file": "thumbs/46-connected-scatter.png",
+      "bytes": 48895,
+      "width": 568,
+      "height": 380,
+      "natural": [
+        858,
+        574
+      ],
+      "scale": 0.662,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.0976,
+      "sourceMtime": "2026-08-22T16:31:20.615Z"
+    },
+    "47-serpentine-timeline": {
+      "file": "thumbs/47-serpentine-timeline.png",
+      "bytes": 54761,
+      "width": 544,
+      "height": 380,
+      "natural": [
+        705,
+        492
+      ],
+      "scale": 0.7724,
+      "transparent": true,
+      "hasAlpha": true,
+      "inkRatio": 0.0851,
+      "sourceMtime": "2026-08-22T16:40:27.475Z"
+    }
+  }
+}

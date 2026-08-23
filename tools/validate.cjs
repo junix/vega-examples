@@ -19,6 +19,8 @@
  *      （加载失败、摄取失败、Infinite extent、未识别属性……）。
  *   5. 渲染闭环：await view.toSVG() 必须产出非空 SVG，且含有 <path>/<text> 等
  *      真实图元——这一步会把 mark/scale/encode 全部跑一遍。
+ *   6. 首页画廊（全量跑时）：index.html 的 GROUPS 与 demos/ 一一对应，
+ *      且每个 demo 都有缩略图 thumbs/<slug>.png。
  *
  * 为什么要第 3/4/5 条：旧版校验器用 vega.loader({mode:'file'}) 读盘，而
  * assets/vega-bundle.cjs 是浏览器构建，其 file loader 直接 reject（"No file
@@ -366,7 +368,20 @@ function checkGallery() {
       + (missing.length ? `；目录存在但未登记: ${missing.join(', ')}` : '')
       + (dangling.length ? `；已登记但目录不存在: ${dangling.join(', ')}` : ''));
   }
-  return pass(`首页画廊与 demos/ 同步（${listed.size} 项）`);
+
+  /*
+   * 画廊每张卡片都要有缩略图 thumbs/<slug>.png。缩略图随仓库提交，
+   * 所以 clone 下来直接 ./serve.sh 就有图，不必先装浏览器。
+   * 这里只查"在不在"（纯 fs）；"新不新"由 node tools/thumbs.cjs --check 查，
+   * 生成则要真实 Chromium，见 tools/thumbs.cjs。
+   */
+  const noThumb = onDisk.filter(d => !fs.existsSync(path.join(EXAMPLES_ROOT, 'thumbs', d + '.png')));
+  if (noThumb.length) {
+    return fail(`缺少画廊缩略图 thumbs/<slug>.png: ${noThumb.join(', ')}`
+      + '；跑 node tools/thumbs.cjs 补齐');
+  }
+
+  return pass(`首页画廊与 demos/ 同步（${listed.size} 项，缩略图齐全）`);
 }
 
 async function main() {

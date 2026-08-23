@@ -16,6 +16,10 @@
 # 打开 http://localhost:8000/
 ```
 
+首页是**带缩略图的画廊**：47 张小图（`thumbs/`，随仓库提交）一眼看完所有图形，
+点进去就是可交互的完整 demo。缩略图不是截屏，而是从 demo 页里的 View
+按比例重绘出来的，画的就是这个 demo 本身。
+
 ## 学习路径
 
 | 分组 | Demo | 核心概念 |
@@ -98,6 +102,32 @@ node tools/export.cjs --svg --no-browser # 只导 SVG，不用浏览器
 导出器会**就地校验透明度**：解 PNG 头确认是 RGBA（colorType 6），
 再采样统计全透明像素占比，写进 `exports/manifest.json`。
 
+### 首页缩略图 thumbs/
+
+首页画廊每张卡片配一张 `thumbs/<slug>.png`，由 `tools/thumbs.cjs` 生成：
+
+```sh
+node tools/thumbs.cjs            # 只重生成过期/缺失的
+node tools/thumbs.cjs --force    # 全部重生成
+node tools/thumbs.cjs 22 33      # 只处理指定 demo
+node tools/thumbs.cjs --check    # 不启浏览器，只报告缺失/过期
+```
+
+几点设计取舍：
+
+- **重绘而非重采样**：先 `view.toCanvas(1)` 量出图表自然尺寸，再按
+  `min(600/宽, 380/高)` 的比例 `view.toCanvas(scale)` 画第二遍。缩放发生在绘制阶段，
+  文字与曲线是重新描边的，所以缩小后依然干净。
+- **进版本库**：`exports/` 是 gitignore 的成品图，`thumbs/` 则随仓库提交 ——
+  clone 下来直接 `./serve.sh` 就有图，不必先装 Chromium 跑一遍。47 张共约 3.9 MB。
+- **不裁切**：各 demo 画幅从 600×194 的宽条到 329×380 的竖幅都有，
+  卡片上固定取景框、图片 contain 居中，只留白不裁切。
+- **空白会报出来**：生成后解 PNG 采样统计"有内容的像素占比"，
+  低于 1% 判为几乎空白并 WARN —— 等到了 `__sceneReady` 但图没画出来这种情况不会被静默写成白板。
+- **过期判定**：缩略图 mtime 早于该 demo 的 `index.html` / `spec.vg.json` / `main.js`
+  即为过期。`tools/validate.cjs` 全量跑时会检查缩略图**存在**，
+  `thumbs.cjs --check` 进一步检查**新鲜度**。
+
 ## 给 agent 的使用说明
 
 - **目录契约与开发规范见 [AGENTS.md](AGENTS.md)**：新增/修改 demo 前必读。
@@ -115,6 +145,7 @@ node tools/validate.cjs              # 纯 Node：契约 + parse + 真实数据�
 node tools/validate.cjs 06 12        # 只校验 slug 含 06 / 12 的
 node tools/inspect.cjs 22 --rows 6   # 打印数据样本(带类型)/比例尺 domain/SVG 里每段文字
 node tools/validate-browser.cjs      # 真实 Chromium：console 无报错 + 导出可用 + PNG 透明
+node tools/thumbs.cjs --check        # 首页缩略图是否齐全且不过期
 ```
 
 任何 demo 改动后 `validate.cjs` 都应跑到全绿；改渲染或导出相关代码时再跑一遍
