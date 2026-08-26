@@ -1,0 +1,184 @@
+{
+  "schema_version": "repository-architecture-infographic/v1",
+  "meta": {
+    "project": "vega-examples",
+    "snapshot": "7691955b0",
+    "generated": "2026-08-26",
+    "language": "zh-CN",
+    "audience": "新贡献者、架构评审者与下游集成方",
+    "thesis": "把仓库的真实入口、实现分区、可执行用法与验证证据放在一条可回查的阅读路径上。",
+    "canonical_source": "docs/infographics/architecture.svg"
+  },
+  "narrative": {
+    "reader_question": "vega-examples 的代码从哪里进入、由哪些分区构成、怎样运行并如何验证？",
+    "order": [
+      "项目指纹",
+      "架构地形",
+      "使用路径",
+      "规模与依赖",
+      "验证与溯源"
+    ],
+    "inference_policy": "文件、计数、命令与依赖是仓库事实；职责名称仅按路径命名归类，均显式标注为推断。"
+  },
+  "sources": {
+    "readme": "README.md",
+    "readme_excerpt": [
+      "面向计算机 agent（也适合人类）的 Vega 教学 demo 集：47 个渐进式 demo， 覆盖 Vega 的 JSON spec 语法（数据、变换、比例尺、标记、信号、事件）、JS 运行时 API （View、动态数据、自定义变换、无头渲染），以及一整组稀有与复杂图形 （桑基、弦图、玫瑰图、等值线、六边形分箱、蜂群、小提琴、平行坐标、流图、K 线、 日历热力图、矢量场、圆填充、径向树、瀑布、马赛克、Bump、甘特、邻接矩阵……）。",
+      "本目录完全独立：不安装依赖、不构建、可离线，所有页面直接引用项目自带的 assets/vega.min.js（v6.4.0，含 geo/force/hierarchy/wordcloud 等全部子包）与 assets/data/ 数据集。"
+    ],
+    "manifests": [
+      "tools/package.json"
+    ],
+    "tracked_file_formula": "git ls-files，排除构建/依赖目录",
+    "line_formula": "逐个已跟踪源码文件统计非空文本行；不等同于语句数或复杂度",
+    "component_formula": "按源码路径首个职责分区聚合；角色名由路径关键词推断",
+    "entrypoint_formula": "按常见入口文件名与 bin/cmd/cli/app 路径定位候选；路径存在是事实，入口职责仍需源码确认"
+  },
+  "facts": {
+    "description": "面向计算机 agent（也适合人类）的 Vega 教学 demo 集：47 个渐进式 demo， 覆盖 Vega 的 JSON spec 语法（数据、变换、比例尺、标记、信号、事件）、JS 运行时 API （View、动态数据、自定义变换、无头渲染），以及一整组稀有与复杂图形 （桑基、弦图、玫瑰图、等值线、六边形分箱、蜂群、小提琴、平行坐标、流图、K 线、 日历热力图、矢量场、圆填充、径向树、瀑布、马赛克、Bump、甘特、邻接矩阵……）。",
+    "tracked_files": 325,
+    "source_files": 51,
+    "source_nonblank_lines": 41600,
+    "languages": [
+      {
+        "name": "JavaScript",
+        "files": 50,
+        "nonblank_lines": 41592,
+        "share": 0.9998
+      },
+      {
+        "name": "Shell",
+        "files": 1,
+        "nonblank_lines": 8,
+        "share": 0.0002
+      }
+    ],
+    "entrypoints": [
+      "demos/01-bar-chart/main.js",
+      "demos/02-line-area-timeseries/main.js",
+      "demos/03-scatter-regression/main.js",
+      "demos/04-histogram-binning/main.js",
+      "demos/05-stacked-grouped-bar/main.js",
+      "demos/06-data-pipeline/main.js",
+      "demos/07-lookup-joins/main.js"
+    ],
+    "components": [
+      {
+        "id": "component-1",
+        "label": "assets",
+        "role": "实现分区",
+        "file_count": 3,
+        "nonblank_lines": 41085,
+        "examples": [
+          "assets/vega.js",
+          "assets/demo.js",
+          "assets/vega.min.js"
+        ]
+      },
+      {
+        "id": "component-2",
+        "label": "demos",
+        "role": "实现分区",
+        "file_count": 47,
+        "nonblank_lines": 507,
+        "examples": [
+          "demos/20-custom-transform-expr/main.js",
+          "demos/19-runtime-api-tour/main.js",
+          "demos/13-dynamic-data-runtime/main.js"
+        ]
+      },
+      {
+        "id": "component-3",
+        "label": "serve",
+        "role": "实现分区",
+        "file_count": 1,
+        "nonblank_lines": 8,
+        "examples": [
+          "serve.sh"
+        ]
+      }
+    ],
+    "static_edges": [],
+    "dependencies": [],
+    "commands": [
+      "./serve.sh",
+      "node tools/export.cjs                    # 全部 demo → exports/，SVG + 透明 PNG(2×)",
+      "node tools/export.cjs 22 33 --scale 3    # 只导指定 demo，3 倍分辨率",
+      "node tools/export.cjs --opaque           # 白底对照",
+      "node tools/export.cjs --svg --no-browser # 只导 SVG，不用浏览器",
+      "node tools/thumbs.cjs            # 只重生成过期/缺失的",
+      "node tools/thumbs.cjs --force    # 全部重生成",
+      "node tools/thumbs.cjs 22 33      # 只处理指定 demo"
+    ],
+    "test_files": 47,
+    "test_examples": [
+      "demos/01-bar-chart/spec.vg.json",
+      "demos/02-line-area-timeseries/spec.vg.json",
+      "demos/03-scatter-regression/spec.vg.json",
+      "demos/04-histogram-binning/spec.vg.json",
+      "demos/05-stacked-grouped-bar/spec.vg.json",
+      "demos/06-data-pipeline/spec.vg.json",
+      "demos/07-lookup-joins/spec.vg.json",
+      "demos/08-reshape-fold-pivot/spec.vg.json"
+    ],
+    "manifest_count": 1,
+    "largest_files": [
+      {
+        "path": "assets/vega.js",
+        "language": "JavaScript",
+        "lines": 42413,
+        "nonblank_lines": 40745,
+        "group": "assets"
+      },
+      {
+        "path": "assets/demo.js",
+        "language": "JavaScript",
+        "lines": 378,
+        "nonblank_lines": 339,
+        "group": "assets"
+      },
+      {
+        "path": "demos/20-custom-transform-expr/main.js",
+        "language": "JavaScript",
+        "lines": 192,
+        "nonblank_lines": 178,
+        "group": "demos"
+      },
+      {
+        "path": "demos/19-runtime-api-tour/main.js",
+        "language": "JavaScript",
+        "lines": 135,
+        "nonblank_lines": 122,
+        "group": "demos"
+      },
+      {
+        "path": "demos/13-dynamic-data-runtime/main.js",
+        "language": "JavaScript",
+        "lines": 92,
+        "nonblank_lines": 81,
+        "group": "demos"
+      },
+      {
+        "path": "demos/21-node-headless-render/main.js",
+        "language": "JavaScript",
+        "lines": 10,
+        "nonblank_lines": 10,
+        "group": "demos"
+      },
+      {
+        "path": "serve.sh",
+        "language": "Shell",
+        "lines": 8,
+        "nonblank_lines": 8,
+        "group": "serve"
+      },
+      {
+        "path": "demos/12-hover-tooltip-legend/main.js",
+        "language": "JavaScript",
+        "lines": 5,
+        "nonblank_lines": 5,
+        "group": "demos"
+      }
+    ]
+  }
+}
