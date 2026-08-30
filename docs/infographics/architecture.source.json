@@ -1,12 +1,12 @@
 {
-  "schema_version": "repository-architecture-infographic/v1",
+  "schema_version": "repository-architecture-infographic/v2",
   "meta": {
     "project": "vega-examples",
-    "snapshot": "7691955b0",
-    "generated": "2026-08-26",
+    "snapshot": "7e878ea86",
+    "generated": "2026-08-30",
     "language": "zh-CN",
     "audience": "新贡献者、架构评审者与下游集成方",
-    "thesis": "把仓库的真实入口、实现分区、可执行用法与验证证据放在一条可回查的阅读路径上。",
+    "thesis": "把仓库的真实入口、实现分区、真实依赖与验证证据放在一条可回查的阅读路径上。",
     "canonical_source": "docs/infographics/architecture.svg"
   },
   "narrative": {
@@ -18,13 +18,13 @@
       "规模与依赖",
       "验证与溯源"
     ],
-    "inference_policy": "文件、计数、命令与依赖是仓库事实；职责名称仅按路径命名归类，均显式标注为推断。"
+    "inference_policy": "文件、计数、命令、依赖与最近提交是仓库事实；职责名称仅按路径命名归类，均显式标注为推断。"
   },
   "sources": {
     "readme": "README.md",
     "readme_excerpt": [
       "面向计算机 agent（也适合人类）的 Vega 教学 demo 集：47 个渐进式 demo， 覆盖 Vega 的 JSON spec 语法（数据、变换、比例尺、标记、信号、事件）、JS 运行时 API （View、动态数据、自定义变换、无头渲染），以及一整组稀有与复杂图形 （桑基、弦图、玫瑰图、等值线、六边形分箱、蜂群、小提琴、平行坐标、流图、K 线、 日历热力图、矢量场、圆填充、径向树、瀑布、马赛克、Bump、甘特、邻接矩阵……）。",
-      "本目录完全独立：不安装依赖、不构建、可离线，所有页面直接引用项目自带的 assets/vega.min.js（v6.4.0，含 geo/force/hierarchy/wordcloud 等全部子包）与 assets/data/ 数据集。"
+      "首页是带缩略图的画廊：47 张小图（thumbs/，随仓库提交）一眼看完所有图形， 点进去就是可交互的完整 demo。缩略图不是截屏，而是从 demo 页里的 View 按比例重绘出来的，画的就是这个 demo 本身。"
     ],
     "manifests": [
       "tools/package.json"
@@ -32,11 +32,12 @@
     "tracked_file_formula": "git ls-files，排除构建/依赖目录",
     "line_formula": "逐个已跟踪源码文件统计非空文本行；不等同于语句数或复杂度",
     "component_formula": "按源码路径首个职责分区聚合；角色名由路径关键词推断",
-    "entrypoint_formula": "按常见入口文件名与 bin/cmd/cli/app 路径定位候选；路径存在是事实，入口职责仍需源码确认"
+    "entrypoint_formula": "按常见入口文件名与 bin/cmd/cli/app 路径定位候选；路径存在是事实，入口职责仍需源码确认",
+    "edge_formula": "在分区代表源码中静态匹配 import/use/mod/require 与相对路径引用；只绘制两端都能定位的边"
   },
   "facts": {
     "description": "面向计算机 agent（也适合人类）的 Vega 教学 demo 集：47 个渐进式 demo， 覆盖 Vega 的 JSON spec 语法（数据、变换、比例尺、标记、信号、事件）、JS 运行时 API （View、动态数据、自定义变换、无头渲染），以及一整组稀有与复杂图形 （桑基、弦图、玫瑰图、等值线、六边形分箱、蜂群、小提琴、平行坐标、流图、K 线、 日历热力图、矢量场、圆填充、径向树、瀑布、马赛克、Bump、甘特、邻接矩阵……）。",
-    "tracked_files": 325,
+    "tracked_files": 332,
     "source_files": 51,
     "source_nonblank_lines": 41600,
     "languages": [
@@ -86,16 +87,6 @@
           "demos/19-runtime-api-tour/main.js",
           "demos/13-dynamic-data-runtime/main.js"
         ]
-      },
-      {
-        "id": "component-3",
-        "label": "serve",
-        "role": "实现分区",
-        "file_count": 1,
-        "nonblank_lines": 8,
-        "examples": [
-          "serve.sh"
-        ]
       }
     ],
     "static_edges": [],
@@ -109,6 +100,20 @@
       "node tools/thumbs.cjs            # 只重生成过期/缺失的",
       "node tools/thumbs.cjs --force    # 全部重生成",
       "node tools/thumbs.cjs 22 33      # 只处理指定 demo"
+    ],
+    "recent_commits": [
+      {
+        "date": "2026-08-29",
+        "subject": "docs: 更新架构文档"
+      },
+      {
+        "date": "2026-08-26",
+        "subject": "docs: relocate architecture infographic to docs/infographics"
+      },
+      {
+        "date": "2026-08-23",
+        "subject": "docs: add architecture visualizations"
+      }
     ],
     "test_files": 47,
     "test_examples": [
