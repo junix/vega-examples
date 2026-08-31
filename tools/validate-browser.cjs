@@ -32,7 +32,7 @@ const path = require('path');
 const { serve, launch, decodePng, findChrome } = require('./cdp.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
-const DEMOS_DIR = path.join(ROOT, 'demos');
+const SRC_DIR = path.join(ROOT, 'src');
 
 /* 采样网格上"全透明像素"的最低占比（透明模式下至少要有这么多） */
 const MIN_TRANSPARENT_RATIO = 0.001;
@@ -72,7 +72,7 @@ async function checkDemo(browser, baseUrl, slug, opts) {
   const notes = [];
   const page = await browser.newPage(1500, 1100);
   try {
-    await page.goto(`${baseUrl}/demos/${slug}/index.html`);
+    await page.goto(`${baseUrl}/src/${slug}/index.html`);
     try {
       await page.waitForFunction('window.__sceneReady === true', 25000);
     } catch (e) {
@@ -176,11 +176,11 @@ async function main() {
   };
   const filters = argv.filter((a, i) => !a.startsWith('--') && !(shotsIdx >= 0 && i === shotsIdx + 1));
 
-  const slugs = fs.readdirSync(DEMOS_DIR)
-    .filter(n => fs.statSync(path.join(DEMOS_DIR, n)).isDirectory())
+  const slugs = fs.readdirSync(SRC_DIR)
+    .filter(n => fs.statSync(path.join(SRC_DIR, n)).isDirectory())
     .filter(n => !filters.length || filters.some(f => n.includes(f)))
     .sort();
-  if (!slugs.length) { console.error('demos/ 下没有匹配的 demo'); process.exit(1); }
+  if (!slugs.length) { console.error('src/ 下没有匹配的 demo'); process.exit(1); }
 
   if (!process.env.CDP_ENDPOINT && !findChrome()) {
     console.error('找不到 Chromium/Chrome —— 浏览器端校验跳过。');

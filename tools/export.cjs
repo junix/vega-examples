@@ -13,7 +13,7 @@
  *     （wordcloud / label 变换）。没装浏览器时的降级方案。
  *
  * 用法:
- *   node tools/export.cjs                       全部 demo → exports/，SVG + 透明 PNG(2×)
+ *   node tools/export.cjs                       全部 demo → out/，SVG + 透明 PNG(2×)
  *   node tools/export.cjs 22 33                 只导 slug 含 22 / 33 的
  *   node tools/export.cjs --out dist/img        换输出目录
  *   node tools/export.cjs --png --scale 3       只导 PNG，3 倍分辨率
@@ -31,7 +31,7 @@ const path = require('path');
 const { serve, launch, decodePng, findChrome } = require('./cdp.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
-const DEMOS_DIR = path.join(ROOT, 'demos');
+const SRC_DIR = path.join(ROOT, 'src');
 
 /* 输出目录在项目内就显示相对路径，在外面就显示绝对路径 */
 function show(p) {
@@ -65,7 +65,7 @@ async function exportSvgWithNode(slug, outDir) {
   const vega = require(path.join(ROOT, 'assets', 'vega-bundle.cjs'));
   vega.textMetrics.canvas(false);
 
-  const dir = path.join(DEMOS_DIR, slug);
+  const dir = path.join(SRC_DIR, slug);
   const spec = JSON.parse(fs.readFileSync(path.join(dir, 'spec.vg.json'), 'utf8'));
   for (const d of spec.data || []) {
     if (typeof d.url === 'string' && !/^[a-z]+:/i.test(d.url)) d.url = path.resolve(dir, d.url);
@@ -90,7 +90,7 @@ async function exportWithBrowser(browser, baseUrl, slug, outDir, opts) {
   const page = await browser.newPage(1500, 1100);
   const out = {};
   try {
-    await page.goto(`${baseUrl}/demos/${slug}/index.html`);
+    await page.goto(`${baseUrl}/src/${slug}/index.html`);
     await page.waitForFunction('window.__sceneReady === true', 25000);
     await page.eval('new Promise(r => setTimeout(r, 400))');
 
@@ -159,7 +159,7 @@ async function main() {
     transparent: !flag('opaque'),
     browser: !flag('no-browser')
   };
-  const outDir = path.resolve(ROOT, val('out', 'exports'));
+  const outDir = path.resolve(ROOT, val('out', 'out'));
 
   const consumed = new Set(['--out', '--scale'].flatMap(f => {
     const i = argv.indexOf(f);
@@ -167,11 +167,11 @@ async function main() {
   }));
   const filters = argv.filter(a => !a.startsWith('--') && !consumed.has(a));
 
-  const slugs = fs.readdirSync(DEMOS_DIR)
-    .filter(n => fs.statSync(path.join(DEMOS_DIR, n)).isDirectory())
+  const slugs = fs.readdirSync(SRC_DIR)
+    .filter(n => fs.statSync(path.join(SRC_DIR, n)).isDirectory())
     .filter(n => !filters.length || filters.some(f => n.includes(f)))
     .sort();
-  if (!slugs.length) { console.error('demos/ 下没有匹配的 demo'); process.exit(1); }
+  if (!slugs.length) { console.error('src/ 下没有匹配的 demo'); process.exit(1); }
 
   fs.mkdirSync(outDir, { recursive: true });
 

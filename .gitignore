@@ -1,5 +1,5 @@
 # Node 无头渲染生成的 SVG（demo 21 render.cjs 输出）
-demos/21-node-headless-render/output.svg
+src/21-node-headless-render/output.svg
 
 # tools/export.cjs 的批量导出产物
-exports/
+out/*

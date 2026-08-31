@@ -21,7 +21,7 @@ const fs = require('fs');
 const path = require('path');
 
 const EXAMPLES_ROOT = path.resolve(__dirname, '..');
-const DEMOS_DIR = path.join(EXAMPLES_ROOT, 'demos');
+const SRC_DIR = path.join(EXAMPLES_ROOT, 'src');
 const vega = require(path.join(EXAMPLES_ROOT, 'assets', 'vega-bundle.cjs'));
 
 vega.textMetrics.canvas(false);
@@ -109,7 +109,7 @@ async function inspectViaBrowser(slug, opts) {
   const browser = await cdp.launch();
   try {
     const page = await browser.newPage(1500, 1100);
-    await page.goto(`${server.url}/demos/${slug}/index.html`);
+    await page.goto(`${server.url}/src/${slug}/index.html`);
     await page.waitForFunction('window.__sceneReady === true', 25000);
     await page.eval('new Promise(r => setTimeout(r, 400))');
 
@@ -288,8 +288,8 @@ async function main() {
     });
   const all = process.argv.includes('--all');
 
-  const dirs = fs.readdirSync(DEMOS_DIR)
-    .map(n => path.join(DEMOS_DIR, n))
+  const dirs = fs.readdirSync(SRC_DIR)
+    .map(n => path.join(SRC_DIR, n))
     .filter(p => fs.statSync(p).isDirectory())
     .filter(p => all || !filters.length || filters.some(f => path.basename(p).includes(f)))
     .sort();
