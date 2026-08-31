@@ -1,23 +1,63 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "Node 无头渲染 demo：用 inline 数据绘制季度销售额柱状图，可在 Node.js 里直接跑 toSVG() 导出矢量文件。",
-  "width": 500,
-  "height": 260,
+  "description": "Node 无头渲染 demo：从 CSV 读 NASA GISTEMP 全球年均气温距平，band 轴显式给 values、正负异色柱、5 年滑动均值线、argmax 标注最暖年；整张图可在 Node.js 里 toSVG() 导出为矢量文件。",
+  "width": 760,
+  "height": 300,
   "padding": 8,
   "autosize": "fit",
 
+  "title": {
+    "text": "全球年均气温距平",
+    "subtitle": {
+      "signal": "'NASA GISTEMP：相对 1951–1980 年均值，' + extent(pluck(data('temps'), 'year'))[0] + '–' + extent(pluck(data('temps'), 'year'))[1] + ' 年，共 ' + length(data('temps')) + ' 个年份'"
+    },
+    "fontSize": 14,
+    "subtitleFontSize": 11,
+    "subtitlePadding": 4
+  },
+
+  "signals": [
+    {
+      "name": "tickYears",
+      "comment": "底轴刻度：从数据自身的年份区间里每 20 年取一个。sequence 是右开区间，所以 stop 要 +1。注意不能靠 labelOverlap 稀释——Node 下文字宽度是估算的，144 个标签一个都不会被抽掉。",
+      "update": "sequence(extent(pluck(data('temps'), 'year'))[0], extent(pluck(data('temps'), 'year'))[1] + 1, 20)"
+    }
+  ],
+
   "data": [
     {
-      "name": "sales",
-      "values": [
-        {"quarter": "Q1-2024", "revenue": 120},
-        {"quarter": "Q2-2024", "revenue": 180},
-        {"quarter": "Q3-2024", "revenue": 150},
-        {"quarter": "Q4-2024", "revenue": 220},
-        {"quarter": "Q1-2025", "revenue": 160},
-        {"quarter": "Q2-2025", "revenue": 250},
-        {"quarter": "Q3-2025", "revenue": 200},
-        {"quarter": "Q4-2025", "revenue": 310}
+      "name": "temps",
+      "url": "../../assets/data/global-temp.csv",
+      "comment": "CSV 必须显式声明 format.type，Vega 不按扩展名推断；parse 把 year/temp 从字符串转成数字，否则 band domain 会是字符串、linear domain 会全 NaN",
+      "format": {
+        "type": "csv",
+        "parse": { "year": "number", "temp": "number" }
+      }
+    },
+    {
+      "name": "smooth",
+      "source": "temps",
+      "comment": "5 年滑动均值：window 的 frame [-4, 0] = 当前行往前数 4 行。前 4 行只有不完整的窗口，用 row_number 判断后置成 null，再由 line 的 defined 通道跳过",
+      "transform": [
+        {
+          "type": "window",
+          "sort": { "field": "year" },
+          "ops": ["row_number", "mean"],
+          "fields": [null, "temp"],
+          "as": ["idx", "ma"],
+          "frame": [-4, 0]
+        },
+        { "type": "formula", "as": "ma5", "expr": "datum.idx >= 5 ? datum.ma : null" }
+      ]
+    },
+    {
+      "name": "warmest",
+      "source": "temps",
+      "comment": "argmax 返回整行对象，两个 formula 把它摊平成标量，供文字标注按 field 引用比例尺",
+      "transform": [
+        { "type": "aggregate", "fields": ["temp"], "ops": ["argmax"], "as": ["top"] },
+        { "type": "formula", "as": "warmYear", "expr": "datum.top.year" },
+        { "type": "formula", "as": "warmTemp", "expr": "datum.top.temp" }
       ]
     }
   ],
@@ -26,14 +66,14 @@
     {
       "name": "x",
       "type": "band",
-      "domain": {"data": "sales", "field": "quarter"},
+      "domain": { "data": "temps", "field": "year" },
       "range": "width",
-      "padding": 0.2
+      "padding": 0.1
     },
     {
       "name": "y",
       "type": "linear",
-      "domain": {"data": "sales", "field": "revenue"},
+      "domain": { "data": "temps", "field": "temp" },
       "range": "height",
       "nice": true,
       "zero": true
@@ -41,44 +81,96 @@
   ],
 
   "axes": [
-    {"orient": "bottom", "scale": "x", "labelAngle": -30, "labelAlign": "right", "labelBaseline": "top"},
-    {"orient": "left", "scale": "y", "title": "营收（万元）", "grid": true, "gridOpacity": 0.2}
+    {
+      "orient": "bottom",
+      "scale": "x",
+      "title": "年份",
+      "values": { "signal": "tickYears" },
+      "labelAngle": -30,
+      "labelAlign": "right",
+      "labelBaseline": "top",
+      "format": "d",
+      "offset": 4
+    },
+    {
+      "orient": "left",
+      "scale": "y",
+      "title": "距平（°C）",
+      "format": ".1f",
+      "grid": true,
+      "gridOpacity": 0.2
+    }
   ],
 
   "marks": [
     {
       "type": "rect",
-      "from": {"data": "sales"},
+      "from": { "data": "temps" },
       "encode": {
         "enter": {
-          "x": {"scale": "x", "field": "quarter"},
-          "width": {"scale": "x", "band": 1},
-          "y": {"scale": "y", "field": "revenue"},
-          "y2": {"scale": "y", "value": 0},
-          "fill": {"value": "#4c78a8"}
+          "x": { "scale": "x", "field": "year" },
+          "width": { "scale": "x", "band": 1 },
+          "y": { "scale": "y", "field": "temp" },
+          "y2": { "scale": "y", "value": 0 }
         },
         "update": {
-          "tooltip": {"signal": "datum.quarter + ': ' + datum.revenue + ' 万元'"}
+          "fill": { "signal": "datum.temp >= 0 ? '#c94c4c' : '#4a76a8'" },
+          "fillOpacity": { "value": 1 },
+          "tooltip": { "signal": "datum.year + ' 年：' + format(datum.temp, '+.2f') + ' °C'" }
         },
         "hover": {
-          "fill": {"value": "#e45756"}
+          "fillOpacity": { "value": 0.45 }
+        }
+      }
+    },
+    {
+      "type": "rule",
+      "comment": "距平基线：y=0 就是 1951–1980 的平均气温",
+      "encode": {
+        "update": {
+          "x": { "value": 0 },
+          "x2": { "signal": "width" },
+          "y": { "scale": "y", "value": 0 },
+          "stroke": { "value": "#333333" },
+          "strokeWidth": { "value": 1 }
+        }
+      }
+    },
+    {
+      "type": "line",
+      "from": { "data": "smooth" },
+      "comment": "5 年滑动均值。defined 为 false 的点会把线断开，而不是被当成 0 拉到基线上",
+      "encode": {
+        "update": {
+          "x": { "scale": "x", "field": "year", "band": 0.5 },
+          "y": { "scale": "y", "field": "ma5" },
+          "defined": { "signal": "datum.ma5 != null" },
+          "stroke": { "value": "#22223b" },
+          "strokeWidth": { "value": 1.6 },
+          "interpolate": { "value": "monotone" }
         }
       }
     },
     {
       "type": "text",
-      "from": {"data": "sales"},
+      "from": { "data": "warmest" },
       "encode": {
         "enter": {
-          "x": {"scale": "x", "field": "quarter", "band": 0.5},
-          "y": {"scale": "y", "field": "revenue", "offset": -6},
-          "align": {"value": "center"},
-          "baseline": {"value": "bottom"},
-          "fontSize": {"value": 11},
-          "fill": {"value": "#24292f"},
-          "text": {"field": "revenue"}
+          "x": { "scale": "x", "field": "warmYear", "band": 0.5 },
+          "y": { "scale": "y", "field": "warmTemp", "offset": -8 },
+          "dx": { "value": -2 },
+          "text": { "signal": "'最暖 ' + datum.warmYear + ' 年 ' + format(datum.warmTemp, '+.2f') + ' °C'" },
+          "align": { "value": "right" },
+          "baseline": { "value": "bottom" },
+          "fontSize": { "value": 11 },
+          "fontWeight": { "value": "bold" },
+          "fill": { "value": "#c94c4c" }
         }
       }
     }
-  ]
+  ],
+
+  "config": {
+    "axis": { "labelFontSize": 11 }
+  }
 }

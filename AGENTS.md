@@ -39,7 +39,8 @@ src/NN-slug/
 - README 必须含四个二级标题：`## 学习目标`、`## spec 逐段讲解`、`## 试一试`、`## 参考`。
   **F 组（22 起，"稀有与复杂图形"）额外必须含 `## 与 matplotlib 的对照`** ——
   说明这张图在 Vega 里靠什么语法元素声明式表达出来、换命令式绘图库要付什么代价。
-  校验器逐字检查这些标题。
+  校验器不但逐字检查这些标题，还检查**每节正文至少 40 个非空白字符** ——
+  贴一排空标题算不得写完（阈值来历见 `tools/validate.cjs` 里 `README_MIN_BODY` 的注释）。
 - 文档与注释用**中文**；标识符、spec JSON 保持英文。
 - 新增 demo 除了在 `index.html` 的 `GROUPS` 里登记，还要跑
   `node tools/thumbs.cjs <NN>` 生成首页缩略图 `thumbs/<slug>.png`（见下文）。
@@ -133,7 +134,7 @@ node tools/validate-browser.cjs    # 真实 Chromium，改渲染/导出相关代
 node tools/thumbs.cjs --check      # 纯 fs，查首页缩略图是否齐全且不过期
 ```
 
-`validate.cjs` 会：查文件契约与 README 小节 → 查 `$schema` 是 v6 → `vega.parse` →
+`validate.cjs` 会：查文件契约与 README 小节（**标题 + 正文字数**）→ 查 `$schema` 是 v6 → `vega.parse` →
 **用带 Node fs 访问的 loader 跑数据流**（`assets/vega-bundle.cjs` 是浏览器构建，
 它自带的 `loader({mode:'file'})` 会直接 reject —— 历史上这个坑让校验器对所有带 url
 的 demo 都假绿过）→ **逐个数据集断言行数 > 0** →

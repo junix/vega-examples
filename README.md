@@ -24,7 +24,7 @@
 
 | 分组 | Demo | 核心概念 |
 | --- | --- | --- |
-| A. Grammar 基础 | [01](src/01-bar-chart/) 柱状图 | data.values、band/linear scale、axis、rect/text mark、encode 集合 |
+| A. Grammar 基础 | [01](src/01-bar-chart/) 柱状图 | data.url、band/linear scale、旋转标签的 labelAlign/labelBaseline、rect/text mark、encode 集合、argmax 派生标注 |
 | | [02](src/02-line-area-timeseries/) 折线/面积 | time scale、多序列分组、line/area mark |
 | | [03](src/03-scatter-regression/) 散点+回归 | symbol mark、regression transform |
 | | [04](src/04-histogram-binning/) 直方图 | bin + aggregate 变换 |
@@ -44,7 +44,7 @@
 | | [18](src/18-voronoi-labels/) 拾取与标签 | voronoi、label 防重叠 |
 | E. 运行时 API | [19](src/19-runtime-api-tour/) View API 全览 | parse、View、监听器、toSVG 导出、resize |
 | | [20](src/20-custom-transform-expr/) 自定义扩展 | 自定义 transform、表达式函数 |
-| | [21](src/21-node-headless-render/) Node 无头渲染 | renderer:'none'、toSVG、fs loader |
+| | [21](src/21-node-headless-render/) Node 无头渲染 | renderer:'none'、toSVG、fs loader、CSV format/parse、axis values、导出后的 SVG 文字断言 |
 | **F. 稀有与复杂图形** | [22](src/22-sankey-alluvial/) 桑基 / 冲积图 | stack ×3、手工三次贝塞尔 path |
 | | [23](src/23-chord-arc-diagram/) 弦图 / 弧线邻接图 | pie、arc、二次贝塞尔 Q / 椭圆弧 A |
 | | [24](src/24-radial-rose-stack/) 玫瑰图 / 径向堆叠柱 | 极坐标 arc、**sqrt scale（面积正比）** |
@@ -141,7 +141,7 @@ node tools/thumbs.cjs --check    # 不启浏览器，只报告缺失/过期
 ## 校验与调试
 
 ```sh
-node tools/validate.cjs              # 纯 Node：契约 + parse + 真实数据流 + 布局溢出 + toSVG
+node tools/validate.cjs              # 纯 Node：契约（含 README 每节正文字数）+ parse + 真实数据流 + 布局溢出 + toSVG
 node tools/validate.cjs 06 12        # 只校验 slug 含 06 / 12 的
 node tools/inspect.cjs 22 --rows 6   # 打印数据样本(带类型)/比例尺 domain/SVG 里每段文字
 node tools/validate-browser.cjs      # 真实 Chromium：console 无报错 + 导出可用 + PNG 透明

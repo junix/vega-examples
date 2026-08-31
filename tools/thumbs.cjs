@@ -216,7 +216,8 @@ async function main() {
     + `／背景 ${opts.transparent ? '透明' : '白底'}`
     + `／本次处理 ${todo.length} 个${skipped ? `（${skipped} 个已是最新，跳过；--force 可强制重生成）` : ''}`);
 
-  /* 清单要覆盖全部 demo，所以先读回上一次的结果，再用本次的覆盖 */
+  /* 清单要覆盖全部 demo，所以先读回上一次的结果，再用本次的覆盖；
+     即使本次只过滤重画少数 demo，也把其余条目原样带上 */
   const manifestFile = path.join(outDir, 'manifest.json');
   let prev = {};
   try { prev = (JSON.parse(fs.readFileSync(manifestFile, 'utf8')) || {}).demos || {}; } catch (e) { /* 头一次跑 */ }
@@ -226,7 +227,7 @@ async function main() {
     options: { box: opts.box, maxScale: opts.maxScale, transparent: opts.transparent },
     demos: {}
   };
-  for (const slug of slugs) if (prev[slug]) manifest.demos[slug] = prev[slug];
+  for (const slug of Object.keys(prev)) manifest.demos[slug] = prev[slug];
 
   let server = null, browser = null, bad = 0;
   try {

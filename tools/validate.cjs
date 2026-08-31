@@ -10,7 +10,7 @@
  * 校验内容（任一项失败即 FAIL）:
  *   1. 目录契约：index.html / spec.vg.json / main.js / README.md 齐全；
  *      index.html 引用了 assets/vega.min.js + assets/demo.js 且声明 DEMO_META；
- *      README.md 含固定四节标题。
+ *      README.md 含固定四节标题，且每节正文不少于 40 个非空白字符。
  *   2. spec.vg.json 是合法 JSON、$schema 指向 vega v6、能被 vega.parse 解析。
  *   3. 数据文件真的存在，并且**真的读进来了**：用带 fs 访问能力的 loader
  *      跑一遍数据流，逐个数据集断言行数 > 0（运行时才填充的数据集在
@@ -89,6 +89,30 @@ const GROUP_F_SECTIONS = ['## 与 matplotlib 的对照'];
  */
 const GROUP_G_SECTIONS = ['## 与官方示例的差异'];
 
+/*
+ * README 每个必需小节的**正文**最少要有多少个非空白字符。
+ *
+ * 光查标题在不在（旧版的 readme.includes）挡不住"把五个标题贴进去就算交差"——
+ * 仓库里真出现过 88/98 字节、只有标题没有正文的 README。
+ * 阈值 40 是量出来的：全仓库最薄的一节真实正文是 01 的「学习目标」（48 字），
+ * 所以 40 能放过所有写过的 README，又能逼停纯标题骨架。
+ * 匹配用"行首前缀"而不是全等，这样「## 试一试（改练）」仍然算「## 试一试」。
+ */
+const README_MIN_BODY = 40;
+
+/* 取某个必需标题下、到下一个 `## ` 之前的正文；标题不存在返回 null */
+function readmeSectionBody(readme, heading) {
+  const lines = readme.split(/\r?\n/);
+  const i = lines.findIndex(l => l.startsWith(heading));
+  if (i < 0) return null;
+  const body = [];
+  for (let j = i + 1; j < lines.length; j++) {
+    if (/^##\s/.test(lines[j])) break;
+    body.push(lines[j]);
+  }
+  return body.join('\n');
+}
+
 function isGroupF(slug) {
   const n = parseInt(slug, 10);
   return Number.isFinite(n) && n >= 22;
@@ -148,8 +172,19 @@ function checkFiles(dir) {
   const want = README_SECTIONS
     .concat(isGroupF(slug) ? GROUP_F_SECTIONS : [])
     .concat(isGroupG(slug) ? GROUP_G_SECTIONS : []);
-  const lackSection = want.filter(s => !readme.includes(s));
+  const lackSection = [];
+  const thinSection = [];
+  for (const heading of want) {
+    const body = readmeSectionBody(readme, heading);
+    if (body === null) { lackSection.push(heading); continue; }
+    const n = body.replace(/\s+/g, '').length;
+    if (n < README_MIN_BODY) thinSection.push(`${heading}（正文 ${n} 字，至少 ${README_MIN_BODY}）`);
+  }
   if (lackSection.length) return fail(`README.md 缺少小节: ${lackSection.join(' / ')}`);
+  if (thinSection.length) {
+    return fail(`README.md 有小节只剩标题、没有正文: ${thinSection.join('；')}\n`
+      + '       小节标题贴齐了不等于写完了；把这几节真的写上（同组邻居的篇幅是参照）。');
+  }
 
   return pass('文件契约齐全');
 }
