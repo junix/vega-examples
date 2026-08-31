@@ -1,26 +1,34 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "最基础的柱状图：inline 数据 + band/linear 比例尺 + 坐标轴 + rect/text 标记 + hover 编码集",
-  "width": 640,
+  "description": "最基础的柱状图：外部数据 url + band/linear 比例尺 + 坐标轴 + rect/text 标记 + hover 编码集；唯一的派生数据集 peak 用 argmax 找出峰值年，供文字标注与副标题共用。",
+  "width": 720,
   "height": 320,
   "padding": 8,
 
   "title": {
-    "text": "一周访问量（虚构数据）",
-    "fontSize": 14
+    "text": "英格兰小麦价格，1565–1820（Playfair 1821）",
+    "subtitle": {
+      "signal": "'峰值 ' + data('peak')[0].peakYear + ' 年，' + format(data('peak')[0].peakWheat, 'd') + ' 先令/夸特'"
+    },
+    "fontSize": 14,
+    "subtitleFontSize": 11,
+    "subtitlePadding": 4
   },
 
   "data": [
     {
-      "name": "visits",
-      "values": [
-        { "day": "周一", "uv": 120 },
-        { "day": "周二", "uv": 200 },
-        { "day": "周三", "uv": 150 },
-        { "day": "周四", "uv": 80 },
-        { "day": "周五", "uv": 230 },
-        { "day": "周六", "uv": 260 },
-        { "day": "周日", "uv": 190 }
+      "name": "wheat",
+      "url": "../../assets/data/wheat.json",
+      "comment": "William Playfair《商业与政治图解集》1821 年版的原始数据：每 5 年一行，year 是字符串，wheat 是每夸特小麦的先令价"
+    },
+    {
+      "name": "peak",
+      "source": "wheat",
+      "comment": "唯一的派生数据集：argmax 返回**整行**（一个对象），所以后面要用两个 formula 把它摊平成标量字段",
+      "transform": [
+        { "type": "aggregate", "fields": ["wheat"], "ops": ["argmax"], "as": ["top"] },
+        { "type": "formula", "as": "peakYear", "expr": "datum.top.year" },
+        { "type": "formula", "as": "peakWheat", "expr": "datum.top.wheat" }
       ]
     }
   ],
@@ -29,14 +37,14 @@
     {
       "name": "x",
       "type": "band",
-      "domain": { "data": "visits", "field": "day" },
+      "domain": { "data": "wheat", "field": "year" },
       "range": "width",
-      "padding": 0.15
+      "padding": 0.12
     },
     {
       "name": "y",
       "type": "linear",
-      "domain": { "data": "visits", "field": "uv" },
+      "domain": { "data": "wheat", "field": "wheat" },
       "range": "height",
       "nice": true,
       "zero": true
@@ -44,23 +52,39 @@
   ],
 
   "axes": [
-    { "orient": "bottom", "scale": "x", "title": "星期" },
-    { "orient": "left", "scale": "y", "title": "独立访客数", "grid": true, "gridOpacity": 0.3 }
+    {
+      "orient": "bottom",
+      "scale": "x",
+      "title": "年份",
+      "labelAngle": -90,
+      "labelAlign": "right",
+      "labelBaseline": "middle",
+      "labelFontSize": 9
+    },
+    {
+      "orient": "left",
+      "scale": "y",
+      "title": "价格（先令 / 夸特）",
+      "format": "d",
+      "grid": true,
+      "gridOpacity": 0.3
+    }
   ],
 
   "marks": [
     {
       "type": "rect",
-      "from": { "data": "visits" },
+      "from": { "data": "wheat" },
       "encode": {
         "enter": {
-          "x": { "scale": "x", "field": "day" },
+          "x": { "scale": "x", "field": "year" },
           "width": { "scale": "x", "band": 1 },
-          "y": { "scale": "y", "field": "uv" },
+          "y": { "scale": "y", "field": "wheat" },
           "y2": { "scale": "y", "value": 0 }
         },
         "update": {
-          "fill": { "value": "#4e79a7" }
+          "fill": { "value": "#4e79a7" },
+          "tooltip": { "signal": "datum.year + ' 年：' + datum.wheat + ' 先令'" }
         },
         "hover": {
           "fill": { "value": "#e15759" }
@@ -69,14 +93,17 @@
     },
     {
       "type": "text",
-      "from": { "data": "visits" },
+      "from": { "data": "peak" },
       "encode": {
         "enter": {
-          "x": { "scale": "x", "field": "day", "band": 0.5 },
-          "y": { "scale": "y", "field": "uv", "offset": -4 },
-          "text": { "field": "uv" },
-          "align": { "value": "center" },
-          "fill": { "value": "#333333" }
+          "x": { "scale": "x", "field": "peakYear", "band": 0 },
+          "y": { "scale": "y", "field": "peakWheat", "offset": 1 },
+          "dx": { "value": -5 },
+          "text": { "signal": "datum.peakYear + ' 年 ' + format(datum.peakWheat, 'd') + ' 先令'" },
+          "align": { "value": "right" },
+          "baseline": { "value": "top" },
+          "fontSize": { "value": 11 },
+          "fill": { "value": "#e15759" }
         }
       }
     }

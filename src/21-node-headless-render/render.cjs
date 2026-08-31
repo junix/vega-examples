@@ -5,9 +5,10 @@
  * 用法:
  *   node src/21-node-headless-render/render.cjs
  *   node src/21-node-headless-render/render.cjs path/to/other-spec.vg.json
+ *   node src/21-node-headless-render/render.cjs <spec> --expect '某段文字' [--expect ...]
  *
  * 输出:
- *   src/21-node-headless-render/output.svg
+ *   src/21-node-headless-render/output.svg（**未进版本库**，见 .gitignore 第 2 行）
  *
  * 原理:
  *   1. require('assets/vega-bundle.cjs') 加载 Vega CommonJS 构建（返回 module.exports）
@@ -16,7 +17,8 @@
  *   4. new vega.View(runtime, {renderer:'none', loader}) 创建无头视图
  *   5. await view.runAsync() 跑完数据流，检查日志里有没有致命 WARN/ERROR
  *   6. await view.toSVG() 从场景图导出 SVG 字符串
- *   7. 写入文件
+ *   7. **内容断言**：把 SVG 里的 <text> 全部抠出来，逐条核对该出现的文字在不在
+ *   8. 写入文件
  *
  * 关键点:
  *   - renderer:'none' 不创建任何 DOM/Canvas，纯内存跑数据流
@@ -25,6 +27,10 @@
  *     必须手工注入 Node 的 fs（见下面 nodeLoader）
  *   - 数据加载失败在 Vega 里只是一条 WARN，脚本必须自己升级为非零退出，
  *     否则会安静地写出一张空图
+ *   - "没报错" ≠ "画对了"：轴标签、标注文字可能整段消失而日志一片安静
+ *     （字段名写错、argmax 数据集为空、band 的 values 落在 domain 之外……）。
+ *     所以导出后还要**读一遍 SVG 里的文字**，这就是下面的 EXPECT_TEXTS 内容闸门 ——
+ *     把 AGENTS.md 里"逐条读一遍 SVG 里的文字再说自己做完了"变成一条机器检查。
  *   - .cjs 后缀确保 Node 始终按 CommonJS 加载 UMD 的 module.exports 分支
  */
 'use strict';
@@ -50,9 +56,35 @@ console.log('✓ Vega v' + vega.version + ' 已加载');
 vega.textMetrics.canvas(false);
 
 // ── 2. 读取 spec ──────────────────────────────────────────────────
-const specPath = process.argv[2]
-  ? path.resolve(process.argv[2])
-  : path.join(__dirname, 'spec.vg.json');
+const argv = process.argv.slice(2);
+const expectArgs = [];
+const positional = [];
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i] === '--expect') { expectArgs.push(argv[++i]); }
+  else { positional.push(argv[i]); }
+}
+
+const OWN_SPEC = path.join(__dirname, 'spec.vg.json');
+const specPath = positional[0] ? path.resolve(positional[0]) : OWN_SPEC;
+
+/*
+ * 内容闸门的默认期望值：只在渲染**本 demo 自己的 spec** 时生效
+ * （渲染别的 spec 时这些文字本来就不该出现）。
+ * 想给任意 spec 加断言就用 --expect '某段文字'，可重复。
+ *
+ * 三条分别覆盖三类"安静失败"：
+ *   - 最暖年标注 → warmest 数据集（aggregate argmax + 两个 formula）真的算出来了
+ *   - 两个轴标题 → 轴没有因为 scale 名写错/domain 退化而整条消失
+ */
+const EXPECT_TEXTS = [
+  { label: '最暖年标注', text: '最暖 2023 年 +1.17 °C' },
+  { label: 'x 轴标题',   text: '年份' },
+  { label: 'y 轴标题',   text: '距平（°C）' }
+];
+
+const expected = expectArgs.length
+  ? expectArgs.map(t => ({ label: '--expect', text: t }))
+  : (specPath === OWN_SPEC ? EXPECT_TEXTS : []);
 
 console.log('  spec: ' + specPath);
 let spec;
@@ -136,6 +168,38 @@ view.runAsync()
     return view.toSVG();
   })
   .then(function (svg) {
+    /*
+     * ── 内容闸门 ───────────────────────────────────────────────────
+     * 把 SVG 里的 <text> 逐个抠出来（去掉内层 <tspan> 之类标签、还原实体），
+     * 再核对期望的文字在不在。缺任何一条就打印全部文字并 exit 1，不写文件 ——
+     * 一张"结构正确但标注全丢了"的图，比一张画不出来的图更难发现。
+     */
+    const texts = [];
+    const re = /<text\b[^>]*>([\s\S]*?)<\/text>/g;
+    let m;
+    while ((m = re.exec(svg))) {
+      texts.push(m[1].replace(/<[^>]+>/g, '')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+        .replace(/&amp;/g, '&')
+        .trim());
+    }
+    const joined = texts.join('\u0000');
+    const missing = expected.filter(e => !joined.includes(e.text));
+    if (missing.length) {
+      console.error('错误: SVG 内容断言失败，缺少 ' + missing.length + ' 段文字，拒绝写出文件：');
+      missing.forEach(e => console.error('  ✗ ' + e.label + ': "' + e.text + '"'));
+      console.error('  SVG 里实际有的 ' + texts.length + ' 段文字：');
+      texts.forEach((t, i) => console.error('    ' + i + ' "' + t + '"'));
+      process.exit(1);
+    }
+    if (expected.length) {
+      console.log('✓ 内容断言通过（' + texts.length + ' 段文字，'
+        + expected.length + ' 条期望全部命中）');
+    } else {
+      console.log('· 未启用内容断言（非本 demo 的 spec；需要就加 --expect）');
+    }
+
     const outPath = path.join(__dirname, 'output.svg');
     fs.writeFileSync(outPath, svg, 'utf8');
     console.log('✓ SVG 已导出 → ' + outPath);

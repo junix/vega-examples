@@ -11,7 +11,7 @@ window.DEMO_META = {
   slug: '21-node-headless-render',
   group: 'E. 运行时 API 与工程化',
   title: '21 · Node 无头渲染导出 SVG：脱离浏览器跑 Vega',
-  concepts: ['renderer: none', 'loader.fileAccess = true', 'view.toSVG()', 'Node.js 无头渲染', '.cjs 脚本', 'labelAlign / labelBaseline']
+  concepts: ['renderer: none', 'loader.fileAccess = true', 'view.toSVG()', 'Node.js 无头渲染', '.cjs 脚本', 'format: csv + parse', 'axis values 显式给刻度', 'SVG 文字内容断言']
 };
 </script>
 </head>
@@ -19,18 +19,22 @@ window.DEMO_META = {
 <main class="demo-main">
   <div class="demo-view">
     <div class="demo-notes">
+      数据是 NASA GISTEMP 全球年均气温距平（1880–2023，相对 1951–1980 基准），
+      正负异色 + 5 年滑动均值线，标题、标注与刻度全部由数据现算。
       本图用 <code>renderDemo</code> 在浏览器里渲染（canvas + hover）。
-      真正的看点是 <code>render.cjs</code>：在 Node.js 里用同一份 spec 无头跑数据流并导出 SVG。
-      试试在终端里执行：<code>node src/21-node-headless-render/render.cjs</code>
+      真正的看点是 <code>render.cjs</code>：在 Node.js 里用同一份 spec 无头跑数据流、导出 SVG，
+      并<strong>逐条核对 SVG 里的文字</strong>。试试在终端里执行：<code>node src/21-node-headless-render/render.cjs</code>
     </div>
     <div id="view"></div>
   </div>
   <aside id="signals" class="demo-signals">
     <h2>说明</h2>
     <div class="demo-notes">
-      本 demo 无交互 signal。重点在 Node 端：<code>render.cjs</code>
+      本 demo 的 <code>tickYears</code> 是派生 signal（从数据年份区间每 20 年取一个刻度），
+      没有交互控件。重点在 Node 端：<code>render.cjs</code>
       读同一份 <code>spec.vg.json</code>，在无浏览器环境下跑完数据流，
-      用 <code>view.toSVG()</code> 导出矢量图到 <code>output.svg</code>。
+      用 <code>view.toSVG()</code> 导出矢量图到 <code>output.svg</code>
+      （该文件在 <code>.gitignore</code> 里，不随仓库提交）。
     </div>
   </aside>
 </main>

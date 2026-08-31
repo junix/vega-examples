@@ -1,4 +1,4 @@
-/* demo 21 入口（浏览器版）：渲染季度销售额柱状图。
+/* demo 21 入口（浏览器版）：渲染 NASA GISTEMP 全球年均气温距平柱状图。
  *
  * 本 demo 的主角其实是 render.cjs —— 同一份 spec 在 Node.js 里
  * 用 renderer:'none' 无头跑数据流，再 toSVG() 导出矢量文件。

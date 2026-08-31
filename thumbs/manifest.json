@@ -11,18 +11,18 @@
   "demos": {
     "01-bar-chart": {
       "file": "thumbs/01-bar-chart.png",
-      "bytes": 20777,
+      "bytes": 27450,
       "width": 600,
-      "height": 344,
+      "height": 322,
       "natural": [
-        697,
-        400
+        777,
+        418
       ],
-      "scale": 0.8608,
+      "scale": 0.7722,
       "transparent": true,
       "hasAlpha": true,
-      "inkRatio": 0.5144,
-      "sourceMtime": "2026-08-22T10:14:51.871Z"
+      "inkRatio": 0.3344,
+      "sourceMtime": "2026-08-31T21:35:35.457Z"
     },
     "02-line-area-timeseries": {
       "file": "thumbs/02-line-area-timeseries.png",
@@ -311,18 +311,18 @@
     },
     "21-node-headless-render": {
       "file": "thumbs/21-node-headless-render.png",
-      "bytes": 21996,
+      "bytes": 34110,
       "width": 600,
-      "height": 320,
+      "height": 244,
       "natural": [
-        516,
-        276
+        776,
+        316
       ],
-      "scale": 1.1628,
+      "scale": 0.7732,
       "transparent": true,
       "hasAlpha": true,
-      "inkRatio": 0.3593,
-      "sourceMtime": "2026-08-22T15:21:54.434Z"
+      "inkRatio": 0.208,
+      "sourceMtime": "2026-08-31T21:36:19.592Z"
     },
     "22-sankey-alluvial": {
       "file": "thumbs/22-sankey-alluvial.png",

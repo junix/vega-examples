@@ -11,7 +11,7 @@ window.DEMO_META = {
   slug: '01-bar-chart',
   group: 'A. Grammar 基础',
   title: '01 · 柱状图：数据、比例尺、坐标轴与矩形标记',
-  concepts: ['data.values', 'scale: band', 'scale: linear', 'axis', 'mark: rect', 'mark: text', 'encode: enter/update/hover']
+  concepts: ['data.url', 'scale: band', 'scale: linear', 'axis: labelAngle', 'mark: rect', 'mark: text', 'encode: enter/update/hover', 'aggregate: argmax']
 };
 </script>
 </head>
@@ -19,6 +19,7 @@ window.DEMO_META = {
 <main class="demo-main">
   <div class="demo-view">
     <div class="demo-notes">
+      数据是 William Playfair 1821 年《商业与政治图解集》里的英格兰小麦价格（每 5 年一行）。
       把鼠标悬停到柱子上看 <code>hover</code> 编码集的效果。本图的全部内容都由
       <code>spec.vg.json</code> 一份 JSON 声明式描述，没有任何手写绘图代码。
     </div>

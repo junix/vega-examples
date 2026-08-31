@@ -24,7 +24,7 @@
 <script>
 var GROUPS = [
   { name: 'A. Grammar 基础', demos: [
-    ['01-bar-chart', '柱状图：数据、比例尺、坐标轴与矩形标记', ['scale', 'axis', 'rect', 'encode']],
+    ['01-bar-chart', '柱状图：外部数据、比例尺、坐标轴与矩形标记（Playfair 小麦价）', ['data.url', 'scale', 'axis', 'rect', 'argmax']],
     ['02-line-area-timeseries', '折线与面积图：时间比例尺与多序列', ['time scale', 'line/area', '多序列']],
     ['03-scatter-regression', '散点图与回归线', ['symbol', 'regression', 'quantitative']],
     ['04-histogram-binning', '直方图：分箱与聚合', ['bin', 'aggregate', 'rect']],
@@ -52,7 +52,7 @@ var GROUPS = [
   { name: 'E. 运行时 API 与工程化', demos: [
     ['19-runtime-api-tour', 'View API 全览：监听/导出/缩放', ['parse', 'View', 'toSVG', 'resize']],
     ['20-custom-transform-expr', '自定义 Transform 与表达式函数', ['transforms 注册表', 'expressionFunction']],
-    ['21-node-headless-render', 'Node 无头渲染导出 SVG', ['node', 'headless', 'toSVG']]
+    ['21-node-headless-render', 'Node 无头渲染导出 SVG（GISTEMP 气温距平）', ['node', 'headless', 'toSVG', 'csv parse', '内容断言']]
   ]},
   { name: 'F. 稀有与复杂图形', demos: [
     ['22-sankey-alluvial', '桑基图 / 冲积图：多级流量分配', ['stack ×3', 'path 贝塞尔', '手工布局']],
