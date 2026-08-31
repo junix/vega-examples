@@ -8,7 +8,7 @@
  * （不是把大图重采样），文字与曲线在缩小后依然是干净的矢量描边。
  *
  * 与 tools/export.cjs 的分工：
- *   export.cjs  出「原尺寸、可再利用」的成品图（exports/，已 gitignore）
+ *   export.cjs  出「原尺寸、可再利用」的成品图（out/，已 gitignore）
  *   thumbs.cjs  出「适配卡片、要进版本库」的小图（thumbs/，随仓库提交，
  *               这样 clone 下来直接 ./serve.sh 就有图，不必先装浏览器跑一遍）
  *
@@ -36,7 +36,7 @@ const path = require('path');
 const { serve, launch, decodePng, findChrome } = require('./cdp.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
-const DEMOS_DIR = path.join(ROOT, 'demos');
+const SRC_DIR = path.join(ROOT, 'src');
 
 /* 决定缩略图是否过期时要看的源文件 */
 const SOURCE_FILES = ['index.html', 'spec.vg.json', 'main.js'];
@@ -55,7 +55,7 @@ function fmtBytes(n) {
 function sourceMtime(slug) {
   let newest = 0;
   for (const name of SOURCE_FILES) {
-    const f = path.join(DEMOS_DIR, slug, name);
+    const f = path.join(SRC_DIR, slug, name);
     if (fs.existsSync(f)) newest = Math.max(newest, fs.statSync(f).mtimeMs);
   }
   return newest;
@@ -117,7 +117,7 @@ function thumbScript(opts) {
 async function makeThumb(browser, baseUrl, slug, outDir, opts) {
   const page = await browser.newPage(1500, 1100);
   try {
-    await page.goto(`${baseUrl}/demos/${slug}/index.html`);
+    await page.goto(`${baseUrl}/src/${slug}/index.html`);
     await page.waitForFunction('window.__sceneReady === true', 25000);
     // 13 之类的 demo 在 __sceneReady 之后还会由 main.js 灌数据 / 起动画，留一点安置时间
     await page.eval(`new Promise(function (r) { setTimeout(r, ${opts.settle}); })`);
@@ -179,11 +179,11 @@ async function main() {
   }));
   const filters = argv.filter(a => !a.startsWith('--') && !consumed.has(a));
 
-  const slugs = fs.readdirSync(DEMOS_DIR)
-    .filter(n => fs.statSync(path.join(DEMOS_DIR, n)).isDirectory())
+  const slugs = fs.readdirSync(SRC_DIR)
+    .filter(n => fs.statSync(path.join(SRC_DIR, n)).isDirectory())
     .filter(n => !filters.length || filters.some(f => n.includes(f)))
     .sort();
-  if (!slugs.length) { console.error('demos/ 下没有匹配的 demo'); process.exit(1); }
+  if (!slugs.length) { console.error('src/ 下没有匹配的 demo'); process.exit(1); }
 
   /* --check：纯 fs，不启浏览器。给 CI / 提交前用 */
   if (opts.check) {

@@ -19,10 +19,16 @@ install:
 thumbs:
     node tools/thumbs.cjs
 
-# Batch-export every demo to exports/ (SVG + 2x transparent PNG).
+# Batch-export every demo to out/ (SVG + 2x transparent PNG).
 export:
     node tools/export.cjs
 
 # Serve the interactive gallery at http://localhost:8000/.
 serve:
     ./serve.sh
+
+# Remove batch-exported images (thumbs/ is committed and untouched).
+clean:
+    rm -rf out
+    mkdir -p out
+    touch out/.gitkeep

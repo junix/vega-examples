@@ -33,25 +33,25 @@
 
 | 图形 | 本仓库 demo | matplotlib 侧 | 谁更省事 |
 | --- | --- | --- | --- |
-| 桑基图 / 冲积图 | [22](demos/22-sankey-alluvial/)：`stack` ×3 + 手工三次贝塞尔 path | `matplotlib.sankey.Sankey` **有内置**，但画的是经典「箭头流」样式；d3 那种二分图缎带桑基要靠 plotly / floWeaver | 看样式：箭头流 → matplotlib；缎带桑基 → 两边都手算，Vega 白得交互 |
-| 弦图 | [23](demos/23-chord-arc-diagram/)：`pie` + 二次贝塞尔 | 无内置，第三方 `mpl-chord-diagram` / `nxviz` | 平手（都要靠外力） |
-| 弧线邻接图 | [23](demos/23-chord-arc-diagram/)：椭圆弧 `A` 命令 | 无内置，手画 `Arc` patch | 平手 |
-| 力导向节点-链接图 | [14](demos/14-force-directed-graph/)：`force` 变换 + 拖拽 | `networkx.spring_layout` 算坐标 + matplotlib 画 | **Vega 赢在交互**：拖拽节点、实时重加热是声明式的；matplotlib 要自己接事件 |
-| 邻接矩阵 | [41](demos/41-matrix-adjacency/)：signal 驱动行列重排 | `imshow` / `matshow` 内置，一行出图 | 静态 → matplotlib；**要交互重排 → Vega** |
+| 桑基图 / 冲积图 | [22](src/22-sankey-alluvial/)：`stack` ×3 + 手工三次贝塞尔 path | `matplotlib.sankey.Sankey` **有内置**，但画的是经典「箭头流」样式；d3 那种二分图缎带桑基要靠 plotly / floWeaver | 看样式：箭头流 → matplotlib；缎带桑基 → 两边都手算，Vega 白得交互 |
+| 弦图 | [23](src/23-chord-arc-diagram/)：`pie` + 二次贝塞尔 | 无内置，第三方 `mpl-chord-diagram` / `nxviz` | 平手（都要靠外力） |
+| 弧线邻接图 | [23](src/23-chord-arc-diagram/)：椭圆弧 `A` 命令 | 无内置，手画 `Arc` patch | 平手 |
+| 力导向节点-链接图 | [14](src/14-force-directed-graph/)：`force` 变换 + 拖拽 | `networkx.spring_layout` 算坐标 + matplotlib 画 | **Vega 赢在交互**：拖拽节点、实时重加热是声明式的；matplotlib 要自己接事件 |
+| 邻接矩阵 | [41](src/41-matrix-adjacency/)：signal 驱动行列重排 | `imshow` / `matshow` 内置，一行出图 | 静态 → matplotlib；**要交互重排 → Vega** |
 
 ### 2. 分布图
 
 | 图形 | 本仓库 demo | matplotlib 侧 | 谁更省事 |
 | --- | --- | --- | --- |
-| 箱线图 | [29](demos/29-boxplot-errorbar/)：`aggregate` 五数概括 + `rect`/`rule` 手工拼 | `ax.boxplot()` **内置一行**，含离群点与 Tukey 须 | **matplotlib 明显赢** |
-| 小提琴图 | [28](demos/28-violin-ridgeline/)：`kde` + 对称 `area` | `ax.violinplot()` **内置**；`seaborn.violinplot` 更漂亮 | **matplotlib 明显赢** |
-| 误差棒 | [29](demos/29-boxplot-errorbar/)：`aggregate(stderr)` + `rule` | `ax.errorbar()` **内置** | **matplotlib 赢** |
-| 山脊线图 | [28](demos/28-violin-ridgeline/)：多组 `kde` + 行偏移 | 无内置，`joypy` 或手工叠 subplot | 平手 |
-| 蜂群图 | [27](demos/27-beeswarm-dotplot/)：`force` + `collide`，`static: true` | 无内置，`seaborn.swarmplot` 有 | 平手 |
-| Wilkinson 点图 | [27](demos/27-beeswarm-dotplot/)：`dotbin` + `stack` | 无内置 | **Vega 赢**（`dotbin` 是内置变换） |
-| 直方图 / 分箱 | [04](demos/04-histogram-binning/)：`bin` + `aggregate` | `ax.hist()` **内置** | matplotlib 赢 |
-| 六边形分箱 | [26](demos/26-hexbin-matrix/)：手算蜂巢格心 + 自定义 symbol path | `ax.hexbin()` **内置一行** | **matplotlib 明显赢** |
-| 二维核密度 / 等值线 | [25](demos/25-contour-density2d/)：`kde2d` + `isocontour` | `ax.contour/contourf` 是 matplotlib 的**王牌**；`seaborn.kdeplot` 一行 | **matplotlib 明显赢** |
+| 箱线图 | [29](src/29-boxplot-errorbar/)：`aggregate` 五数概括 + `rect`/`rule` 手工拼 | `ax.boxplot()` **内置一行**，含离群点与 Tukey 须 | **matplotlib 明显赢** |
+| 小提琴图 | [28](src/28-violin-ridgeline/)：`kde` + 对称 `area` | `ax.violinplot()` **内置**；`seaborn.violinplot` 更漂亮 | **matplotlib 明显赢** |
+| 误差棒 | [29](src/29-boxplot-errorbar/)：`aggregate(stderr)` + `rule` | `ax.errorbar()` **内置** | **matplotlib 赢** |
+| 山脊线图 | [28](src/28-violin-ridgeline/)：多组 `kde` + 行偏移 | 无内置，`joypy` 或手工叠 subplot | 平手 |
+| 蜂群图 | [27](src/27-beeswarm-dotplot/)：`force` + `collide`，`static: true` | 无内置，`seaborn.swarmplot` 有 | 平手 |
+| Wilkinson 点图 | [27](src/27-beeswarm-dotplot/)：`dotbin` + `stack` | 无内置 | **Vega 赢**（`dotbin` 是内置变换） |
+| 直方图 / 分箱 | [04](src/04-histogram-binning/)：`bin` + `aggregate` | `ax.hist()` **内置** | matplotlib 赢 |
+| 六边形分箱 | [26](src/26-hexbin-matrix/)：手算蜂巢格心 + 自定义 symbol path | `ax.hexbin()` **内置一行** | **matplotlib 明显赢** |
+| 二维核密度 / 等值线 | [25](src/25-contour-density2d/)：`kde2d` + `isocontour` | `ax.contour/contourf` 是 matplotlib 的**王牌**；`seaborn.kdeplot` 一行 | **matplotlib 明显赢** |
 
 这一节要坦白：**分布类统计图是 matplotlib（尤其加上 seaborn）的主场。**
 Vega 本体没有复合 mark —— 箱线图那种「盒 + 中位线 + 须 + 端帽 + 离群点」的组合
@@ -62,22 +62,22 @@ Vega 本体没有复合 mark —— 箱线图那种「盒 + 中位线 + 须 + �
 
 | 图形 | 本仓库 demo | matplotlib 侧 | 谁更省事 |
 | --- | --- | --- | --- |
-| 流图（streamgraph） | [31](demos/31-streamgraph/)：`stack` 的 `offset: center` + inside-out 排序 | `ax.stackplot(baseline='wiggle'/'sym')` **内置** | 平手（Vega 多送一个可切基线的下拉框） |
-| K 线图 | [32](demos/32-candlestick-ohlc/)：`rule` 影线 + `rect` 实体 + 十字光标 | matplotlib 3.x 已移除 candlestick，要装 `mplfinance` | 平手 |
-| 日历热力图 | [33](demos/33-calendar-heatmap/)：手算 周/星期 + `facet` 分年 | 无内置，`calmap` / `calplot` / `july` | 平手 |
-| 甘特图 / 时间线 | [40](demos/40-gantt-timeline/)：区间 `rect` + 依赖折线 | `ax.broken_barh()` 能画条，依赖箭头要手画 | 平手 |
-| Bump 图 / 斜率图 | [39](demos/39-bump-slope-chart/)：`window(rank)` + 反向 `point` 轴 | 无内置，手算名次再 `plot` | **Vega 赢**：名次是 `window` 变换算的，换数据自动跟随 |
-| 瀑布图 | [38](demos/38-waterfall-marimekko/)：`window` 累计和 + 连接虚线 | 无内置，手算 `bottom=` 参数 | 平手 |
-| 马赛克 / Marimekko | [38](demos/38-waterfall-marimekko/)：两级 `stack` 嵌套 | `statsmodels.graphics.mosaicplot.mosaic` | 平手 |
+| 流图（streamgraph） | [31](src/31-streamgraph/)：`stack` 的 `offset: center` + inside-out 排序 | `ax.stackplot(baseline='wiggle'/'sym')` **内置** | 平手（Vega 多送一个可切基线的下拉框） |
+| K 线图 | [32](src/32-candlestick-ohlc/)：`rule` 影线 + `rect` 实体 + 十字光标 | matplotlib 3.x 已移除 candlestick，要装 `mplfinance` | 平手 |
+| 日历热力图 | [33](src/33-calendar-heatmap/)：手算 周/星期 + `facet` 分年 | 无内置，`calmap` / `calplot` / `july` | 平手 |
+| 甘特图 / 时间线 | [40](src/40-gantt-timeline/)：区间 `rect` + 依赖折线 | `ax.broken_barh()` 能画条，依赖箭头要手画 | 平手 |
+| Bump 图 / 斜率图 | [39](src/39-bump-slope-chart/)：`window(rank)` + 反向 `point` 轴 | 无内置，手算名次再 `plot` | **Vega 赢**：名次是 `window` 变换算的，换数据自动跟随 |
+| 瀑布图 | [38](src/38-waterfall-marimekko/)：`window` 累计和 + 连接虚线 | 无内置，手算 `bottom=` 参数 | 平手 |
+| 马赛克 / Marimekko | [38](src/38-waterfall-marimekko/)：两级 `stack` 嵌套 | `statsmodels.graphics.mosaicplot.mosaic` | 平手 |
 
 ### 4. 层次结构
 
 | 图形 | 本仓库 demo | matplotlib 侧 | 谁更省事 |
 | --- | --- | --- | --- |
-| Treemap | [15](demos/15-hierarchies/)：`treemap` 变换（5 种切分算法） | 无内置，`squarify` 只做 squarify 一种 | **Vega 赢** |
-| Sunburst / Icicle | [15](demos/15-hierarchies/)：`partition` 变换 | 无内置，手算角度 | **Vega 赢** |
-| 圆填充（circle packing） | [35](demos/35-pack-dendrogram/)：`pack` 变换 | 无内置，得自己实现装箱 | **Vega 明显赢** |
-| 树 / 径向树状图 | [35](demos/35-pack-dendrogram/)：`tree` + `linkpath(orient: radial)` | `scipy.cluster.hierarchy.dendrogram` 画矩形树状图很方便，**径向**要手算 | 矩形 → scipy；**径向 → Vega 赢** |
+| Treemap | [15](src/15-hierarchies/)：`treemap` 变换（5 种切分算法） | 无内置，`squarify` 只做 squarify 一种 | **Vega 赢** |
+| Sunburst / Icicle | [15](src/15-hierarchies/)：`partition` 变换 | 无内置，手算角度 | **Vega 赢** |
+| 圆填充（circle packing） | [35](src/35-pack-dendrogram/)：`pack` 变换 | 无内置，得自己实现装箱 | **Vega 明显赢** |
+| 树 / 径向树状图 | [35](src/35-pack-dendrogram/)：`tree` + `linkpath(orient: radial)` | `scipy.cluster.hierarchy.dendrogram` 画矩形树状图很方便，**径向**要手算 | 矩形 → scipy；**径向 → Vega 赢** |
 
 层次布局是 Vega 的强项：`treemap` / `partition` / `pack` / `tree` / `stratify` /
 `treelinks` / `linkpath` 全是内置变换，而 Python 侧这些算法散落在不同的第三方包里、
@@ -87,22 +87,22 @@ Vega 本体没有复合 mark —— 箱线图那种「盒 + 中位线 + 须 + �
 
 | 图形 | 本仓库 demo | matplotlib 侧 | 谁更省事 |
 | --- | --- | --- | --- |
-| 矢量场 / 风场 | [34](demos/34-vector-field/)：自定义箭头字形 + `angle` + `pow(2)` size | `ax.quiver()` / `ax.streamplot()` **内置且成熟** | **matplotlib 明显赢** |
-| 分级统计地图 | [16](demos/16-geo-choropleth/)：TopoJSON + `lookup` + `quantize` | `cartopy` / `geopandas.plot()` 很顺手 | 平手 |
-| 投影画廊 | [37](demos/37-geo-projections-arcs/)：`projection` 的 type/rotate 接 signal | `cartopy.crs` 投影库更全、更专业 | **cartopy 更专业**；Vega 赢在「拖滑杆转地球」几乎零成本 |
-| 大圆航线 | [37](demos/37-geo-projections-arcs/)：`geoshape` 自动重采样 LineString | `cartopy` 的 `transform=ccrs.Geodetic()` 一行搞定 | 平手（两边都对） |
-| Voronoi | [18](demos/18-voronoi-labels/)：`voronoi` 变换 | `scipy.spatial.voronoi_plot_2d` | 平手 |
-| 词云 | [17](demos/17-wordcloud/)：`wordcloud` 变换 | `wordcloud` 包（生成位图） | Vega 输出**矢量**文字，可选中可缩放 |
+| 矢量场 / 风场 | [34](src/34-vector-field/)：自定义箭头字形 + `angle` + `pow(2)` size | `ax.quiver()` / `ax.streamplot()` **内置且成熟** | **matplotlib 明显赢** |
+| 分级统计地图 | [16](src/16-geo-choropleth/)：TopoJSON + `lookup` + `quantize` | `cartopy` / `geopandas.plot()` 很顺手 | 平手 |
+| 投影画廊 | [37](src/37-geo-projections-arcs/)：`projection` 的 type/rotate 接 signal | `cartopy.crs` 投影库更全、更专业 | **cartopy 更专业**；Vega 赢在「拖滑杆转地球」几乎零成本 |
+| 大圆航线 | [37](src/37-geo-projections-arcs/)：`geoshape` 自动重采样 LineString | `cartopy` 的 `transform=ccrs.Geodetic()` 一行搞定 | 平手（两边都对） |
+| Voronoi | [18](src/18-voronoi-labels/)：`voronoi` 变换 | `scipy.spatial.voronoi_plot_2d` | 平手 |
+| 词云 | [17](src/17-wordcloud/)：`wordcloud` 变换 | `wordcloud` 包（生成位图） | Vega 输出**矢量**文字，可选中可缩放 |
 
 ### 6. 任意形状
 
 | 能力 | 本仓库 demo | matplotlib 侧 |
 | --- | --- | --- |
-| 自定义符号形状 | [36](demos/36-custom-shapes-gradients/)：`symbol` 的 `shape` 直接吃 SVG path | `Path` + `PathPatch`，或 `marker=` 传 `Path` |
-| 参数方程曲线 | [36](demos/36-custom-shapes-gradients/)：`sequence` + `formula` | `numpy` 算点 + `ax.plot` —— **numpy 这里更顺手** |
-| 渐变填充 | [36](demos/36-custom-shapes-gradients/)：`fill: {gradient, stops}` | 无直接 API，得用 `imshow` + clip 或 `LinearSegmentedColormap` 拼 |
-| 变宽线 | [36](demos/36-custom-shapes-gradients/)：`trail` mark | 无内置，`LineCollection` 逐段设线宽 |
-| 裁剪 | [36](demos/36-custom-shapes-gradients/)：group 的 `clip` | `set_clip_path()` |
+| 自定义符号形状 | [36](src/36-custom-shapes-gradients/)：`symbol` 的 `shape` 直接吃 SVG path | `Path` + `PathPatch`，或 `marker=` 传 `Path` |
+| 参数方程曲线 | [36](src/36-custom-shapes-gradients/)：`sequence` + `formula` | `numpy` 算点 + `ax.plot` —— **numpy 这里更顺手** |
+| 渐变填充 | [36](src/36-custom-shapes-gradients/)：`fill: {gradient, stops}` | 无直接 API，得用 `imshow` + clip 或 `LinearSegmentedColormap` 拼 |
+| 变宽线 | [36](src/36-custom-shapes-gradients/)：`trail` mark | 无内置，`LineCollection` 逐段设线宽 |
+| 裁剪 | [36](src/36-custom-shapes-gradients/)：group 的 `clip` | `set_clip_path()` |
 
 平手偏 Vega：**Vega 的形状是数据驱动的** —— path 字符串本身可以是数据行的函数
 （demo 22 的每条缎带、demo 26 的每个六边形都是这么来的）。matplotlib 里同样的事
@@ -115,8 +115,8 @@ Vega 本体没有复合 mark —— 箱线图那种「盒 + 中位线 + 须 + �
 1. **交互是声明的，不是写出来的。**
    `signals` + 事件流选择器（`[mousedown, mouseup] > mousemove`）+ 声明式联动，
    刷选、缩放、跨视图 crossfilter、图例点选过滤都是 spec 的一部分：
-   [10](demos/10-signals-bind/) / [11](demos/11-events-brush-zoom/) /
-   [12](demos/12-hover-tooltip-legend/) / [09](demos/09-crossfilter/)。
+   [10](src/10-signals-bind/) / [11](src/11-events-brush-zoom/) /
+   [12](src/12-hover-tooltip-legend/) / [09](src/09-crossfilter/)。
    matplotlib 的 `widgets` + `mpl_connect` 能做，但你得自己维护状态机，
    而且换后端（Agg / Qt / notebook）行为会变。
 
@@ -131,7 +131,7 @@ Vega 本体没有复合 mark —— 箱线图那种「盒 + 中位线 + 须 + �
    `node tools/inspect.cjs <slug>` 能把每个中间数据集打出来的原因。
 
 4. **同一份声明能跑在三处**：浏览器 canvas、浏览器 SVG、Node 无头
-   （[19](demos/19-runtime-api-tour/) / [21](demos/21-node-headless-render/)），
+   （[19](src/19-runtime-api-tour/) / [21](src/21-node-headless-render/)），
    而且 `toSVG()` 是从**场景图**重新生成的真矢量，不是截图。
 
 5. **spec 是数据，可以被程序生成、diff、校验。**
@@ -150,7 +150,7 @@ Vega 本体没有复合 mark —— 箱线图那种「盒 + 中位线 + 须 + �
    密集散点下效果有限；matplotlib 侧 `adjustText` 也不完美，但至少不挑运行环境。
 4. **完全没有 3D。** mplot3d 那一套没有对应物。
 5. **表达式语言弱。** 没有循环、没有自定义函数（只能用 `expressionFunction`
-   从宿主注入，见 [20](demos/20-custom-transform-expr/)）。复杂几何要靠
+   从宿主注入，见 [20](src/20-custom-transform-expr/)）。复杂几何要靠
    `sequence` + `flatten` 绕出来（demo 30 的逐轴刻度就是这么造的）。
 6. **没有数学排版。** matplotlib 的 `mathtext` / `usetex` 能直接排 LaTeX 公式，
    Vega 只能贴纯文本。

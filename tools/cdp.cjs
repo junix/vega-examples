@@ -12,7 +12,7 @@
  *   const server  = await serve(root, 0);            // 端口 0 = 自动挑空闲端口
  *   const browser = await launch();                  // 起 headless chromium + 连 CDP
  *   const page    = await browser.newPage();
- *   await page.goto(server.url + '/demos/01-bar-chart/index.html');
+ *   await page.goto(server.url + '/src/01-bar-chart/index.html');
  *   await page.waitForFunction('window.__sceneReady === true');
  *   const r = await page.eval('window.__vegaExport({format:"png"})');
  *   await browser.close(); server.close();

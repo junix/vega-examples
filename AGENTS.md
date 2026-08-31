@@ -12,7 +12,7 @@
 
 **零安装、零构建、可离线**：Vega UMD 库与数据集都内置于 `assets/` 目录：
 
-| 资源 | 从 demo 目录（demos/NN-slug/）出发的相对路径 |
+| 资源 | 从 demo 目录（src/NN-slug/）出发的相对路径 |
 | --- | --- |
 | Vega 库（UMD，含全部子包） | `../../assets/vega.min.js` |
 | 共享助手 | `../../assets/demo.js` |
@@ -25,8 +25,8 @@
 ## 每个 demo 的目录契约
 
 ```
-demos/NN-slug/
-├── index.html     # 固定骨架（见 demos/01-bar-chart/）：DEMO_META + 容器 + 三个 <script>
+src/NN-slug/
+├── index.html     # 固定骨架（见 src/01-bar-chart/）：DEMO_META + 容器 + 三个 <script>
 ├── spec.vg.json   # Vega spec（v6）。数据 url 一律写 ../../assets/data/...
 ├── main.js        # 入口。纯 spec demo 只有一行 renderDemo({spec: './spec.vg.json', ...})；
 │                  # 运行时 API demo 在这里做 signal 监听、动态数据等
@@ -92,7 +92,7 @@ Vega 默认就是 `null`，但**如果 spec 里写了 `"background"`，会被继
 
 | | 输出 | 进版本库？ | 用途 |
 | --- | --- | --- | --- |
-| `export.cjs` | `exports/<slug>.{svg,png}` 原尺寸 | 否（`.gitignore`） | 拿出去用的成品图 |
+| `export.cjs` | `out/<slug>.{svg,png}` 原尺寸 | 否（`.gitignore`） | 拿出去用的成品图 |
 | `thumbs.cjs` | `thumbs/<slug>.png` 适配卡片 | **是** | 首页画廊；clone 下来就有图 |
 
 ```sh
@@ -121,7 +121,7 @@ node tools/thumbs.cjs --check      # 不启浏览器，只报告缺失/过期
 | `node tools/validate.cjs [slug片段…] [--verbose]` | **主校验器**。契约 + `$schema` + parse + 真实数据流 + `toSVG` |
 | `node tools/inspect.cjs <slug片段> [--rows N] [--texts] [--data 名] [--svg 文件]` | **调试利器**。打印数据样本（值带 `num`/`str`/`date` 类型前缀）、比例尺真实 domain/range、以及**最终 SVG 里按渲染顺序的每一段文字** |
 | `node tools/validate-browser.cjs [slug片段…] [--shots 目录]` | 浏览器端校验：console 无报错 + 画布非空 + SVG/PNG 导出可用 + **PNG 透明与白底成对断言** |
-| `node tools/export.cjs [slug片段…] [--out 目录] [--svg\|--png] [--scale N] [--opaque]` | 批量导出 SVG + PNG（默认透明）到 `exports/`，附 `manifest.json` |
+| `node tools/export.cjs [slug片段…] [--out 目录] [--svg\|--png] [--scale N] [--opaque]` | 批量导出 SVG + PNG（默认透明）到 `out/`，附 `manifest.json` |
 | `node tools/thumbs.cjs [slug片段…] [--force] [--check] [--box WxH]` | 生成首页画廊缩略图 `thumbs/<slug>.png`（**随仓库提交**）；`--check` 只查缺失/过期 |
 | `node tools/cdp.cjs` | 库，不直接跑：极小 CDP 客户端 + 静态服务器 + PNG 解码器 |
 
@@ -176,7 +176,7 @@ node tools/thumbs.cjs --check      # 纯 fs，查首页缩略图是否齐全且�
   `"signals": [{"name": "height", "update": "<该 group 的高度>"}]`，要么把 range 写成
   显式区间 `[0, {"signal": "panelH"}]`（后者更省心，还能绕开整个陷阱）。
   症状：子图按整幅画布尺寸铺开、溢出面板，而 parse / 数据流 / `toSVG` 全都不报错。
-  `tools/validate.cjs` 的布局溢出检查专为它而设。详见 `demos/05-stacked-grouped-bar/README.md`
+  `tools/validate.cjs` 的布局溢出检查专为它而设。详见 `src/05-stacked-grouped-bar/README.md`
   的「作用域陷阱」一节。
 - **自定义 signal 不要撞内建名。** `width` / `height` / `padding` / `background` /
   `autosize` / `cursor` 都是 view 的内建信号，同名自定义会**直接顶替**内建定义
@@ -195,8 +195,8 @@ node tools/thumbs.cjs --check      # 纯 fs，查首页缩略图是否齐全且�
   - 想让视觉半径等于 `r` 像素 → `size = pow(2 * r, 2)`（实测 `size: 144` 渲染出 `A6,6`，半径正好 6）。
   - `size = 2*r*r` 只能得到 `0.707r`，`size = PI*r*r` 得到 `0.886r` —— 都是常见的写错。
   - 想让**长度**线性正比于数值 → scale 用 `pow` exponent 2（值→面积），或 `sqrt`（面积→值）。
-  玫瑰图（`demos/24`）、矢量场（`demos/34`）、比例符号地图（`demos/37`）、
-  圆填充（`demos/35`）、力导向图（`demos/14`）都在这条上栽过。
+  玫瑰图（`src/24`）、矢量场（`src/34`）、比例符号地图（`src/37`）、
+  圆填充（`src/35`）、力导向图（`src/14`）都在这条上栽过。
   自定义 `shape` 的 SVG path 同理：Vega 把它按 `sqrt(size)/2` 等比缩放到 `[-1,1]` 的框里。
 - **`encode` 的 `band` 可以取信号**：`{"scale": "x", "field": "g", "band": {"signal": "(1-w)/2"}}`
   合法，比在 encode 里手拼 `scale()+bandwidth()` 表达式干净。

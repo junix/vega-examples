@@ -3,7 +3,7 @@
  * vega-examples 无头校验器（Node，零依赖）
  *
  * 用法:
- *   node tools/validate.cjs              校验 demos/ 下全部 demo
+ *   node tools/validate.cjs              校验 src/ 下全部 demo
  *   node tools/validate.cjs 01 03        只校验 slug 含 "01" / "03" 的 demo
  *   node tools/validate.cjs --verbose    额外打印每个数据集的行数
  *
@@ -19,7 +19,7 @@
  *      （加载失败、摄取失败、Infinite extent、未识别属性……）。
  *   5. 渲染闭环：await view.toSVG() 必须产出非空 SVG，且含有 <path>/<text> 等
  *      真实图元——这一步会把 mark/scale/encode 全部跑一遍。
- *   6. 首页画廊（全量跑时）：index.html 的 GROUPS 与 demos/ 一一对应，
+ *   6. 首页画廊（全量跑时）：index.html 的 GROUPS 与 src/ 一一对应，
  *      且每个 demo 都有缩略图 thumbs/<slug>.png。
  *
  * 为什么要第 3/4/5 条：旧版校验器用 vega.loader({mode:'file'}) 读盘，而
@@ -39,7 +39,7 @@ const fs = require('fs');
 const path = require('path');
 
 const EXAMPLES_ROOT = path.resolve(__dirname, '..');
-const DEMOS_DIR = path.join(EXAMPLES_ROOT, 'demos');
+const SRC_DIR = path.join(EXAMPLES_ROOT, 'src');
 
 const vega = require(path.join(EXAMPLES_ROOT, 'assets', 'vega-bundle.cjs'));
 if (!vega || typeof vega.parse !== 'function') {
@@ -345,7 +345,7 @@ async function checkSpec(dir, opts) {
 }
 
 /*
- * 首页画廊（index.html 里的 GROUPS 数组）必须与 demos/ 目录一一对应。
+ * 首页画廊（index.html 里的 GROUPS 数组）必须与 src/ 目录一一对应。
  * 新增 demo 忘了登记、或删了目录忘了摘条目，都会让首页出现死链或漏项。
  */
 function checkGallery() {
@@ -360,11 +360,11 @@ function checkGallery() {
     return fail(`index.html 的 GROUPS 无法求值: ${e.message}`);
   }
   const listed = new Set(groups.flatMap(g => (g.demos || []).map(d => d[0])));
-  const onDisk = fs.readdirSync(DEMOS_DIR).filter(n => fs.statSync(path.join(DEMOS_DIR, n)).isDirectory());
+  const onDisk = fs.readdirSync(SRC_DIR).filter(n => fs.statSync(path.join(SRC_DIR, n)).isDirectory());
   const missing = onDisk.filter(d => !listed.has(d));
   const dangling = [...listed].filter(d => !onDisk.includes(d));
   if (missing.length || dangling.length) {
-    return fail('首页画廊与 demos/ 不同步'
+    return fail('首页画廊与 src/ 不同步'
       + (missing.length ? `；目录存在但未登记: ${missing.join(', ')}` : '')
       + (dangling.length ? `；已登记但目录不存在: ${dangling.join(', ')}` : ''));
   }
@@ -381,7 +381,7 @@ function checkGallery() {
       + '；跑 node tools/thumbs.cjs 补齐');
   }
 
-  return pass(`首页画廊与 demos/ 同步（${listed.size} 项，缩略图齐全）`);
+  return pass(`首页画廊与 src/ 同步（${listed.size} 项，缩略图齐全）`);
 }
 
 async function main() {
@@ -389,13 +389,13 @@ async function main() {
   const opts = { verbose: argv.includes('--verbose') };
   const filters = argv.filter(a => !a.startsWith('--'));
 
-  const dirs = fs.readdirSync(DEMOS_DIR)
-    .map(name => path.join(DEMOS_DIR, name))
+  const dirs = fs.readdirSync(SRC_DIR)
+    .map(name => path.join(SRC_DIR, name))
     .filter(p => fs.statSync(p).isDirectory())
     .filter(p => !filters.length || filters.some(f => path.basename(p).includes(f)))
     .sort();
   if (!dirs.length) {
-    console.error('demos/ 下没有匹配的 demo 目录');
+    console.error('src/ 下没有匹配的 demo 目录');
     process.exit(1);
   }
 

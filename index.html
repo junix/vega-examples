@@ -127,7 +127,7 @@ GROUPS.forEach(function (g) {
   g.demos.forEach(function (d) {
     var card = document.createElement('a');
     card.className = 'gallery-card';
-    card.href = './demos/' + d[0] + '/index.html';
+    card.href = './src/' + d[0] + '/index.html';
     card.appendChild(buildThumb(d[0], d[0] + ' · ' + d[1]));
 
     var body = document.createElement('div');

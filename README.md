@@ -24,53 +24,53 @@
 
 | 分组 | Demo | 核心概念 |
 | --- | --- | --- |
-| A. Grammar 基础 | [01](demos/01-bar-chart/) 柱状图 | data.values、band/linear scale、axis、rect/text mark、encode 集合 |
-| | [02](demos/02-line-area-timeseries/) 折线/面积 | time scale、多序列分组、line/area mark |
-| | [03](demos/03-scatter-regression/) 散点+回归 | symbol mark、regression transform |
-| | [04](demos/04-histogram-binning/) 直方图 | bin + aggregate 变换 |
-| | [05](demos/05-stacked-grouped-bar/) 堆叠/分组 | stack 变换、facet、group mark、**group 局部 width/height 信号** |
-| B. 数据变换 | [06](demos/06-data-pipeline/) 变换管线 | filter / formula / aggregate / window / sort |
-| | [07](demos/07-lookup-joins/) 表连接 | lookup 变换、多数据集、CSV 的 format.type |
-| | [08](demos/08-reshape-fold-pivot/) 宽长互转 | fold / pivot 变换、线性轴的 zero |
-| | [09](demos/09-crossfilter/) 联动过滤 | crossfilter 手法、多视图共享 signal |
-| C. 交互 | [10](demos/10-signals-bind/) 控件绑定 | signal、bind（滑杆/下拉/复选） |
-| | [11](demos/11-events-brush-zoom/) 刷选缩放 | 事件流语法、interval brush、pan/zoom |
-| | [12](demos/12-hover-tooltip-legend/) 提示与图例 | tooltip 通道、legend 交互过滤 |
-| | [13](demos/13-dynamic-data-runtime/) 动态数据 | view.insert/remove/change、signal()、runAsync |
-| D. 高级布局 | [14](demos/14-force-directed-graph/) 力导向图 | force 变换、节点拖拽 |
-| | [15](demos/15-hierarchies/) 层次布局 | treemap / partition、stratify |
-| | [16](demos/16-geo-choropleth/) 分级统计地图 | geo 投影、topojson、lookup 填色、domain 截断 |
-| | [17](demos/17-wordcloud/) 词云 | wordcloud 变换 |
-| | [18](demos/18-voronoi-labels/) 拾取与标签 | voronoi、label 防重叠 |
-| E. 运行时 API | [19](demos/19-runtime-api-tour/) View API 全览 | parse、View、监听器、toSVG 导出、resize |
-| | [20](demos/20-custom-transform-expr/) 自定义扩展 | 自定义 transform、表达式函数 |
-| | [21](demos/21-node-headless-render/) Node 无头渲染 | renderer:'none'、toSVG、fs loader |
-| **F. 稀有与复杂图形** | [22](demos/22-sankey-alluvial/) 桑基 / 冲积图 | stack ×3、手工三次贝塞尔 path |
-| | [23](demos/23-chord-arc-diagram/) 弦图 / 弧线邻接图 | pie、arc、二次贝塞尔 Q / 椭圆弧 A |
-| | [24](demos/24-radial-rose-stack/) 玫瑰图 / 径向堆叠柱 | 极坐标 arc、**sqrt scale（面积正比）** |
-| | [25](demos/25-contour-density2d/) 等值线 / 二维核密度 | isocontour、kde2d、grid 栅格对象 |
-| | [26](demos/26-hexbin-matrix/) 六边形分箱 / 矩阵热力图 | 手算蜂巢格心、自定义 symbol shape |
-| | [27](demos/27-beeswarm-dotplot/) 蜂群图 / Wilkinson 点图 | force collide（static）、dotbin |
-| | [28](demos/28-violin-ridgeline/) 小提琴图 / 山脊线图 | kde、对称 area、重叠行布局 |
-| | [29](demos/29-boxplot-errorbar/) 箱线图 / 误差棒 | aggregate 五数、Tukey 围栏、stderr |
-| | [30](demos/30-parallel-coordinates/) 平行坐标图 | fold、归一化、逐轴刻度反算 |
-| | [31](demos/31-streamgraph/) 流图 | stack 的 offset zero/center/normalize |
-| | [32](demos/32-candlestick-ohlc/) K 线图 | 双面板共享 x scale、window lag、十字光标 |
-| | [33](demos/33-calendar-heatmap/) 日历热力图 | 手算 周/星期、facet 分年、gradient 图例 |
-| | [34](demos/34-vector-field/) 矢量场 / 风场图 | 自定义箭头字形、angle、**pow(2) size** |
-| | [35](demos/35-pack-dendrogram/) 圆填充 / 径向树状图 | pack、tree、linkpath(orient: radial) |
-| | [36](demos/36-custom-shapes-gradients/) 自定义形状与渐变 | symbol path、gradient、trail、clip |
-| | [37](demos/37-geo-projections-arcs/) 投影画廊 / 大圆航线 | projection、graticule、geoshape |
-| | [38](demos/38-waterfall-marimekko/) 瀑布图 / 马赛克图 | window 累计和、两级 stack |
-| | [39](demos/39-bump-slope-chart/) Bump 图 / 斜率图 | window(rank)、point 反向轴 |
-| | [40](demos/40-gantt-timeline/) 甘特图 / 时间线 | 区间 rect、依赖折线、time + band |
-| | [41](demos/41-matrix-adjacency/) 邻接矩阵 | 镜像边表、scale.domain 用 signal |
-| **G. 官方示例精读** | [42](demos/42-job-voyager/) Job Voyager | aggregate 的 argmax 返回整行、from.data + from.facet |
-| | [43](demos/43-edge-bundling/) 层级边捆绑 | treePath、按数组字段 facet、interpolate: bundle |
-| | [44](demos/44-tree-layout/) 直角坐标树布局 | tree 用 as 重命名转置、linkpath 四种 shape |
-| | [45](demos/45-radar-chart/) 雷达图 | point 角度尺、pow 半径尺、linear-closed 闭合 |
-| | [46](demos/46-connected-scatter/) 连接散点图 | line 轨迹、ordinal 当查找表、collect 定顺序 |
-| | [47](demos/47-serpentine-timeline/) 蛇形时间线 | 直段+圆弧的几何参数化、formula 链 |
+| A. Grammar 基础 | [01](src/01-bar-chart/) 柱状图 | data.values、band/linear scale、axis、rect/text mark、encode 集合 |
+| | [02](src/02-line-area-timeseries/) 折线/面积 | time scale、多序列分组、line/area mark |
+| | [03](src/03-scatter-regression/) 散点+回归 | symbol mark、regression transform |
+| | [04](src/04-histogram-binning/) 直方图 | bin + aggregate 变换 |
+| | [05](src/05-stacked-grouped-bar/) 堆叠/分组 | stack 变换、facet、group mark、**group 局部 width/height 信号** |
+| B. 数据变换 | [06](src/06-data-pipeline/) 变换管线 | filter / formula / aggregate / window / sort |
+| | [07](src/07-lookup-joins/) 表连接 | lookup 变换、多数据集、CSV 的 format.type |
+| | [08](src/08-reshape-fold-pivot/) 宽长互转 | fold / pivot 变换、线性轴的 zero |
+| | [09](src/09-crossfilter/) 联动过滤 | crossfilter 手法、多视图共享 signal |
+| C. 交互 | [10](src/10-signals-bind/) 控件绑定 | signal、bind（滑杆/下拉/复选） |
+| | [11](src/11-events-brush-zoom/) 刷选缩放 | 事件流语法、interval brush、pan/zoom |
+| | [12](src/12-hover-tooltip-legend/) 提示与图例 | tooltip 通道、legend 交互过滤 |
+| | [13](src/13-dynamic-data-runtime/) 动态数据 | view.insert/remove/change、signal()、runAsync |
+| D. 高级布局 | [14](src/14-force-directed-graph/) 力导向图 | force 变换、节点拖拽 |
+| | [15](src/15-hierarchies/) 层次布局 | treemap / partition、stratify |
+| | [16](src/16-geo-choropleth/) 分级统计地图 | geo 投影、topojson、lookup 填色、domain 截断 |
+| | [17](src/17-wordcloud/) 词云 | wordcloud 变换 |
+| | [18](src/18-voronoi-labels/) 拾取与标签 | voronoi、label 防重叠 |
+| E. 运行时 API | [19](src/19-runtime-api-tour/) View API 全览 | parse、View、监听器、toSVG 导出、resize |
+| | [20](src/20-custom-transform-expr/) 自定义扩展 | 自定义 transform、表达式函数 |
+| | [21](src/21-node-headless-render/) Node 无头渲染 | renderer:'none'、toSVG、fs loader |
+| **F. 稀有与复杂图形** | [22](src/22-sankey-alluvial/) 桑基 / 冲积图 | stack ×3、手工三次贝塞尔 path |
+| | [23](src/23-chord-arc-diagram/) 弦图 / 弧线邻接图 | pie、arc、二次贝塞尔 Q / 椭圆弧 A |
+| | [24](src/24-radial-rose-stack/) 玫瑰图 / 径向堆叠柱 | 极坐标 arc、**sqrt scale（面积正比）** |
+| | [25](src/25-contour-density2d/) 等值线 / 二维核密度 | isocontour、kde2d、grid 栅格对象 |
+| | [26](src/26-hexbin-matrix/) 六边形分箱 / 矩阵热力图 | 手算蜂巢格心、自定义 symbol shape |
+| | [27](src/27-beeswarm-dotplot/) 蜂群图 / Wilkinson 点图 | force collide（static）、dotbin |
+| | [28](src/28-violin-ridgeline/) 小提琴图 / 山脊线图 | kde、对称 area、重叠行布局 |
+| | [29](src/29-boxplot-errorbar/) 箱线图 / 误差棒 | aggregate 五数、Tukey 围栏、stderr |
+| | [30](src/30-parallel-coordinates/) 平行坐标图 | fold、归一化、逐轴刻度反算 |
+| | [31](src/31-streamgraph/) 流图 | stack 的 offset zero/center/normalize |
+| | [32](src/32-candlestick-ohlc/) K 线图 | 双面板共享 x scale、window lag、十字光标 |
+| | [33](src/33-calendar-heatmap/) 日历热力图 | 手算 周/星期、facet 分年、gradient 图例 |
+| | [34](src/34-vector-field/) 矢量场 / 风场图 | 自定义箭头字形、angle、**pow(2) size** |
+| | [35](src/35-pack-dendrogram/) 圆填充 / 径向树状图 | pack、tree、linkpath(orient: radial) |
+| | [36](src/36-custom-shapes-gradients/) 自定义形状与渐变 | symbol path、gradient、trail、clip |
+| | [37](src/37-geo-projections-arcs/) 投影画廊 / 大圆航线 | projection、graticule、geoshape |
+| | [38](src/38-waterfall-marimekko/) 瀑布图 / 马赛克图 | window 累计和、两级 stack |
+| | [39](src/39-bump-slope-chart/) Bump 图 / 斜率图 | window(rank)、point 反向轴 |
+| | [40](src/40-gantt-timeline/) 甘特图 / 时间线 | 区间 rect、依赖折线、time + band |
+| | [41](src/41-matrix-adjacency/) 邻接矩阵 | 镜像边表、scale.domain 用 signal |
+| **G. 官方示例精读** | [42](src/42-job-voyager/) Job Voyager | aggregate 的 argmax 返回整行、from.data + from.facet |
+| | [43](src/43-edge-bundling/) 层级边捆绑 | treePath、按数组字段 facet、interpolate: bundle |
+| | [44](src/44-tree-layout/) 直角坐标树布局 | tree 用 as 重命名转置、linkpath 四种 shape |
+| | [45](src/45-radar-chart/) 雷达图 | point 角度尺、pow 半径尺、linear-closed 闭合 |
+| | [46](src/46-connected-scatter/) 连接散点图 | line 轨迹、ordinal 当查找表、collect 定顺序 |
+| | [47](src/47-serpentine-timeline/) 蛇形时间线 | 直段+圆弧的几何参数化、formula 链 |
 
 G 组（42 起）每个 demo 对应 [vega.github.io/vega/examples](https://vega.github.io/vega/examples/) 下的一个
 官方示例，README 里除了讲解还必须有一节 **`## 与官方示例的差异`** ——
@@ -93,14 +93,14 @@ F 组起每个 demo 的 README 都带一节 **`## 与 matplotlib 的对照`**；
 批量导出：
 
 ```sh
-node tools/export.cjs                    # 全部 demo → exports/，SVG + 透明 PNG(2×)
+node tools/export.cjs                    # 全部 demo → out/，SVG + 透明 PNG(2×)
 node tools/export.cjs 22 33 --scale 3    # 只导指定 demo，3 倍分辨率
 node tools/export.cjs --opaque           # 白底对照
 node tools/export.cjs --svg --no-browser # 只导 SVG，不用浏览器
 ```
 
 导出器会**就地校验透明度**：解 PNG 头确认是 RGBA（colorType 6），
-再采样统计全透明像素占比，写进 `exports/manifest.json`。
+再采样统计全透明像素占比，写进 `out/manifest.json`。
 
 ### 首页缩略图 thumbs/
 
@@ -118,7 +118,7 @@ node tools/thumbs.cjs --check    # 不启浏览器，只报告缺失/过期
 - **重绘而非重采样**：先 `view.toCanvas(1)` 量出图表自然尺寸，再按
   `min(600/宽, 380/高)` 的比例 `view.toCanvas(scale)` 画第二遍。缩放发生在绘制阶段，
   文字与曲线是重新描边的，所以缩小后依然干净。
-- **进版本库**：`exports/` 是 gitignore 的成品图，`thumbs/` 则随仓库提交 ——
+- **进版本库**：`out/` 是 gitignore 的成品图，`thumbs/` 则随仓库提交 ——
   clone 下来直接 `./serve.sh` 就有图，不必先装 Chromium 跑一遍。47 张共约 3.9 MB。
 - **不裁切**：各 demo 画幅从 600×194 的宽条到 329×380 的竖幅都有，
   卡片上固定取景框、图片 contain 居中，只留白不裁切。
