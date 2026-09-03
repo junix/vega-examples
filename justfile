@@ -19,6 +19,14 @@ install:
 thumbs:
     node tools/thumbs.cjs
 
+# Publish the existing offline catalog under the explicit gallery.html name.
+gallery:
+    node tools/build-gallery.cjs
+
+gallery-check:
+    node tools/build-gallery.cjs --check
+    node tools/thumbs.cjs --check
+
 # Batch-export every demo to out/ (SVG + 2x transparent PNG).
 export:
     node tools/export.cjs

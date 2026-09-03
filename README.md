@@ -1,5 +1,9 @@
 # vega-examples
 
+The offline catalog is available as both [`index.html`](index.html) and the
+generated [`gallery.html`](gallery.html). Run `just gallery` after changing the
+catalog and `just gallery-check` to verify the alias and committed thumbnails.
+
 > 面向计算机 agent（也适合人类）的 **Vega 教学 demo 集**：47 个渐进式 demo，
 > 覆盖 Vega 的 JSON spec 语法（数据、变换、比例尺、标记、信号、事件）、JS 运行时 API
 > （View、动态数据、自定义变换、无头渲染），以及一整组**稀有与复杂图形**
