@@ -1,8 +1,12 @@
 # vega-examples
 
-The offline catalog is available as both [`index.html`](index.html) and the
-generated [`gallery.html`](gallery.html). Run `just gallery` after changing the
-catalog and `just gallery-check` to verify the alias and committed thumbnails.
+**目录入口：[`gallery.html`](gallery.html)**（[在线打开](gallery.html)）—— 单文件离线版画廊：
+样式与 47 张缩略图全部内联，下载这一个文件即可离线浏览；带实时搜索（标题 / 描述 /
+概念标签）与分组锚点导航，配色自动跟随系统的亮 / 暗模式（图表本体保持浅底）。
+
+[`index.html`](index.html) 是 gallery.html 的**开发源**（引用 `assets/` 与 `thumbs/`
+下的分立文件，便于本地迭代）。改动目录或样式后运行 `just gallery` 重新生成
+gallery.html，`just gallery-check` 校验产物与已提交缩略图同步。
 
 > 面向计算机 agent（也适合人类）的 **Vega 教学 demo 集**：47 个渐进式 demo，
 > 覆盖 Vega 的 JSON spec 语法（数据、变换、比例尺、标记、信号、事件）、JS 运行时 API
@@ -17,8 +21,13 @@ catalog and `just gallery-check` to verify the alias and committed thumbnails.
 
 ```sh
 ./serve.sh
-# 打开 http://localhost:8000/
+# 打开 http://localhost:8000/gallery.html
 ```
+
+> 示例页（`src/*/index.html`）通过 fetch 加载数据与 spec，**file:// 直开不可用
+> （fetch CORS）**，需要 http 服务：`./serve.sh`、`python3 -m http.server` 或任意
+> 静态服务器均可。`gallery.html` 自身已全部内联，可 file:// 直开浏览，
+> 但从它点进示例页仍需先起 http 服务。
 
 首页是**带缩略图的画廊**：47 张小图（`thumbs/`，随仓库提交）一眼看完所有图形，
 点进去就是可交互的完整 demo。缩略图不是截屏，而是从 demo 页里的 View

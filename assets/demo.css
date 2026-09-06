@@ -1,4 +1,5 @@
-/* vega-examples 共享样式：浅色、窄版心、突出图表本体 */
+/* vega-examples 共享样式：浅色为默认（图表 spec 按浅底设计），暗色跟随系统
+   （prefers-color-scheme）只暗页面 chrome，图表容器保持浅色孤岛 */
 * { box-sizing: border-box; }
 
 body {
@@ -112,8 +113,48 @@ a:hover { text-decoration: underline; }
 
 /* gallery 首页 */
 .gallery-main { max-width: 1560px; margin: 24px auto; padding: 0 24px; }
+/* 锚点跳转时标题不被 sticky 控制条盖住 */
+.gallery-group { scroll-margin-top: 76px; }
 .gallery-group h2 { font-size: 17px; border-bottom: 1px solid #d8dee4; padding-bottom: 6px; margin-top: 28px; }
 .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+
+/* gallery 控制条：sticky 搜索 + 分组锚点 chips + 结果计数（aria-live） */
+.gallery-controls {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 24px;
+  background: #fff;
+  border-bottom: 1px solid #d8dee4;
+}
+#gallery-search {
+  flex: 0 1 300px;
+  min-width: 160px;
+  font: inherit;
+  font-size: 14px;
+  padding: 5px 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #f6f8fa;
+  color: inherit;
+}
+.gallery-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.gallery-chips a {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  background: #f6f8fa;
+  color: #57606a;
+  white-space: nowrap;
+}
+.gallery-chips a:hover { background: #ddf4ff; border-color: #0969da; color: #0969da; text-decoration: none; }
+.gallery-count { margin-left: auto; font-size: 12px; color: #57606a; white-space: nowrap; }
+.gallery-empty { display: none; padding: 48px 0; text-align: center; color: #57606a; }
 .gallery-card {
   display: flex;
   flex-direction: column;
@@ -197,3 +238,37 @@ a:hover { text-decoration: underline; }
   margin-left: auto;
 }
 .demo-export-status.is-error { color: #cf222e; }
+
+/*
+ * 暗色模式：跟随系统（prefers-color-scheme），只暗页面 chrome ——
+ * body 背景/文字、页头、gallery 控制条、卡片面板。
+ * 图表本体所在的 .demo-view / .demo-signals / .gallery-thumb 保持浅底：
+ * 图表 spec 全部按浅底设计（轴/文字/默认配色），暗底会毁可读性，
+ * 所以这些容器钉回深色文字当"浅色孤岛"，而不是跟着变暗。
+ */
+@media (prefers-color-scheme: dark) {
+  body { background: #0d1117; color: #e6edf3; }
+  a { color: #58a6ff; }
+
+  /* 页头 */
+  .demo-header { background: #161b22; border-bottom-color: #30363d; }
+  .demo-header .crumb { color: #8b949e; }
+  .demo-header .tag { background: rgba(56, 139, 253, .18); color: #58a6ff; }
+
+  /* 浅色孤岛：白底不变，把文字钉回深色，避免继承到 body 的浅色文字 */
+  .demo-view, .demo-signals { color: #24292f; }
+
+  /* gallery 控制条 */
+  .gallery-controls { background: #161b22; border-bottom-color: #30363d; }
+  #gallery-search { background: #0d1117; border-color: #30363d; color: #e6edf3; }
+  .gallery-chips a { background: #21262d; border-color: #30363d; color: #8b949e; }
+  .gallery-chips a:hover { background: #1c2a3a; border-color: #58a6ff; color: #58a6ff; }
+  .gallery-count { color: #8b949e; }
+  .gallery-empty { color: #8b949e; }
+
+  /* gallery 卡片面板（缩略图取景框 .gallery-thumb 保持白底不动） */
+  .gallery-group h2 { border-bottom-color: #30363d; }
+  .gallery-card { background: #161b22; border-color: #30363d; }
+  .gallery-card:hover { border-color: #58a6ff; box-shadow: 0 2px 10px rgba(56, 166, 255, .16); }
+  .gallery-card .tag { background: #21262d; color: #8b949e; }
+}

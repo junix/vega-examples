@@ -19,7 +19,14 @@
     <a href="https://vega.github.io/editor/" target="_blank">在线 Editor</a>
   </div>
 </header>
-<main class="gallery-main" id="gallery"></main>
+<div class="gallery-controls">
+  <input type="search" id="gallery-search" placeholder="搜索标题 / 描述 / 概念标签" aria-label="搜索 demo（标题、描述、概念标签）" autocomplete="off">
+  <nav class="gallery-chips" id="gallery-chips" aria-label="分组导航"></nav>
+  <span class="gallery-count" id="gallery-count" aria-live="polite"></span>
+</div>
+<main class="gallery-main" id="gallery">
+  <div class="gallery-empty" id="gallery-empty">没有匹配的 demo，换个关键词试试。</div>
+</main>
 
 <script>
 var GROUPS = [
@@ -115,10 +122,14 @@ function buildThumb(slug, title) {
   return box;
 }
 
+/* 分组锚点 id：'A. Grammar 基础' → group-a，chips 与 section 共用 */
+function groupId(name) { return 'group-' + name.charAt(0).toLowerCase(); }
+
 var gallery = document.getElementById('gallery');
 GROUPS.forEach(function (g) {
   var section = document.createElement('section');
   section.className = 'gallery-group';
+  section.id = groupId(g.name);
   var h2 = document.createElement('h2');
   h2.textContent = g.name;
   section.appendChild(h2);
@@ -128,6 +139,8 @@ GROUPS.forEach(function (g) {
     var card = document.createElement('a');
     card.className = 'gallery-card';
     card.href = './src/' + d[0] + '/index.html';
+    /* 搜索索引：slug + 标题描述 + 概念标签，统一小写做子串匹配 */
+    card.dataset.search = (d[0] + ' ' + d[1] + ' ' + d[2].join(' ')).toLowerCase();
     card.appendChild(buildThumb(d[0], d[0] + ' · ' + d[1]));
 
     var body = document.createElement('div');
@@ -151,6 +164,42 @@ GROUPS.forEach(function (g) {
   section.appendChild(grid);
   gallery.appendChild(section);
 });
+
+/* 分组锚点 chips：指向上面各 section 的 id，点击滚动定位（scroll-margin-top 避开 sticky 条） */
+var chips = document.getElementById('gallery-chips');
+GROUPS.forEach(function (g) {
+  var chip = document.createElement('a');
+  chip.href = '#' + groupId(g.name);
+  chip.textContent = g.name;
+  chips.appendChild(chip);
+});
+
+/* 实时搜索：过滤 47 张卡，整组空则连标题一起收起；计数走 aria-live，空态单独可见 */
+var searchInput = document.getElementById('gallery-search');
+var countEl = document.getElementById('gallery-count');
+var emptyEl = document.getElementById('gallery-empty');
+var sections = Array.prototype.slice.call(document.querySelectorAll('.gallery-group'));
+var total = document.querySelectorAll('.gallery-card').length;
+
+function applyFilter() {
+  var q = searchInput.value.trim().toLowerCase();
+  var visible = 0;
+  sections.forEach(function (section) {
+    var sectionVisible = 0;
+    Array.prototype.forEach.call(section.querySelectorAll('.gallery-card'), function (card) {
+      var hit = !q || card.dataset.search.indexOf(q) !== -1;
+      card.style.display = hit ? '' : 'none';
+      if (hit) sectionVisible++;
+    });
+    section.style.display = sectionVisible ? '' : 'none';
+    visible += sectionVisible;
+  });
+  emptyEl.style.display = visible ? 'none' : 'block';
+  countEl.textContent = q ? '匹配 ' + visible + ' / ' + total + ' 个 demo' : '共 ' + total + ' 个 demo';
+}
+
+searchInput.addEventListener('input', applyFilter);
+applyFilter();
 </script>
 </body>
 </html>
