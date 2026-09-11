@@ -40,3 +40,6 @@ dist/
 *.dylib
 *.dll
 *.exe
+
+# Generated caches, render slices, and numbered lint images (keep final PNG/PDF).
+/docs/infographics/architecture.lint.png
