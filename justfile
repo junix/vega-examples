@@ -9,6 +9,7 @@ build:
 
 # The validation gate is the test gate.
 test: build
+    node tools/test-export.cjs
     @echo "all demos validated"
 
 # Gallery repo — no binary, no launcher (ADR-749: nothing to install).

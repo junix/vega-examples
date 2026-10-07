@@ -146,21 +146,39 @@
     return ((global.DEMO_META || {}).slug || 'vega-demo');
   }
 
-  /* 临时把 background 换成 bg，跑完 fn 再复原（无论成功失败） */
-  function withBackground(view, bg, fn) {
-    var prev = view.background();
-    var same = (prev == null && bg == null) || prev === bg;
-    if (same) return Promise.resolve().then(fn);
+  /*
+   * 每个 View 一条导出链：background 是 View 级共享的内建 signal，
+   * 并发的透明/不透明导出会互相看到对方的临时背景，还会把对方的临时值
+   * 当成"原值"复原，所以同一 View 上改背景的导出必须串行。
+   * 链尾吞掉 rejection：上一次导出失败不能卡死后续导出。
+   */
+  var exportChains = new WeakMap();
 
-    function restore() {
-      view.background(prev);
-      return view.runAsync();
+  /*
+   * 临时把 background 换成 bg，跑完 fn 再复原（无论成功失败）。
+   * prev 必须等真正轮到本次导出才读 —— 排队期间别的导出可能正临时改着背景。
+   */
+  function withBackground(view, bg, fn) {
+    function turn() {
+      var prev = view.background();
+      var same = (prev == null && bg == null) || prev === bg;
+      if (same) return Promise.resolve().then(fn);
+
+      function restore() {
+        view.background(prev);
+        return view.runAsync();
+      }
+      return Promise.resolve()
+        .then(function () { view.background(bg); return view.runAsync(); })
+        .then(fn)
+        .then(function (r) { return restore().then(function () { return r; }); },
+              function (e) { return restore().then(function () { throw e; }); });
     }
-    return Promise.resolve()
-      .then(function () { view.background(bg); return view.runAsync(); })
-      .then(fn)
-      .then(function (r) { return restore().then(function () { return r; }); },
-            function (e) { return restore().then(function () { throw e; }); });
+
+    var chain = exportChains.get(view) || Promise.resolve();
+    var mine = chain.then(turn, turn);
+    exportChains.set(view, mine.then(function () {}, function () {}));
+    return mine;
   }
 
   /*
