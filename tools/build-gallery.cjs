@@ -7,6 +7,8 @@ const root = path.resolve(__dirname, '..');
 const source = path.join(root, 'index.html');
 const output = path.join(root, 'gallery.html');
 const stylesheet = fs.readFileSync(path.join(root, 'assets', 'demo.css'), 'utf8');
+// Shared Catppuccin theme: Mocha dark by default, Latte light, persisted auto/light/dark toggle.
+const theme = fs.readFileSync(path.join(__dirname, 'catppuccin-theme.html'), 'utf8');
 const thumbnails = Object.fromEntries(
   fs.readdirSync(path.join(root, 'thumbs'))
     .filter(name => name.endsWith('.png'))
@@ -21,7 +23,8 @@ generated = generated
   .replace('<!DOCTYPE html>', '<!DOCTYPE html>\n<!-- Generated from index.html by tools/build-gallery.cjs. -->')
   .replace('<link rel="stylesheet" href="./assets/demo.css">', `<style>\n${stylesheet}\n</style>`)
   .replace('<script>\nvar GROUPS', `<script>\nvar GALLERY_THUMBS = ${JSON.stringify(thumbnails)};\nvar GROUPS`)
-  .replace("img.src = './thumbs/' + slug + '.png';", 'img.src = GALLERY_THUMBS[slug];');
+  .replace("img.src = './thumbs/' + slug + '.png';", 'img.src = GALLERY_THUMBS[slug];')
+  .replace('</head>', () => `${theme}</head>`);
 
 if (process.argv.includes('--check')) {
   if (!fs.existsSync(output) || fs.readFileSync(output, 'utf8') !== generated) {
