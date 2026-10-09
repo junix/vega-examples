@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '..');
 const source = path.join(root, 'index.html');
 const output = path.join(root, 'gallery.html');
 const stylesheet = fs.readFileSync(path.join(root, 'assets', 'demo.css'), 'utf8');
-// Shared Catppuccin theme: Mocha dark by default, Latte light, persisted auto/light/dark toggle.
+// Shared Catppuccin theme: Mocha dark by default, apple.com-like light, persisted auto/light/dark toggle.
 const theme = fs.readFileSync(path.join(__dirname, 'catppuccin-theme.html'), 'utf8');
 const thumbnails = Object.fromEntries(
   fs.readdirSync(path.join(root, 'thumbs'))
